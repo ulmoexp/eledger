@@ -14,10 +14,14 @@ from reportlab.platypus import (BaseDocTemplate, Frame, KeepTogether, PageBreak,
                                PageTemplate, Paragraph, Spacer, Table, TableStyle)
 
 # ---------------------------------------------------------------- fuentes
-G = "/usr/share/fonts/truetype/google-fonts/"
+# Lato y DejaVu en vez de Poppins: se instalan con un simple
+# `apt install fonts-lato fonts-dejavu` en cualquier máquina o CI, mientras
+# que Poppins solo estaba en la carpeta personal de "google-fonts" de quien
+# escribió esto la primera vez y no se podía reproducir en otra parte.
+G = "/usr/share/fonts/truetype/lato/"
 D = "/usr/share/fonts/truetype/dejavu/"
-pdfmetrics.registerFont(TTFont("Head", G + "Poppins-Medium.ttf"))
-pdfmetrics.registerFont(TTFont("HeadB", G + "Poppins-Bold.ttf"))
+pdfmetrics.registerFont(TTFont("Head", G + "Lato-Medium.ttf"))
+pdfmetrics.registerFont(TTFont("HeadB", G + "Lato-Bold.ttf"))
 pdfmetrics.registerFont(TTFont("Body", D + "DejaVuSans.ttf"))
 pdfmetrics.registerFont(TTFont("BodyB", D + "DejaVuSans-Bold.ttf"))
 pdfmetrics.registerFont(TTFont("BodyI", D + "DejaVuSans-Oblique.ttf"))

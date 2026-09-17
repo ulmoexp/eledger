@@ -1,0 +1,39 @@
+PRUEBAS DE LA HERRAMIENTA
+=========================
+
+Para qué sirve
+--------------
+Comprueba de una tacada que la herramienta sigue haciendo lo que debe: leer los
+cinco formatos de banco, clasificar bien, no duplicar movimientos, respetar tus
+correcciones manuales y no estropear tu fichero de contabilidad.
+
+Ejecútalo SIEMPRE antes de dar por buena una versión nueva o de repartirla.
+
+Cómo se lanza
+-------------
+Windows:  doble clic en  probar.bat
+Mac:      doble clic en  probar.command
+Terminal: python probar.py
+
+Al final dice cuántas comprobaciones han ido bien. Si alguna falla, sale
+marcada con una x y el valor que ha salido en vez del esperado.
+
+  python probar.py dedup        pasa solo los casos que se llamen así
+  python probar.py -v           conserva las carpetas temporales para mirarlas
+
+¿Toca mis datos?
+----------------
+No. Cada caso se monta en una carpeta temporal del sistema con una copia del
+programa y ficheros de banco inventados, y se borra al terminar. Tu
+datos/historico.xlsx, tu carpeta entrada/, tus ajustes/ y tu fichero de
+contabilidad no se abren en ningún momento.
+
+Esta carpeta no hace falta para usar la herramienta. Si repartes una copia a
+otra persona, puedes no incluirla.
+
+Qué hay aquí
+------------
+probar.py      los casos de prueba y el que los ejecuta
+fixtures.py    fabrica los ficheros de banco falsos (HTML, XML, CSV, xlsx)
+xlrd_stub.py   imita la librería xlrd, para poder probar la ruta del .xls
+               BIFF sin tenerla instalada

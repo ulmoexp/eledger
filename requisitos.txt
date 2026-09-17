@@ -1,0 +1,9 @@
+# Librerías que necesita la herramienta.
+#   instalar.bat  las instala en app\.venv sin tocar el Python del sistema.
+pandas>=2.0
+openpyxl>=3.1
+
+# Solo hace falta para los .xls "de verdad" (Excel 97-2003, contenedor OLE2).
+# La mayoría de bancos españoles NO usan ese formato: llaman .xls a un HTML o
+# a un XML. Si nunca te sale el aviso de que falta, no la necesitas.
+xlrd>=2.0

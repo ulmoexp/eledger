@@ -1,0 +1,65 @@
+MOVIMIENTOS BANCARIOS
+=====================
+
+La primera vez
+--------------
+Doble clic en  instalar.bat  (en Mac: instalar.command). Tarda un par de
+minutos y solo hay que hacerlo una vez: prepara las librerías en una carpeta
+propia, sin tocar nada de lo que tengas instalado.
+
+Si te dice que no encuentra Python, instálalo desde python.org y marca la
+casilla "Add Python to PATH" durante la instalación.
+
+Si lo que tienes es un Movimientos.exe, sáltate este paso: no hace falta nada.
+
+Cómo se usa
+-----------
+1. Descarga los extractos del banco y déjalos en la carpeta  entrada/
+   Con el nombre y la extensión que traigan. No hay que renombrar nada.
+2. Doble clic en  ejecutar.bat   (en Mac: ejecutar.command)
+3. Abre  datos/historico.xlsx
+
+Puedes volver a ejecutarlo tantas veces como quieras. Los movimientos que ya
+estuvieran no se duplican, así que da igual si dos descargas se solapan.
+
+Qué hay en cada carpeta
+-----------------------
+  entrada/   lo que te bajas del banco. Puedes vaciarla cuando quieras.
+  salida/    se regenera en cada ejecución. Borrable sin miedo.
+  datos/     historico.xlsx y sus copias. ESTO ES LO IMPORTANTE.
+             Si haces una copia de seguridad de algo, que sea de esta carpeta.
+  ajustes/   tu configuración: reglas, exclusiones, categorías.
+  app/       la herramienta. No hace falta tocar nada de aquí.
+
+Para actualizar a una versión nueva
+-----------------------------------
+Borra  app/  y  GUIA.pdf , y copia los nuevos encima. (Con el .exe, basta con
+reemplazar el .exe.)
+NO toques entrada/, salida/, datos/ ni ajustes/: ahí está lo tuyo.
+
+Si vienes de la versión antigua (todo suelto en una carpeta), la primera vez
+que ejecutes se recolocará solo y te dirá lo que ha movido. Hace una copia de
+todo antes, en datos/copias/. Después puedes borrar los .py que queden sueltos
+en esta carpeta: los que valen son los de app/.
+
+Lo primero que deberías configurar
+----------------------------------
+El recibo con que tu cuenta paga la tarjeta, en  ajustes/exclude_patterns.json
+Si no lo excluyes, cada gasto de la tarjeta se cuenta DOS veces: una en el
+extracto de la tarjeta y otra en el recibo de la cuenta. El fichero viene con
+instrucciones dentro.
+
+Si le pasas esto a alguien
+--------------------------
+NO comprimas la carpeta: le estarías dando tu histórico y tus reglas, que dicen
+bastante de ti (el colegio, el veterinario, el casero, los dígitos de tu
+tarjeta). Usa  exportar.bat  (Mac: exportar.command). Genera un ZIP con el
+programa, la guía y unas reglas de partida genéricas, y nada tuyo.
+
+Qué versión tengo
+-----------------
+Sale en la primera línea al ejecutar, y queda grabada en la hoja _meta de
+datos/historico.xlsx. Es lo primero que hace falta saber si algo va mal.
+CHANGELOG.md cuenta qué cambió en cada una.
+
+Lo demás está explicado en GUIA.pdf.

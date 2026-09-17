@@ -1,0 +1,12 @@
+{
+  "_comentario": "El mes CONTABLE. Una nomina que entra el dia 1 o el 2 es, en la practica, la del mes anterior: es con lo que has vivido ese mes. Aqui se decide que se mueve al mes anterior. El resumen agrupa por 'mes_ajustado'; la columna 'mes' conserva siempre la fecha real.",
+
+  "_dias": "Se mueve solo si cae en los primeros N dias del mes. 0 desactiva el ajuste por completo.",
+  "dias": 3,
+
+  "_palabras": "Trozos de la descripcion que activan el ajuste. Sin tildes y en minusculas.",
+  "palabras": ["nomina"],
+
+  "_solo_ingresos": "true = solo se mueven los importes positivos. Dejalo en true: si no, la CUOTA que pagas a la mutua se iria al mes anterior junto con la PRESTACION que cobras de ella, y son cosas distintas.",
+  "solo_ingresos": true
+}

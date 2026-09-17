@@ -1,0 +1,14 @@
+{
+  "_comentario": "Vuelca los movimientos directamente en tu fichero de contabilidad, para no tener que copiar y pegar cada mes. Si 'archivo' está vacío, no se sincroniza nada y la herramienta se comporta como antes.",
+  "_archivo": "Ruta a tu .xlsx. Si está en la misma carpeta, basta el nombre. Tiene que ser .xlsx: ni .xlsm (macros) ni .ods. DÉJALO VACÍO hasta que hayas probado sobre una copia.",
+  "archivo": "",
+  "_hoja": "La hoja de DATOS donde se vuelcan los movimientos. Nunca la de totales: si tiene fórmulas, la herramienta se niega a escribir.",
+  "hoja": "MOVIMIENTOS",
+  "_inicio": "Esquina donde empieza la tabla. 1,1 = celda A1.",
+  "fila_inicial": 1,
+  "columna_inicial": 1,
+  "_incluir_excluidos": "false = solo lo que cuenta. true = también las líneas excluidas, marcadas en su columna.",
+  "incluir_excluidos": false,
+  "_copias": "Cuántas copias de seguridad guardar en copias/. Se hace una antes de cada escritura.",
+  "copias_de_seguridad": 10
+}

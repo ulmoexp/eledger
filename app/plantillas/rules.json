@@ -1,0 +1,13 @@
+{
+  "_sintaxis": "clave = inicio de palabra | =clave = palabra completa | ~clave = en cualquier sitio | re:... = regex | las claves que empiezan por _ se ignoran. Gana la PRIMERA regla que casa, asi que el orden importa.",
+
+  "_valores": "\"Comida\" = categoria fija | {\"+\": \"Ingresos\", \"-\": \"Ocio\"} = segun el signo del importe | null = apaga una regla de la base.",
+
+  "_capas": "Este fichero es TUYO y manda sobre app/rules_base.json, que trae las cadenas conocidas en toda Espana (Mercadona, Endesa, Movistar...) y se reemplaza en cada version. Aqui solo hace falta lo que la base no sepa: tu casero, el bar de tu barrio, tu gimnasio, tu mutua. Para cambiar una regla de la base, repite la clave aqui. Para apagarla, ponla a null.",
+
+  "_probar": "python app/reglas.py \"TEXTO DEL MOVIMIENTO\" -25",
+
+  "_ejemplo_1": "\"pepe garcia\": \"Piso\",",
+  "_ejemplo_2": "\"bizum\": {\"+\": \"Ingresos\", \"-\": \"Ocio\"},",
+  "_ejemplo_3": "\"netflix\": null"
+}

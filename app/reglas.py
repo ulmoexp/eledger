@@ -1,0 +1,377 @@
+"""
+reglas.py — Motor de clasificación y exclusión.
+
+Cambia la coincidencia por subcadena "a pelo" (que hacía que MEDIA MARKT
+cayera en Comida por contener "dia", o NAVIDAD en Piso por contener "vida")
+por una coincidencia con límite de palabra, y añade tres modos explícitos.
+
+SINTAXIS DE LAS CLAVES en rules.json / exclude_patterns.json
+-------------------------------------------------------------------
+  "mercadona"   INICIO DE PALABRA (modo por defecto).
+                La clave debe empezar donde empieza una palabra, pero
+                puede continuar. Así "veterin" sigue pillando
+                "VETERINARIO", y "dia" ya NO pilla "MEDIA".
+
+  "=dia"        PALABRA COMPLETA.
+                Solo casa si además termina en final de palabra.
+                Para claves cortas y ambiguas: =dia, =bar, =bp, =o2, =vida.
+
+  "~dia"        EN CUALQUIER SITIO (el comportamiento antiguo).
+                Úsalo solo si de verdad quieres pillar la clave dentro
+                de otra palabra.
+
+  "re:^abono"   EXPRESIÓN REGULAR, para casos raros.
+
+  "_lo_que_sea" Las claves que empiezan por "_" se ignoran: sirven
+                para dejar comentarios dentro del JSON.
+
+Además el texto se normaliza sin acentos, así que "NÓMINA" casa con
+"nomina" y "CLÍNICA" con "clinica".
+
+El orden del fichero importa: gana la PRIMERA regla que casa.
+
+QUÉ SE PUEDE PONER COMO VALOR
+-------------------------------------------------------------------
+  "mercadona": "Comida"
+
+        Lo de siempre: casa, y va a esa categoría.
+
+  "bizum": {"+": "Ingresos", "-": "Ocio"}
+
+        SEGÚN EL SIGNO. Un Bizum que recibes es un ingreso; uno que
+        envías es un gasto. Con un solo texto para los dos, los
+        recibidos restaban de Ocio y el mes salía barato.
+
+        Ojo: esto NO hace falta para las devoluciones. Si te devuelven
+        una compra del Mercadona, que ese abono reste de Comida es
+        exactamente lo correcto. El signo solo hace falta cuando el
+        positivo es un concepto DISTINTO del negativo, no cuando es la
+        devolución del mismo.
+
+  "amazon": {"-": "Otros"}
+
+        Solo un lado. Los movimientos del otro signo siguen buscando
+        en las reglas de más abajo.
+
+  "netflix": null
+
+        APAGA la regla. Sirve para desactivar una de la base sin tener
+        que editar la base: repites la clave en tu fichero con null.
+
+LAS DOS CAPAS
+-------------------------------------------------------------------
+  ajustes/rules.json     las TUYAS. Mandan. No se tocan al actualizar.
+  app/rules_base.json    la BASE que viene con el programa: cadenas
+                         conocidas en toda España. Se reemplaza entera
+                         con cada versión nueva.
+
+De la base solo entran las claves que tú no hayas escrito ya, así que
+para cambiar cualquiera basta con repetirla en la tuya.
+
+Para ver qué hace una descripción concreta, y de qué capa sale:
+
+    python app/reglas.py "BIZUM DE MARTA" 25
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import unicodedata
+
+
+def normalizar(texto) -> str:
+    """'COMPRA NÓMINA  S.L.' -> 'compra nomina s.l.'"""
+    t = unicodedata.normalize("NFKD", str(texto))
+    t = "".join(c for c in t if not unicodedata.combining(c))
+    return re.sub(r"\s+", " ", t.lower()).strip()
+
+
+_INICIO = r"(?<![0-9a-z])"
+_FIN = r"(?![0-9a-z])"
+
+
+def compilar(clave: str) -> tuple[re.Pattern, str]:
+    """Devuelve (patrón compilado, modo)."""
+    if clave.startswith("re:"):
+        return re.compile(clave[3:], re.IGNORECASE), "regex"
+    if clave.startswith("="):
+        return re.compile(_INICIO + re.escape(normalizar(clave[1:])) + _FIN), "palabra"
+    if clave.startswith("~"):
+        return re.compile(re.escape(normalizar(clave[1:]))), "libre"
+    return re.compile(_INICIO + re.escape(normalizar(clave))), "prefijo"
+
+
+class Regla:
+    """Una regla ya compilada, con de dónde sale y qué categoría produce."""
+
+    __slots__ = ("patron", "valor", "clave", "modo", "origen")
+
+    def __init__(self, patron, valor, clave, modo, origen):
+        self.patron = patron
+        self.valor = valor        # str, o {"+": ..., "-": ...}
+        self.clave = clave
+        self.modo = modo
+        self.origen = origen      # "tuya" | "base"
+
+    @property
+    def por_signo(self) -> bool:
+        return isinstance(self.valor, dict)
+
+    def categoria(self, importe):
+        """
+        La categoría que produce esta regla para un importe dado.
+
+        Devuelve None si la regla NO aplica a ese signo, y entonces se sigue
+        buscando en las reglas siguientes. Así `{"-": "Ocio"}` significa
+        «clasifica solo los cargos, y de los abonos que se encargue otra».
+        """
+        if not self.por_signo:
+            return self.valor
+        lado = "+" if (importe is None or importe >= 0) else "-"
+        return self.valor.get(lado) or None
+
+    @property
+    def categorias_posibles(self) -> list:
+        if self.por_signo:
+            return [c for c in self.valor.values() if c]
+        return [self.valor] if self.valor else []
+
+
+class Clasificador:
+    """
+    Dos capas de reglas:
+
+      · las TUYAS      ajustes/rules.json    nunca se tocan al actualizar
+      · la BASE        app/rules_base.json   se reemplaza con cada versión
+
+    Las tuyas se miran primero, así que siempre ganan. De la base solo entran
+    las claves que tú no hayas escrito ya, lo que significa que para cambiar
+    cualquier regla de la base basta con repetir esa clave en la tuya.
+    """
+
+    def __init__(self, reglas: dict, por_defecto: str = "Otros", base: dict = None,
+                 categorias_validas=None):
+        self.por_defecto = por_defecto
+        self.reglas = []
+        self.descartadas_de_base = []
+        self.desactivadas = []
+
+        propias = {k: v for k, v in (reglas or {}).items() if not k.startswith("_")}
+
+        for clave, valor in propias.items():
+            # valor null = «esta clave no clasifica nada». Sirve para apagar una
+            # regla de la base sin tener que editar la base.
+            if valor is None:
+                self.desactivadas.append(clave)
+                continue
+            patron, modo = compilar(clave)
+            self.reglas.append(Regla(patron, valor, clave, modo, "tuya"))
+
+        for clave, valor in (base or {}).items():
+            if clave.startswith("_") or clave in propias:
+                continue
+            if valor is None:
+                continue
+            patron, modo = compilar(clave)
+            regla = Regla(patron, valor, clave, modo, "base")
+
+            # Una regla de la base que apunte a una categoría que este usuario no
+            # tiene declarada se DESCARTA en silencio (se cuentan aparte). Si se
+            # dejara pasar, esos movimientos caerían en una categoría que no es
+            # columna de ninguna suma del resumen: no contarían como gasto ni
+            # como ingreso, y el total descuadraría sin que nada lo dijera.
+            if categorias_validas is not None:
+                posibles = regla.categorias_posibles
+                if posibles and not all(c in categorias_validas for c in posibles):
+                    self.descartadas_de_base.append(clave)
+                    continue
+            self.reglas.append(regla)
+
+    # --- cuentas, para poder decirlo por pantalla ---
+    @property
+    def n_propias(self) -> int:
+        return sum(1 for r in self.reglas if r.origen == "tuya")
+
+    @property
+    def n_base(self) -> int:
+        return sum(1 for r in self.reglas if r.origen == "base")
+
+    def clasificar(self, descripcion, importe=None) -> tuple[str, str]:
+        """Devuelve (categoria, clave_que_ha_casado)."""
+        cat, clave, _ = self.clasificar_detalle(descripcion, importe)
+        return cat, clave
+
+    def clasificar_detalle(self, descripcion, importe=None) -> tuple[str, str, str]:
+        """Como clasificar(), pero diciendo también de qué capa sale la regla."""
+        texto = normalizar(descripcion)
+        for r in self.reglas:
+            if not r.patron.search(texto):
+                continue
+            categoria = r.categoria(importe)
+            if categoria is None:
+                continue          # la regla no aplica a este signo: sigue buscando
+            return categoria, r.clave, r.origen
+        return self.por_defecto, "", ""
+
+    @classmethod
+    def desde_json(cls, ruta, por_defecto="Otros", ruta_base=None,
+                   categorias_validas=None):
+        with open(ruta, "r", encoding="utf-8") as f:
+            propias = json.load(f)
+        base = {}
+        if ruta_base and os.path.exists(ruta_base):
+            with open(ruta_base, "r", encoding="utf-8") as f:
+                base = json.load(f)
+        return cls(propias, por_defecto, base, categorias_validas)
+
+
+class Catalogo:
+    """
+    Las categorías que espera la hoja de resumen, y su papel en los totales.
+
+    Existe para atajar el fallo más traicionero de todo el montaje: si el texto
+    de rules.json y el criterio de la fórmula de Excel no coinciden letra por
+    letra, la celda devuelve 0 y no avisa nadie. «Higiene» y «Limpieza/Higiene»
+    son categorías distintas; «Luz/agua» y «Luz/Agua» también.
+    """
+
+    def __init__(self, datos: dict):
+        self.gastos = list(datos.get("gastos", []))
+        self.ingresos = list(datos.get("ingresos", []))
+        self.neutras = list(datos.get("neutras", []))
+        self.columna_mes = datos.get("columna_mes", "mes_ajustado")
+
+    @property
+    def todas(self):
+        return self.gastos + self.ingresos + self.neutras
+
+    @classmethod
+    def desde_json(cls, ruta):
+        with open(ruta, "r", encoding="utf-8") as f:
+            return cls({k: v for k, v in json.load(f).items() if not k.startswith("_")})
+
+    def validar(self, clasificador) -> list[str]:
+        """Devuelve la lista de avisos (vacía si todo cuadra)."""
+        producidas = set()
+        for r in clasificador.reglas:
+            producidas.update(r.categorias_posibles)
+        producidas.add(clasificador.por_defecto)
+        declaradas = set(self.todas)
+        avisos = []
+
+        # 1) mismo nombre salvo tildes o mayúsculas: casi siempre es una errata
+        for pr in sorted(producidas - declaradas):
+            for de in declaradas - producidas:
+                if normalizar(pr) == normalizar(de):
+                    avisos.append(
+                        f"«{pr}» (rules.json) y «{de}» (categorias.json) solo se "
+                        f"diferencian en tildes o mayúsculas. Para Excel son "
+                        f"categorías distintas: la columna sumaría 0.")
+                    break
+
+        casi = {normalizar(x) for x in declaradas}
+        for pr in sorted(producidas - declaradas):
+            if normalizar(pr) not in casi:
+                avisos.append(
+                    f"«{pr}» se asigna en rules.json pero no está en categorias.json: "
+                    f"esos movimientos no aparecerán en ninguna columna del resumen.")
+
+        casi_pr = {normalizar(x) for x in producidas}
+        for de in sorted(declaradas - producidas):
+            if normalizar(de) not in casi_pr:
+                avisos.append(
+                    f"«{de}» está en categorias.json pero ninguna regla la asigna: "
+                    f"su columna saldrá siempre a 0.")
+
+        repes = [c for c in self.todas if self.todas.count(c) > 1]
+        for c in sorted(set(repes)):
+            avisos.append(f"«{c}» aparece más de una vez en categorias.json.")
+
+        return avisos
+
+
+class Excluidor:
+    def __init__(self, patrones: list):
+        self.patrones = [(compilar(p)[0], p) for p in patrones if not p.startswith("_")]
+
+    def excluir(self, descripcion) -> tuple[bool, str]:
+        texto = normalizar(descripcion)
+        for patron, clave in self.patrones:
+            if patron.search(texto):
+                return True, clave
+        return False, ""
+
+    @classmethod
+    def desde_json(cls, ruta):
+        with open(ruta, "r", encoding="utf-8") as f:
+            return cls(json.load(f))
+
+
+# ========= COMPROBACIÓN =========
+# python app/reglas.py                          los ejemplos de siempre
+# python app/reglas.py "BIZUM DE MARTA"         una descripción
+# python app/reglas.py "BIZUM DE MARTA" 25      con importe, para ver el signo
+if __name__ == "__main__":
+    import sys
+
+    # Se leen de ajustes/ y app/, no del directorio actual: así funciona igual
+    # desde la raíz del proyecto que desde dentro de app/.
+    import rutas
+
+    cat = Catalogo.desde_json(rutas.CATEGORIAS)
+    clf = Clasificador.desde_json(rutas.REGLAS, ruta_base=rutas.REGLAS_BASE,
+                                  categorias_validas=set(cat.todas))
+    exc = Excluidor.desde_json(rutas.EXCLUSIONES)
+
+    argumentos = sys.argv[1:]
+    importe = None
+    if len(argumentos) >= 2:
+        try:
+            importe = float(argumentos[-1].replace(",", "."))
+            argumentos = argumentos[:-1]
+        except ValueError:
+            pass
+
+    if argumentos:
+        casos = [(t, importe) for t in argumentos]
+    else:
+        casos = [
+            ("MEDIA MARKT ONLINE", -200.0), ("SUPERMERCADOS DIA MADRID", -50.0),
+            ("GUARDIA CIVIL", -30.0), ("BAR LA ESQUINA", -18.0),
+            ("BARCELONA HOTEL", -300.0), ("CESTA DE NAVIDAD", -20.0),
+            ("SEGURO DE VIDA MAPFRE", -40.0), ("BP OIL ESPANA", -55.0),
+            ("ABP CONSULTING", -10.0), ("NÓMINA EMPRESA SL", 2000.0),
+            ("CLÍNICA DENTAL", -90.0), ("REPSOL E.S. LAS ROZAS", -60.0),
+            ("BIZUM A MARTA CENA", -18.0), ("BIZUM DE MARTA CENA", 18.0),
+            ("DEVOLUCION MERCADONA", 12.0),
+        ]
+
+    print(f"Reglas activas: {clf.n_propias} tuyas + {clf.n_base} de la base")
+    # El ejemplo de exclusión se construye con TU primer patrón, en vez de
+    # llevarlo escrito aquí: este fichero se reparte y no puede saber nada de ti.
+    if not sys.argv[1:] and exc.patrones:
+        casos.append((f"UN MOVIMIENTO CON «{exc.patrones[0][1].upper()}» DENTRO",
+                      -500.0))
+    if clf.desactivadas:
+        print(f"Apagadas con null: {', '.join(clf.desactivadas)}")
+    if clf.descartadas_de_base:
+        print(f"De la base, descartadas por apuntar a una categoría que no tienes "
+              f"en categorias.json: {', '.join(clf.descartadas_de_base)}")
+    print()
+
+    ancho = max(len(t) for t, _ in casos)
+    for texto, imp in casos:
+        etiqueta = f"{texto:<{ancho}}"
+        if imp is not None:
+            etiqueta += f"  {imp:>9,.2f}"
+        fuera, cl_exc = exc.excluir(texto)
+        if fuera:
+            print(f"{etiqueta}  ->  EXCLUIDO           [{cl_exc}]")
+            continue
+        categoria, clave, origen = clf.clasificar_detalle(texto, imp)
+        marca = clave or "sin regla"
+        if origen == "base":
+            marca += " · base"
+        print(f"{etiqueta}  ->  {categoria:<24} [{marca}]")

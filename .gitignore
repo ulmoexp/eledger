@@ -1,0 +1,10 @@
+ajustes/
+datos/
+entrada/
+salida/
+app/.venv/
+__pycache__/
+*.pyc
+dist/
+build/
+*.zip

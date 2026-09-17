@@ -1,0 +1,7 @@
+[
+  "_Lo que aparezca aqui se guarda en el historico pero NO cuenta en los totales.",
+  "_El caso tipico: el recibo mensual con que la cuenta paga la tarjeta. Si no lo excluyes, cada gasto de la tarjeta cuenta DOS veces.",
+  "_Mira tu extracto, busca esa linea y copia aqui un trozo que la identifique, incluidos los digitos con que tu banco identifica la tarjeta. Por ejemplo, si tu extracto dice PAGO RECIBO 77 TARJETA:",
+  "_    pago recibo 77",
+  "_Cambia el 77 por lo que ponga el tuyo. Las lineas que empiezan por _ se ignoran: son estos comentarios."
+]

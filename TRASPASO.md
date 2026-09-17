@@ -1,0 +1,153 @@
+# Traspaso
+
+Herramienta local para clasificar movimientos bancarios. Lee los extractos que
+el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
+produce un Excel con resumen mensual.
+
+**Versión actual: 2.0.1.** Estado: funcionando, con red de pruebas. Los totales
+del usuario se han verificado idénticos antes y después de cada cambio.
+
+---
+
+## 1. Lo primero: ejecuta las pruebas
+
+```
+python pruebas/probar.py          46 casos, 207 comprobaciones, ~2 min
+python pruebas/probar.py dedup    solo los que se llamen así
+python pruebas/probar.py -v       conserva las carpetas temporales
+```
+
+Son de **caja negra**: montan una carpeta temporal, ejecutan `app/process.py`
+como proceso aparte y comprueban el Excel resultante. No importan ningún módulo
+de la herramienta, así que sobreviven a refactorizaciones.
+
+Si vas a cambiar algo, ejecútalas antes para tener la línea base y después para
+saber qué has roto. **No des nada por bueno sin pasarlas.**
+
+Para tocar la estructura de carpetas, las constantes están agrupadas al
+principio de `probar.py` (`DIR_APP`, `MODULOS`, `CONFIG`...); es lo único que
+hay que actualizar.
+
+## 2. Estructura
+
+```
+proyecto/
+├── instalar.bat / ejecutar.bat / exportar.bat / compilar.bat   (+ .command/.sh)
+├── LEEME.txt · GUIA.pdf · CHANGELOG.md · COMPILAR.md
+├── movimientos.spec · requisitos.txt
+├── entrada/    lo que el usuario descarga del banco
+├── salida/     se regenera cada vez. Borrable.
+├── datos/      historico.xlsx + copias/.  INSUSTITUIBLE
+├── ajustes/    configuración del usuario (5 JSON)
+├── app/        el programa + rules_base.json + plantillas/ + VERSION
+└── pruebas/
+```
+
+Regla que lo gobierna todo: **actualizar = reemplazar `app/` y `GUIA.pdf`**. Las
+otras cuatro carpetas no se tocan jamás.
+
+`app/rutas.py` centraliza dónde vive cada cosa, calculado desde la posición del
+propio fichero (o desde `sys.executable` si corre dentro del `.exe`). Nada
+depende del directorio actual. Si añades un fichero de configuración, va ahí y
+en `CONFIGURACION` para que la semilla lo cree.
+
+## 3. Los módulos
+
+| Fichero | Qué hace |
+|---|---|
+| `process.py` | Orquesta. `arrancar()` prepara carpetas, migra y siembra; luego lee, clasifica, fusiona, guarda. |
+| `bank_io.py` | Detecta el formato por **contenido**, no por extensión, y localiza la fila de cabecera. |
+| `reglas.py` | `Clasificador` (dos capas, signo, null), `Excluidor`, `Catalogo`. |
+| `historico.py` | Carga, deduplicación, resumen mensual, escritura con formato, hoja `_meta` y migraciones. |
+| `sincronizar.py` | Volcado opcional al fichero de contabilidad del usuario. |
+| `rutas.py` | Rutas, migración de la carpeta antigua, semilla de configuración, versión. |
+| `exportar.py` | ZIP repartible por lista blanca. |
+| `build_guia.py` | Genera `GUIA.pdf`. Ejecutar tras cualquier cambio de comportamiento. |
+
+## 4. Cosas que no son obvias y conviene no romper
+
+**Los bancos españoles llaman `.xls` a cinco cosas distintas** (HTML, XML
+SpreadsheetML, CSV, xlsx real y BIFF). `detectar_formato()` mira los primeros
+bytes. No lo simplifiques a mirar la extensión.
+
+**Deduplicación:** la clave es `fecha|descripción|importe|tipo` más `n_rep`, un
+contador de repeticiones dentro del mismo fichero. Eso permite que dos cargos
+idénticos el mismo día cuenten como dos, y que dos descargas solapadas no
+dupliquen. `origen` **no** entra en la clave, a propósito. Efecto lateral
+conocido: dos cuentas distintas del mismo `tipo` con un movimiento idéntico se
+fusionarían. Hoy no afecta; si se reparte a alguien con dos cuentas corrientes,
+haría falta un identificador de cuenta.
+
+**Las reglas casan por límite de palabra**, no por subcadena. `dia` no pilla
+MEDIA MARKT, `vida` no pilla NAVIDAD, `bar` no pilla BARCELONA. Hay casos de
+prueba para cada trampa; si alguno falla, has roto el motor.
+
+**Gana la primera regla que casa**, así que el orden importa. Las del usuario se
+miran antes que las de la base.
+
+**Signo:** el valor de una regla puede ser `{"+": ..., "-": ...}`. Solo hace
+falta cuando el positivo es un concepto **distinto** del negativo (Bizum
+recibido/enviado, prestación/cuota). Para una devolución normal, que el abono
+reste de su categoría ya es lo correcto. Hay un caso de prueba que lo fija.
+
+**Descuadres silenciosos.** Es la clase de fallo que más ha aparecido: un
+movimiento acaba en una categoría que no es columna de ninguna suma del resumen
+y desaparece de los totales sin restar de nada. Hay tres cerrojos: la
+`categoria_manual` inválida se ignora, las reglas de la base a categorías no
+declaradas se descartan, y `Catalogo.validar()` avisa de desajustes.
+**Si añades una vía nueva por la que pueda salir una categoría, ponle su
+cerrojo.**
+
+**El resumen muestra los gastos en positivo** (es `-suma`). Una categoría que
+acabe a favor sale negativa. No lo "arregles": hubo un `ABS()` que disfrazaba
+las devoluciones de gasto.
+
+**Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
+`=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y
+`sincronizar.py` se niega a escribir en una hoja con fórmulas, y no borra filas
+enteras si hay datos del usuario fuera del bloque volcado.
+
+**Privacidad.** El `rules.json` del usuario es un retrato de su vida. `app/` y
+`pruebas/` se reparten, así que **no pueden llevar datos reales**: nada de
+nombres de comercios suyos, importes de su extracto ni dígitos de su tarjeta,
+ni siquiera como ejemplo. El caso `sin-datos-personales` lo vigila comparando
+contra `rules_base.json`; si falla, su docstring explica cómo decidir.
+
+## 5. Lo que queda pendiente
+
+1. **Compilar el `.exe`.** Todo listo (`compilar.bat`, `movimientos.spec`,
+   `COMPILAR.md`), pero **hay que hacerlo en Windows** y no se ha podido
+   probar el binario. Lo que sí está probado es que `rutas.py` resuelve bien en
+   modo congelado (caso `congelado`, simulando las señales de PyInstaller) y
+   que el `.spec` apunta a ficheros que existen. Al compilar por primera vez,
+   comprobar: que las carpetas se crean junto al `.exe` y no en la temporal, que
+   `ajustes/` se rellena con las plantillas, y el tamaño (60–80 MB esperado).
+
+2. **Identificador de cuenta en la deduplicación**, si alguna vez se usan dos
+   cuentas del mismo tipo. Ver punto 4.
+
+3. **Afinar el lado negativo de `mutua`** en `ajustes/rules.json`: está puesto a
+   `Higiene` por suposición, el usuario tenía que confirmarlo.
+
+4. **`app/plantillas/rules.json`** viene casi vacío a propósito (la base cubre
+   lo genérico). Si con el uso se ve que a los nuevos les falta algo, va a
+   `rules_base.json`, no a la plantilla.
+
+5. Ideas menores: un registro de diagnóstico (que **no** incluya descripciones
+   de movimientos), y firmar el `.exe` para evitar SmartScreen (cuesta dinero).
+
+## 6. Cómo trabajar aquí
+
+- El usuario quiere **entender el porqué**, no solo el resultado. Explica las
+  decisiones y avisa de los problemas que aún no ha visto: varios de los fallos
+  más serios han salido así, no de lo que pedía.
+- **Comentarios en el código que expliquen la razón**, no lo que ya se ve. Los
+  módulos actuales siguen ese estilo; mantenlo.
+- Todo en **español**, incluidos nombres de funciones y variables nuevos.
+- **Verifica sobre los datos reales del usuario**, no solo con las pruebas. Dos
+  regresiones serias (la palabra `mutua` del mes contable, la columna de notas
+  de `sincronizar`) se detectaron comparando la salida antes y después, no
+  leyendo el código.
+- Al cambiar comportamiento: actualiza `CHANGELOG.md`, sube `app/VERSION`,
+  añade la migración en `historico.py` si el formato del histórico cambia, y
+  regenera `GUIA.pdf` con `python app/build_guia.py`.

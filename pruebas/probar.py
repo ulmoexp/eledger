@@ -474,6 +474,117 @@ def prueba_reclasificar(e):
               str(categoria_de(df, "ZURRIOLA")))
 
 
+@caso("informe-agrupa", "El informe de sin clasificar agrupa, ordena y limita a 10")
+def prueba_informe_agrupa(e):
+    # 12 comercios ajenos a la base, cada uno con un importe distinto y sin
+    # ninguna otra palabra en común entre ellos (el "compra" de delante es
+    # relleno y se descarta), para que cada uno forme su propio grupo y el
+    # orden por importe sea inequívoco.
+    nombres = ["zafiro", "yodo", "xenon", "uva", "tango", "sierra",
+              "romeo", "quebec", "papaya", "oscar", "noviembre", "mikonos"]
+    datos = [(f"{10 + i:02d}/04/2026", f"COMPRA {n.upper()} TIENDA{i}", -(120 - i * 10))
+             for i, n in enumerate(nombres)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar("sin ninguna regla" in salida, "avisa de lo sin clasificar", salida)
+    comprobar("12 grupos" in salida, "cuenta los 12 grupos que hay",
+              salida)
+    comprobar("se muestran los 10" in salida,
+              "avisa de que solo enseña los 10 de más importe", salida)
+
+    comprobar("ZAFIRO" in salida and "YODO" in salida,
+              "los dos grupos más gordos aparecen")
+    comprobar("NOVIEMBRE" not in salida and "MIKONOS" not in salida,
+              "los dos más pequeños se quedan fuera de los 10")
+    comprobar(salida.find("ZAFIRO") < salida.find("OSCAR"),
+              "van de más a menos importe (zafiro=120 antes que oscar=30)")
+    comprobar('"zafiro": "PON_TU_CATEGORIA"' in salida,
+              "trae una línea lista para pegar en rules.json", salida)
+
+
+@caso("informe-otros-por-regla", "Otros por una regla explícita no es «sin clasificar»")
+def prueba_informe_otros_por_regla(e):
+    # amazon->Otros ya está en rules_base.json: es "Otros por regla", no por
+    # defecto, y por tanto NO tiene que aparecer en el informe aunque su
+    # categoría final sea la misma que la de lo que sí queda sin clasificar.
+    datos = [("07/04/2026", "AMAZON MKTPLACE PAGO", -200.00),
+             ("09/04/2026", "MISTERIOSA TIENDA RARA", -50.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar("AMAZON" not in salida,
+              "lo clasificado por una regla (aunque sea a Otros) no sale en el informe",
+              salida)
+    comprobar("MISTERIOSA TIENDA RARA" in salida,
+              "lo que de verdad no casa con ninguna regla sí sale", salida)
+
+
+@caso("informe-validacion", "La clave sugerida se valida contra lo ya clasificado")
+def prueba_informe_validacion(e):
+    # Grupo A: "barcelona" es la palabra más repetida, pero ya aparece dentro
+    # de un movimiento que otra regla ("taxi") clasifica. Pegar "barcelona"
+    # tal cual reclasificaría ese movimiento en silencio, así que el informe
+    # tiene que descartarla y ofrecer otra palabra del mismo grupo ("hotel").
+    #
+    # Grupo B: las cuatro palabras de la única fila aparecen también en un
+    # movimiento que ya clasifica la regla "renfe". Ninguna es segura, así que
+    # el informe no debe sugerir nada para ese grupo.
+    datos = [
+        ("05/04/2026", "TAXI BARCELONA AEROPUERTO", -25.00),
+        ("06/04/2026", "RENFE CERCANIAS RETRASO ESTACION AVISO", -12.00),
+        ("10/04/2026", "BARCELONA HOTEL RESERVA", -30.00),
+        ("11/04/2026", "BARCELONA HOTEL RESERVA", -25.00),
+        ("12/04/2026", "BARCELONA HOTEL RESERVA", -20.00),
+        ("13/04/2026", "BARCELONA SOUVENIR TIENDA", -15.00),
+        ("14/04/2026", "CERCANIAS RETRASO ESTACION AVISO", -40.00),
+    ]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar('"barcelona": "PON_TU_CATEGORIA"' not in salida,
+              "no sugiere «barcelona»: capturaría el movimiento del taxi", salida)
+    comprobar('"hotel": "PON_TU_CATEGORIA"' in salida,
+              "pero sí sugiere otra palabra del mismo grupo, que no colisiona",
+              salida)
+    comprobar('"cercanias": "PON_TU_CATEGORIA"' not in salida
+              and '"retraso": "PON_TU_CATEGORIA"' not in salida
+              and '"estacion": "PON_TU_CATEGORIA"' not in salida
+              and '"aviso": "PON_TU_CATEGORIA"' not in salida,
+              "y si TODAS las palabras del grupo colisionan, no sugiere ninguna",
+              salida)
+    comprobar("revísalo a mano" in salida,
+              "y lo dice, en vez de callarse sin más", salida)
+
+
+@caso("informe-relleno", "El relleno del banco y los números no se sugieren como clave")
+def prueba_informe_relleno(e):
+    datos = [("07/04/2026", "PAGO TARJ 000456 CLUB DEPORTIVO", -15.00),
+             ("08/04/2026", "PAGO TARJ 000456 CLUB DEPORTIVO", -15.00),
+             ("09/04/2026", "PAGO TARJ 000456 CLUB DEPORTIVO", -15.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar('"pago"' not in salida and '"tarj"' not in salida
+              and '"000456"' not in salida,
+              "ni el relleno del banco ni el número de referencia se sugieren",
+              salida)
+    comprobar('"deportivo": "PON_TU_CATEGORIA"' in salida
+              or '"club": "PON_TU_CATEGORIA"' in salida,
+              "y sí una palabra de verdad del concepto", salida)
+
+
+@caso("informe-vacio", "Sin nada sin clasificar, el informe no se muestra")
+def prueba_informe_vacio(e):
+    datos = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00),
+             ("09/04/2026", "COMPRA CARREFOUR MADRID", -10.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar("sin ninguna regla" not in salida,
+              "no aparece nada si todo está clasificado", salida)
+
+
 @caso("iso", "Las fechas aaaa-mm-dd no se invierten")
 def prueba_iso(e):
     datos = [("02/04/2026", "COMPRA MERCADONA MADRID", -10.00)]

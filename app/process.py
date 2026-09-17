@@ -11,6 +11,7 @@ Todo el procesamiento es local; no se conecta a internet.
 
 import json
 import os
+import re
 import sys
 
 # Antes que nada, comprobar que están las librerías. Un ModuleNotFoundError con
@@ -33,7 +34,7 @@ import historico as hist
 import sincronizar as sync
 from bank_io import detectar_tipo, leer_tabla_bancaria
 import rutas
-from reglas import Catalogo, Clasificador, Excluidor, normalizar
+from reglas import Catalogo, Clasificador, Excluidor, compilar, normalizar
 
 # La consola de Windows usa cp1252 por defecto y revienta con acentos y símbolos.
 try:
@@ -235,6 +236,141 @@ def clasificar(df, categorias_validas=None):
     return df.sort_values("fecha").reset_index(drop=True)
 
 
+# ========= INFORME DE LO SIN CLASIFICAR (hito A1 del roadmap) =========
+# Palabras que mete el banco en cualquier concepto y que no identifican
+# ningún comercio: aunque sean la palabra que más se repita, no sirven como
+# clave de regla.
+_PALABRAS_RELLENO = {"compra", "pago", "recibo", "tarj", "tarjeta",
+                     "transferencia"}
+_MAX_GRUPOS_SIN_CLASIFICAR = 10
+_PLACEHOLDER_CATEGORIA = "PON_TU_CATEGORIA"
+
+
+def _palabras_candidatas(descripcion) -> set:
+    """Palabras de una descripción que podrían servir de clave de regla: sin
+    relleno del banco y sin números sueltos (referencias, dígitos de tarjeta).
+    Se trabaja sobre el texto ya normalizado (sin acentos, en minúsculas), que
+    es justo lo que compara el motor de reglas."""
+    texto = normalizar(descripcion)
+    return {p for p in re.findall(r"[a-z0-9]+", texto)
+            if p not in _PALABRAS_RELLENO and not p.isdigit() and len(p) >= 3}
+
+
+def _agrupar_sin_clasificar(sin_regla):
+    """
+    Reparte los movimientos sin regla en grupos disjuntos, palabra a palabra:
+    en cada vuelta se elige la que más importe arrastra ENTRE LOS QUE QUEDAN,
+    se le lleva ese grupo entero y se saca del reparto. Así ningún movimiento
+    cuenta en dos grupos a la vez.
+
+    Un movimiento cuya descripción no deja ninguna palabra aprovechable (todo
+    relleno o números) se queda fuera: no hay nada razonable que sugerirle.
+    """
+    candidatas = {i: _palabras_candidatas(fila["descripcion"])
+                 for i, fila in sin_regla.iterrows()}
+    pendientes = set(candidatas)
+    grupos = []
+
+    while pendientes:
+        gasto = {}
+        filas_de = {}
+        for i in pendientes:
+            for palabra in candidatas[i]:
+                gasto[palabra] = gasto.get(palabra, 0.0) - sin_regla.at[i, "importe"]
+                filas_de.setdefault(palabra, []).append(i)
+        if not gasto:
+            break
+        mejor = max(gasto, key=lambda p: (gasto[p], len(filas_de[p]), p))
+        indices = filas_de[mejor]
+        grupos.append((mejor, sin_regla.loc[indices]))
+        pendientes -= set(indices)
+
+    return grupos
+
+
+def _palabras_del_grupo(grupo, palabra_principal):
+    """Las palabras candidatas del grupo: primero la que lo formó (está en
+    TODAS sus filas, por construcción), luego el resto por cuántas filas
+    cubren, de más a menos."""
+    conteo = {}
+    for _, fila in grupo.iterrows():
+        for palabra in _palabras_candidatas(fila["descripcion"]):
+            conteo[palabra] = conteo.get(palabra, 0) + 1
+    resto = sorted((p for p in conteo if p != palabra_principal),
+                   key=lambda p: (-conteo[p], p))
+    return [palabra_principal] + resto
+
+
+def _sugerir_regla(grupo, palabra_principal, descripciones_clasificadas):
+    """
+    Prueba las palabras del grupo, empezando por la que lo formó, y devuelve
+    la primera que el propio motor de reglas (compilar(), de reglas.py) NO
+    haría casar con ningún movimiento que ya tiene categoría por otra regla.
+    None si ninguna es segura.
+
+    Es el cerrojo que evita el fallo que dio pie a este informe: sugerir "dia"
+    y arrastrar MEDIA MARKT o GUARDIA CIVIL. Agrupar ya va por palabra
+    completa (_palabras_candidatas), pero una palabra suelta puede seguir
+    casando por delante con OTRA descripción por el modo prefijo de
+    compilar() (p.ej. "barcelona" también aparece dentro de un movimiento que
+    ya clasifica la regla "taxi"). Sin este paso, pegar la sugerencia podría
+    cambiar en silencio la categoría de movimientos que ya estaban bien.
+    """
+    for palabra in _palabras_del_grupo(grupo, palabra_principal):
+        patron, _ = compilar(palabra)
+        if not any(patron.search(d) for d in descripciones_clasificadas):
+            return palabra
+    return None
+
+
+def informe_sin_clasificar(df):
+    """
+    Hito A1 del roadmap: qué se ha quedado en Otros SIN que ninguna regla
+    casara. `regla == ""` es justo eso (ver clasificar()): por construcción
+    implica categoria == por_defecto. Una regla que apunte a Otros a propósito
+    deja «regla» rellena con su clave, así que no entra aquí: eso ya está
+    clasificado, no es "esto no sé qué es".
+    """
+    sin_regla = df[df["regla"] == ""]
+    if sin_regla.empty:
+        return
+
+    grupos = _agrupar_sin_clasificar(sin_regla)
+    if not grupos:
+        return
+
+    # de más a menos importe, con el mismo criterio que el resto del resumen:
+    # en positivo (-suma), sin ABS() que disfrace un grupo que acabe a favor.
+    grupos.sort(key=lambda g: g[1]["importe"].sum())
+    mostrados = grupos[:_MAX_GRUPOS_SIN_CLASIFICAR]
+
+    # universo contra el que se valida cada clave sugerida: todo lo que YA
+    # tiene categoría por una regla de verdad, no por una corrección manual
+    # (esa manda igual, así que da igual si la nueva clave también la toca).
+    clasificados = df.loc[~df["regla"].isin(("", "(manual)")), "descripcion"]
+    normalizados = [normalizar(d) for d in clasificados]
+
+    print(f"\nℹ️  {len(sin_regla)} movimientos sin ninguna regla, en "
+          f"{len(grupos)} grupos por palabra común:")
+    if len(grupos) > _MAX_GRUPOS_SIN_CLASIFICAR:
+        print(f"   (se muestran los {_MAX_GRUPOS_SIN_CLASIFICAR} de más importe)")
+    print()
+
+    for palabra, filas in mostrados:
+        total = -filas["importe"].sum()
+        ejemplo = filas["descripcion"].mode().iloc[0]
+        print(f"   {total:>10,.2f} €  ·  {len(filas):>3} mov.  ·  {palabra}")
+        print(f"      ej: {ejemplo}")
+        sugerida = _sugerir_regla(filas, palabra, normalizados)
+        if sugerida:
+            print(f'      añade a rules.json:  "{sugerida}": '
+                  f'"{_PLACEHOLDER_CATEGORIA}"')
+        else:
+            print("      (ninguna palabra de este grupo es segura de sugerir "
+                  "sin pisar otra regla; revísalo a mano)")
+        print()
+
+
 # ========= MAIN =========
 def arrancar():
     """
@@ -390,15 +526,7 @@ def main():
               f"ingresos {ult['Ingresos']:,.2f} € · balance {ult['Balance']:+,.2f} €")
         print(f"   Acumulado desde el principio: {ult['Acumulado']:+,.2f} €")
 
-    sin_regla = df[df["regla"] == ""]
-    if not sin_regla.empty:
-        cuanto = -sin_regla["importe"].sum()
-        print(f"\nℹ️  {len(sin_regla)} movimientos sin ninguna regla ({cuanto:,.2f} € "
-              f"en «Otros»):")
-        for d in sin_regla["descripcion"].drop_duplicates().head(10):
-            print("   -", d)
-        if sin_regla["descripcion"].nunique() > 10:
-            print(f"   ... y {sin_regla['descripcion'].nunique() - 10} conceptos más")
+    informe_sin_clasificar(df)
 
 
 # ========= RUN =========

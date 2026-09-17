@@ -76,8 +76,9 @@ EXCLUSIONES = AJUSTES / "exclude_patterns.json"
 CATEGORIAS = AJUSTES / "categorias.json"
 SINCRONIZAR = AJUSTES / "sincronizar.json"
 MES_CONTABLE = AJUSTES / "mes_contable.json"
+CUENTAS = AJUSTES / "cuentas.json"
 
-CONFIGURACION = [REGLAS, EXCLUSIONES, CATEGORIAS, SINCRONIZAR, MES_CONTABLE]
+CONFIGURACION = [REGLAS, EXCLUSIONES, CATEGORIAS, SINCRONIZAR, MES_CONTABLE, CUENTAS]
 
 # Compatibilidad con la forma antigua de trabajar, ahora relativa a RAIZ.
 NOMBRE_CUENTA_LEGADO = "movimientos"

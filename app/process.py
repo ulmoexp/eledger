@@ -35,7 +35,7 @@ import historico as hist
 import sincronizar as sync
 from bank_io import detectar_tipo, leer_tabla_bancaria
 import rutas
-from reglas import Catalogo, Clasificador, Excluidor, compilar, normalizar
+from reglas import Catalogo, Clasificador, Excluidor, IdentificadorCuentas, compilar, normalizar
 
 # La consola de Windows usa cp1252 por defecto y revienta con acentos y símbolos.
 try:
@@ -53,17 +53,17 @@ EXTENSIONES = (".xls", ".xlsx", ".xlsm", ".csv", ".txt", ".tsv", ".ods", ".htm",
 COLUMNAS_BASE = ["fecha", "descripcion", "importe", "tipo",
                  "mes", "mes_ajustado", "categoria"]
 COLUMNAS_HISTORICO = COLUMNAS_BASE + ["categoria_manual", "excluido",
-                                      "origen", "regla", "n_rep", "saldo"]
+                                      "origen", "regla", "n_rep", "saldo", "cuenta"]
 
 # ========= REGLAS =========
 # Se cargan dentro de main(), NO al importar el módulo: antes hay que dejar las
 # carpetas en su sitio y migrar lo que venga de la versión antigua, porque si
 # no, ajustes/ podría no existir todavía cuando se intente leer.
-clasificador = excluidor = catalogo = cfg_sync = cfg_mes = None
+clasificador = excluidor = catalogo = cfg_sync = cfg_mes = identificador_cuentas = None
 
 
 def cargar_configuracion():
-    global clasificador, excluidor, catalogo, cfg_sync, cfg_mes
+    global clasificador, excluidor, catalogo, cfg_sync, cfg_mes, identificador_cuentas
     catalogo = Catalogo.desde_json(rutas.CATEGORIAS)
     # El catálogo primero: el clasificador lo necesita para descartar las reglas
     # de la base que apunten a categorías que este usuario no tiene declaradas.
@@ -71,6 +71,7 @@ def cargar_configuracion():
         rutas.REGLAS, ruta_base=rutas.REGLAS_BASE,
         categorias_validas=set(catalogo.todas))
     excluidor = Excluidor.desde_json(rutas.EXCLUSIONES)
+    identificador_cuentas = IdentificadorCuentas.desde_json(rutas.CUENTAS)
     cfg_sync = sync.Config.desde_json(rutas.SINCRONIZAR, raiz=rutas.RAIZ)
     cfg_mes = MesContable.desde_json(rutas.MES_CONTABLE)
 
@@ -170,7 +171,13 @@ def leer_entrada():
             tipo, motivo = detectar_tipo(df)
             df["tipo"] = tipo
             df["origen"] = os.path.basename(ruta)
-            print(f"     → {tipo} ({motivo})")
+            cuenta = identificador_cuentas.identificar(os.path.basename(ruta))
+            df["cuenta"] = cuenta
+            # solo se dice algo si HAY una cuenta identificada: sin
+            # ajustes/cuentas.json configurado (el caso normal), no aporta
+            # nada repetir "cuenta: " vacío en cada línea.
+            extra = f" · cuenta: {cuenta}" if cuenta else ""
+            print(f"     → {tipo} ({motivo}){extra}")
             dfs.append(df)
         except Exception as e:
             print(f"   ⚠️  Error leyendo {os.path.basename(ruta)}: {e}")
@@ -242,24 +249,36 @@ def clasificar(df, categorias_validas=None):
 # del saldo real de la cuenta en vez de partir de 0. Sin esto, alguien que
 # empieza a usar la herramienta con 10.000 € ya en la cuenta ve un Acumulado
 # que arranca en 0 y no vuelve a coincidir con su banco hasta que lo entiende.
-def calcular_saldo_inicial(todo) -> float:
+def calcular_saldo_inicial(todo) -> dict:
     """
-    El saldo de la cuenta justo ANTES del primer movimiento que se tiene. 0.0
-    si no hay ningún movimiento de cuenta con saldo conocido (solo tarjeta, o
-    un extracto de cuenta sin esa columna): mismo comportamiento que hasta
-    ahora, Acumulado empieza de cero.
+    El saldo de cada cuenta (ver ajustes/cuentas.json) justo ANTES de su
+    primer movimiento conocido: {"": 5000.0} si solo hay una (o ninguna
+    declarada, el caso normal), {"principal": 5000.0, "ahorro": 800.0} con
+    varias. 0.0 para una cuenta sin saldo conocido (solo tarjeta, un extracto
+    sin columna de saldo, o el caso ambiguo de _saldo_inicial_una_cuenta):
+    mismo comportamiento que hasta ahora, esa cuenta no arrastra nada.
 
-    El único sitio delicado es el primer DÍA con más de un movimiento de
-    cuenta: el saldo que trae cada fila es el que queda TRAS ella, y sin saber
-    el orden real en que el banco los aplicó ese día no se puede invertir uno
-    cualquiera con garantías. Por eso se busca el primer día que tenga
-    saldo conocido y UN SOLO movimiento (sin ambigüedad posible) y se resta
-    desde ahí lo de los días anteriores, que si son días completos enteros sí
-    se pueden sumar sin importar el orden dentro de cada uno. Si ni un solo
-    día es así de simple, mejor 0.0 que un cuadre inventado.
+    Cada cuenta se calcula POR SEPARADO: mezclar movimientos de cuentas
+    distintas para decidir "qué pasó primero" sería tan inventado como
+    adivinar el orden dentro de un mismo día.
     """
-    cuenta = todo[todo["tipo"] == "cuenta"]
-    con_saldo = cuenta[cuenta["saldo"].notna()]
+    cuenta_mov = todo[todo["tipo"] == "cuenta"]
+    return {id_cuenta: _saldo_inicial_una_cuenta(grupo)
+            for id_cuenta, grupo in cuenta_mov.groupby("cuenta")}
+
+
+def _saldo_inicial_una_cuenta(movimientos) -> float:
+    """
+    El único sitio delicado es el primer DÍA con más de un movimiento: el
+    saldo que trae cada fila es el que queda TRAS ella, y sin saber el orden
+    real en que el banco los aplicó ese día no se puede invertir uno
+    cualquiera con garantías. Por eso se busca el primer día que tenga saldo
+    conocido y UN SOLO movimiento (sin ambigüedad posible) y se resta desde
+    ahí lo de los días anteriores, que si son días completos enteros sí se
+    pueden sumar sin importar el orden dentro de cada uno. Si ni un solo día
+    es así de simple, mejor 0.0 que un cuadre inventado.
+    """
+    con_saldo = movimientos[movimientos["saldo"].notna()]
     if con_saldo.empty:
         return 0.0
 
@@ -270,7 +289,7 @@ def calcular_saldo_inicial(todo) -> float:
 
     ancla_fecha = fechas_sin_ambiguedad[0]
     ancla = con_saldo[con_saldo["fecha"] == ancla_fecha].iloc[0]
-    anteriores = cuenta.loc[cuenta["fecha"] < ancla_fecha, "importe"].sum()
+    anteriores = movimientos.loc[movimientos["fecha"] < ancla_fecha, "importe"].sum()
     return float(ancla["saldo"] - ancla["importe"] - anteriores)
 
 
@@ -655,11 +674,20 @@ def main():
     # --- salidas ---
     # el histórico guarda TODO (incluido lo excluido); el resumen y el fichero
     # que pegas en Excel, solo lo que cuenta.
-    saldo_inicial = calcular_saldo_inicial(todo)
-    if abs(saldo_inicial) >= 0.005:      # no avisar por ruido de coma flotante
-        print(f"\n💰 Saldo inicial detectado: {saldo_inicial:,.2f} € (el que "
-              f"tenía tu cuenta antes del primer movimiento que hay). El "
-              f"Acumulado del resumen parte de ahí, no de 0.")
+    saldos_por_cuenta = calcular_saldo_inicial(todo)
+    # ruido de coma flotante aparte: solo cuenta lo que de verdad se detectó
+    detectados = {c: s for c, s in saldos_por_cuenta.items() if abs(s) >= 0.005}
+    if len(detectados) == 1:
+        print(f"\n💰 Saldo inicial detectado: {next(iter(detectados.values())):,.2f} "
+              f"€ (el que tenía tu cuenta antes del primer movimiento que "
+              f"hay). El Acumulado del resumen parte de ahí, no de 0.")
+    elif detectados:
+        print(f"\n💰 Saldo inicial detectado en {len(detectados)} cuentas "
+              f"(ver ajustes/cuentas.json); el Acumulado del resumen parte "
+              f"de la suma:")
+        for id_cuenta, saldo in sorted(detectados.items()):
+            print(f"   {id_cuenta or '(sin identificar)'}: {saldo:,.2f} €")
+    saldo_inicial = sum(saldos_por_cuenta.values())
     resumen = hist.construir_resumen(df, catalogo, saldo_inicial)
     if os.path.exists(rutas.HISTORICO):
         sync.copia_de_seguridad(rutas.HISTORICO, cfg_sync.copias_de_seguridad)

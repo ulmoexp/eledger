@@ -1,0 +1,7 @@
+{
+  "_comentario": "Solo hace falta si tienes MAS DE UNA cuenta del mismo tipo (dos cuentas corrientes, por ejemplo). Sin esto, un movimiento identico en dos cuentas distintas el mismo dia se cuenta una sola vez, como si fuera el mismo. Vacio, cada fichero cuenta como si fuera de la misma cuenta: es el comportamiento de siempre.",
+
+  "_como_se_usa": "Una clave por cada trozo que distinga el NOMBRE DEL FICHERO (no la descripcion de un movimiento). Misma sintaxis que rules.json: inicio de palabra por defecto, =clave para palabra completa, ~clave para cualquier sitio, re:... para regex. El valor es el identificador que le pones a esa cuenta, el texto que quieras.",
+
+  "_ejemplo": "Si tus extractos se llaman 'principal_042026.xls' y 'ahorro_042026.xls': {\"principal\": \"principal\", \"ahorro\": \"ahorro\"}"
+}

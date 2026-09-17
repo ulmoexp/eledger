@@ -6,6 +6,22 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.4.0
+
+- **Identificador de cuenta en la deduplicación** (hito A3 del roadmap). Dos
+  cuentas del mismo tipo con un movimiento idéntico el mismo día se fusionaban
+  en una: ahora se declara en `ajustes/cuentas.json` un patrón (misma
+  sintaxis que `rules.json`) contra el NOMBRE DEL FICHERO, y cada cuenta
+  declarada da filas propias. Sin declarar nada, el comportamiento es el de
+  siempre: nadie con una sola cuenta nota ningún cambio.
+- El saldo inicial (2.3.0) ahora se calcula **por cuenta** y se suma: con dos
+  cuentas declaradas, cada una arrastra su propio saldo de partida.
+- El histórico guarda la cuenta de cada fila (columna nueva, al final, no
+  desplaza nada de A–L). Los históricos antiguos se migran solos, sin
+  identificar (no se puede saber a toro pasado de qué cuenta era cada fila).
+
+---
+
 ## 2.3.0
 
 - **Saldo inicial de la cuenta.** Si el extracto trae columna de saldo, el

@@ -309,6 +309,43 @@ class Excluidor:
             return cls(json.load(f))
 
 
+class IdentificadorCuentas:
+    """
+    De qué cuenta es cada fichero, para poder distinguir dos cuentas del
+    mismo tipo en la deduplicación (ver TRASPASO.md, hito A3). Se declara en
+    ajustes/cuentas.json: un patrón, con la MISMA SINTAXIS que rules.json,
+    pero que casa contra el NOMBRE DEL FICHERO, no contra la descripción de
+    un movimiento.
+
+    Sin ningún patrón que case, la cuenta es "" para todo el mundo: es
+    justo el comportamiento de siempre, así que quien no declare nada no
+    nota ningún cambio.
+    """
+
+    def __init__(self, patrones: dict):
+        self.reglas = []
+        propias = {k: v for k, v in (patrones or {}).items() if not k.startswith("_")}
+        for clave, valor in propias.items():
+            if not valor:
+                continue
+            patron, _ = compilar(clave)
+            self.reglas.append((patron, str(valor)))
+
+    def identificar(self, nombre_fichero) -> str:
+        texto = normalizar(nombre_fichero)
+        for patron, cuenta in self.reglas:
+            if patron.search(texto):
+                return cuenta
+        return ""
+
+    @classmethod
+    def desde_json(cls, ruta):
+        if not os.path.exists(ruta):
+            return cls({})
+        with open(ruta, "r", encoding="utf-8") as f:
+            return cls(json.load(f))
+
+
 # ========= COMPROBACIÓN =========
 # python app/reglas.py                          los ejemplos de siempre
 # python app/reglas.py "BIZUM DE MARTA"         una descripción

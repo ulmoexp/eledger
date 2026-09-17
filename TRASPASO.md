@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.0.1.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.4.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          46 casos, 207 comprobaciones, ~2 min
+python pruebas/probar.py          70 casos, 263 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -57,7 +57,7 @@ en `CONFIGURACION` para que la semilla lo cree.
 |---|---|
 | `process.py` | Orquesta. `arrancar()` prepara carpetas, migra y siembra; luego lee, clasifica, fusiona, guarda. |
 | `bank_io.py` | Detecta el formato por **contenido**, no por extensión, y localiza la fila de cabecera. |
-| `reglas.py` | `Clasificador` (dos capas, signo, null), `Excluidor`, `Catalogo`. |
+| `reglas.py` | `Clasificador` (dos capas, signo, null), `Excluidor`, `Catalogo`, `IdentificadorCuentas`. |
 | `historico.py` | Carga, deduplicación, resumen mensual, escritura con formato, hoja `_meta` y migraciones. |
 | `sincronizar.py` | Volcado opcional al fichero de contabilidad del usuario. |
 | `rutas.py` | Rutas, migración de la carpeta antigua, semilla de configuración, versión. |
@@ -70,13 +70,15 @@ en `CONFIGURACION` para que la semilla lo cree.
 SpreadsheetML, CSV, xlsx real y BIFF). `detectar_formato()` mira los primeros
 bytes. No lo simplifiques a mirar la extensión.
 
-**Deduplicación:** la clave es `fecha|descripción|importe|tipo` más `n_rep`, un
-contador de repeticiones dentro del mismo fichero. Eso permite que dos cargos
-idénticos el mismo día cuenten como dos, y que dos descargas solapadas no
-dupliquen. `origen` **no** entra en la clave, a propósito. Efecto lateral
-conocido: dos cuentas distintas del mismo `tipo` con un movimiento idéntico se
-fusionarían. Hoy no afecta; si se reparte a alguien con dos cuentas corrientes,
-haría falta un identificador de cuenta.
+**Deduplicación:** la clave es `fecha|descripción|importe|tipo|cuenta` más
+`n_rep`, un contador de repeticiones dentro del mismo fichero. Eso permite que
+dos cargos idénticos el mismo día cuenten como dos, y que dos descargas
+solapadas no dupliquen. `origen` **no** entra en la clave, a propósito.
+`cuenta` (hito A3, cerrado) sale de `ajustes/cuentas.json`: un patrón contra
+el NOMBRE DEL FICHERO, misma sintaxis que `rules.json`. Sin declarar nada es
+`""` para todos los ficheros, así que quien tiene una sola cuenta no nota
+ningún cambio; quien tiene dos, nombra sus extractos de forma distinguible y
+los declara ahí para que un cargo idéntico en las dos no se fusione en uno.
 
 **Las reglas casan por límite de palabra**, no por subcadena. `dia` no pilla
 MEDIA MARKT, `vida` no pilla NAVIDAD, `bar` no pilla BARCELONA. Hay casos de
@@ -123,17 +125,14 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
    comprobar: que las carpetas se crean junto al `.exe` y no en la temporal, que
    `ajustes/` se rellena con las plantillas, y el tamaño (60–80 MB esperado).
 
-2. **Identificador de cuenta en la deduplicación**, si alguna vez se usan dos
-   cuentas del mismo tipo. Ver punto 4.
-
-3. **Afinar el lado negativo de `mutua`** en `ajustes/rules.json`: está puesto a
+2. **Afinar el lado negativo de `mutua`** en `ajustes/rules.json`: está puesto a
    `Higiene` por suposición, el usuario tenía que confirmarlo.
 
-4. **`app/plantillas/rules.json`** viene casi vacío a propósito (la base cubre
+3. **`app/plantillas/rules.json`** viene casi vacío a propósito (la base cubre
    lo genérico). Si con el uso se ve que a los nuevos les falta algo, va a
    `rules_base.json`, no a la plantilla.
 
-5. Ideas menores: un registro de diagnóstico (que **no** incluya descripciones
+4. Ideas menores: un registro de diagnóstico (que **no** incluya descripciones
    de movimientos), y firmar el `.exe` para evitar SmartScreen (cuesta dinero).
 
 ## 6. Cómo trabajar aquí

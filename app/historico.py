@@ -26,13 +26,15 @@ VERSION_SIN_SELLO = "1.0.0"
 
 # Lo que identifica a un movimiento. 'n_rep' distingue repeticiones legítimas
 # (dos cargos idénticos el mismo día en el mismo sitio son dos gastos reales).
+# 'cuenta' distingue dos cuentas del mismo tipo con un cargo idéntico el mismo
+# día (ver ajustes/cuentas.json): sin ella se fusionarían en una sola.
 #
 # 'categoria_manual' es la única columna del fichero que TÚ puedes escribir.
 # Sirve para corregir una línea suelta que ninguna regla puede distinguir: el
 # Bizum que un mes es un regalo y otro la parte del alquiler. Se lee del
 # histórico anterior y se conserva, ejecución tras ejecución.
 COLUMNAS_CRUDAS = ["fecha", "descripcion", "importe", "tipo", "origen", "n_rep",
-                   "categoria_manual", "saldo"]
+                   "categoria_manual", "saldo", "cuenta"]
 
 # Valor especial de 'categoria_manual' para sacar una línea de los totales.
 MARCA_EXCLUIDO = "(excluido)"
@@ -42,7 +44,8 @@ def _clave(df: pd.DataFrame) -> pd.Series:
     return (pd.to_datetime(df["fecha"]).dt.strftime("%Y-%m-%d") + "|"
             + df["descripcion"].map(normalizar) + "|"
             + df["importe"].astype(float).round(2).map("{:.2f}".format) + "|"
-            + df["tipo"].astype(str))
+            + df["tipo"].astype(str) + "|"
+            + df["cuenta"].fillna("").astype(str))
 
 
 # =====================================================================
@@ -88,10 +91,22 @@ def _añadir_saldo(df):
     return df, True
 
 
+def _añadir_cuenta(df):
+    """2.3.0 -> 2.4.0. El identificador de cuenta (ver ajustes/cuentas.json).
+    "" para lo que ya hubiera: no se puede saber a toro pasado de qué cuenta
+    era cada fila vieja, así que se tratan todas como la misma, que es el
+    comportamiento que ya tenían antes de que existiera esto."""
+    if "cuenta" in df.columns:
+        return df, False
+    df["cuenta"] = ""
+    return df, True
+
+
 # (versión en la que se introdujo, qué hace, función)
 MIGRACIONES = [
     ("1.1.0", "añadida la columna «categoria_manual»", _añadir_categoria_manual),
     ("2.3.0", "añadida la columna «saldo»", _añadir_saldo),
+    ("2.4.0", "añadida la columna «cuenta»", _añadir_cuenta),
 ]
 
 
@@ -179,6 +194,7 @@ def cargar(ruta: str) -> pd.DataFrame:
     # a diferencia de n_rep, aquí NO se rellena con 0: un saldo desconocido y
     # uno de 0 € son cosas distintas para calcular_saldo_inicial().
     df["saldo"] = pd.to_numeric(df["saldo"], errors="coerce")
+    df["cuenta"] = df["cuenta"].fillna("").astype(str).str.strip()
     return df
 
 

@@ -57,7 +57,7 @@ MODULOS = ["process.py", "bank_io.py", "reglas.py", "historico.py",
 # La capa base de reglas viaja dentro de app/, no en ajustes/.
 APP_DATOS = ["rules_base.json", "VERSION"]
 CONFIG = ["rules.json", "exclude_patterns.json", "categorias.json",
-          "sincronizar.json", "mes_contable.json"]
+          "sincronizar.json", "mes_contable.json", "cuentas.json"]
 
 LANZADOR = "app/process.py"
 
@@ -498,7 +498,7 @@ def prueba_saldo_inicial_migracion(e):
     e.vaciar_entrada()
     salida = e.ejecutar()
 
-    comprobar("saldo" in salida and "actualizado" in salida,
+    comprobar("«saldo»" in salida and "actualizado" in salida,
               "dice qué migración ha aplicado", salida)
     df = e.historico()
     comprobar(len(df) == antes, "sin perder movimientos", f"{len(df)} en vez de {antes}")
@@ -506,6 +506,92 @@ def prueba_saldo_inicial_migracion(e):
     comprobar("Saldo inicial detectado" not in salida,
               "el saldo viejo no puede recuperarse a toro pasado, así que "
               "esta vez el Acumulado vuelve a partir de 0", salida)
+
+
+@caso("dedup-cuenta", "Dos cuentas declaradas no fusionan un movimiento idéntico")
+def prueba_dedup_cuenta(e):
+    e.escribir_config("cuentas.json",
+                      {"principal": "principal", "secundaria": "secundaria"})
+    igual = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    fx.escribir_html(e.entrada / "principal_042026.xls", igual)
+    fx.escribir_html(e.entrada / "secundaria_042026.xls", igual)
+    salida = e.ejecutar()
+
+    df = e.historico()
+    comprobar(len(df) == 2, "las dos cuentas dan DOS filas, no una fusionada",
+              f"{len(df)} filas")
+    comprobar(set(df["cuenta"]) == {"principal", "secundaria"},
+              "cada fila queda marcada con la cuenta que le tocaba",
+              str(set(df["cuenta"])))
+    comprobar("cuenta: principal" in salida and "cuenta: secundaria" in salida,
+              "y se avisa por pantalla de la cuenta detectada", salida)
+
+
+@caso("dedup-cuenta-sin-declarar", "Sin declarar cuentas, el comportamiento es el de siempre")
+def prueba_dedup_cuenta_sin_declarar(e):
+    # regresión: el efecto lateral que documenta TRASPASO.md (dos cuentas del
+    # mismo tipo con un cargo idéntico se fusionan) sigue igual si no se
+    # configura ajustes/cuentas.json. Es a propósito: nadie nota un cambio de
+    # comportamiento por no haber tocado un fichero que no sabía que existía.
+    igual = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    fx.escribir_html(e.entrada / "cuenta_a.xls", igual)
+    fx.escribir_html(e.entrada / "cuenta_b.xls", igual)
+    salida = e.ejecutar()
+
+    df = e.historico()
+    comprobar(len(df) == 1,
+              "sin ajustes/cuentas.json, las dos siguen fusionándose en una",
+              f"{len(df)} filas")
+    comprobar("cuenta:" not in salida, "y no se menciona ninguna cuenta", salida)
+
+
+@caso("cuentas-migracion", "Un histórico viejo sin columna «cuenta» se actualiza")
+def prueba_cuentas_migracion(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    antes = len(e.historico())
+
+    import pandas as pd
+    movimientos = pd.read_excel(e.ruta_historico, sheet_name="MOVIMIENTOS")
+    movimientos = movimientos.drop(columns=["cuenta"])
+    with pd.ExcelWriter(e.ruta_historico, engine="openpyxl") as w:
+        movimientos.to_excel(w, sheet_name="MOVIMIENTOS", index=False)
+
+    e.vaciar_entrada()
+    salida = e.ejecutar()
+
+    comprobar("«cuenta»" in salida and "actualizado" in salida,
+              "dice qué migración ha aplicado", salida)
+    df = e.historico()
+    comprobar(len(df) == antes, "sin perder movimientos", f"{len(df)} en vez de {antes}")
+    comprobar("cuenta" in df.columns, "y la columna vuelve a estar")
+    # una celda vacía escrita en Excel vuelve como NaN en una lectura a
+    # pelo como esta (sin pasar por historico.cargar(), que sí la limpia)
+    comprobar(set(df["cuenta"].fillna("")) == {""},
+              "todo lo viejo queda sin identificar: no se puede saber a toro "
+              "pasado de qué cuenta era", str(set(df["cuenta"])))
+
+
+@caso("saldo-por-cuenta", "Con varias cuentas, el saldo inicial se calcula de cada una")
+def prueba_saldo_por_cuenta(e):
+    e.escribir_config("cuentas.json", {"principal": "principal", "ahorro": "ahorro"})
+    fx.escribir_html(e.entrada / "principal_042026.xls",
+                     [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+    fx.escribir_html(e.entrada / "ahorro_042026.xls",
+                     [("05/04/2026", "TRASPASO DESDE PRINCIPAL", 200.00)])
+    salida = e.ejecutar()
+    res = e.resumen()
+
+    comprobar("Saldo inicial detectado en 2 cuentas" in salida, "avisa de las dos",
+              salida)
+    comprobar("principal: 5,000.00" in salida and "ahorro: 5,000.00" in salida,
+              "cada una con SU PROPIO saldo (5000 €, fijado por fixtures.py)",
+              salida)
+    # 5000+5000 de saldo inicial, -100 de gasto ese mes (el traspaso entre
+    # las dos propias cuentas es neutro: no suma como ingreso, ver rules_base)
+    comprobar(abs(res.iloc[0]["Acumulado"] - 9900) < 0.005,
+              "el Acumulado combinado suma las dos cuentas más el balance",
+              str(res.iloc[0]["Acumulado"]))
 
 
 @caso("gastos-signo", "Una devolución sale en negativo, no disfrazada de gasto")
@@ -936,7 +1022,7 @@ def prueba_columnas(e):
 
     esperado = ["fecha", "descripcion", "importe", "tipo", "mes", "mes_ajustado",
                 "categoria", "categoria_manual", "excluido", "origen", "regla",
-                "n_rep", "saldo"]
+                "n_rep", "saldo", "cuenta"]
     real = list(e.historico().columns)
     comprobar(real == esperado,
               "A-G fijas para las fórmulas del usuario, lo demás detrás",
@@ -1123,7 +1209,7 @@ def prueba_semilla(e):
     comprobar("rules.json" in salida and "genéric" in salida,
               "avisa de que ha creado la configuración de partida", salida)
     for f in ("rules.json", "exclude_patterns.json", "categorias.json",
-              "sincronizar.json"):
+              "sincronizar.json", "mes_contable.json", "cuentas.json"):
         comprobar((e.ajustes / f).exists(), f"se crea {f}")
 
     comprobar(categoria_de(e.historico(), "MERCADONA") == "Comida",

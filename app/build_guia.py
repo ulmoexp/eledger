@@ -418,7 +418,9 @@ story += [tabla(
      ["K", "regla", "qué clave de rules.json la clasificó, o «(manual)»"],
      ["L", "n_rep", "0, 1, 2... para distinguir cargos idénticos el mismo día"],
      ["M", "saldo", "el saldo que traía el extracto tras esa fila, si lo "
-      "traía (ver «De dónde parte el Acumulado»)"]],
+      "traía (ver «De dónde parte el Acumulado»)"],
+     ["N", "cuenta", "el identificador de ajustes/cuentas.json, si tienes "
+      "más de una cuenta declarada; en blanco si no"]],
     [ANCHO * 0.08, ANCHO * 0.24, ANCHO * 0.68],
     ["celdaB", "celdaM", "celda"])]
 story += [Spacer(1, 7)]
@@ -556,6 +558,31 @@ story += [Paragraph(
     "Lo descartado no se pierde: acaba en "
     "<font face='Mono' size='8.2'>movimientos_excluidos.xlsx</font> para que puedas "
     "comprobar que no se ha ido nada de más.", S["pmini"])]
+story += [EE]
+
+story += [h1("cuentas.json · si tienes más de una cuenta"), E]
+story += [p(
+    "Solo hace falta si tienes <b>más de una cuenta del mismo tipo</b> (dos cuentas "
+    "corrientes, por ejemplo). Sin esto, un movimiento idéntico el mismo día en dos "
+    "cuentas distintas se cuenta una sola vez, como si fuera el mismo.")]
+story += [codigo([
+    '{',
+    '  "principal": "principal",',
+    '  "ahorro": "ahorro"',
+    '}',
+])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
+    "La clave es un trozo del <b>nombre del fichero</b>, no de la descripción de un "
+    "movimiento: con el ejemplo de arriba, nombra tus extractos de forma que se "
+    "distingan (<font face='Mono' size='8.2'>principal_042026.xls</font>, "
+    "<font face='Mono' size='8.2'>ahorro_042026.xls</font>...) y cada uno cae en su "
+    "cuenta sola. Misma sintaxis que rules.json.", S["pmini"])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
+    "Vacío (como viene de fábrica), todos los ficheros cuentan como si fueran de la "
+    "misma cuenta: es el comportamiento de siempre, y quien solo tiene una cuenta no "
+    "nota ningún cambio.", S["pmini"])]
 
 story += [h1("El histórico"), E]
 story += [p(
@@ -689,7 +716,8 @@ story += [aviso(
     "empieza en 0: empieza en el saldo real que tenía la cuenta antes de tu primer "
     "movimiento. Se detecta solo y se avisa por pantalla de qué saldo ha usado. Sin "
     "esa columna, o si solo subes extractos de tarjeta, sigue empezando en 0 como "
-    "siempre.",
+    "siempre. Con más de una cuenta declarada en cuentas.json, cada una arrastra el "
+    "suyo y el Acumulado parte de la suma de todas.",
     ACENTO, ACENTO_CL)]
 story += [EE]
 

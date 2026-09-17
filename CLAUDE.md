@@ -10,7 +10,7 @@ Documentos: `TRASPASO.md` (cómo funciona y qué hay pendiente), `ROADMAP.md`
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        46 casos, 207 comprobaciones, ~2 min
+python pruebas/probar.py        70 casos, 263 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se
@@ -61,9 +61,11 @@ las devoluciones de gasto.
 **Excel toma por fórmula cualquier texto que empiece por `=`**, y hay reglas
 que se llaman `=dia`. Lo evita `_texto_seguro()`.
 
-**Deduplicación:** clave `fecha|descripción|importe|tipo` más `n_rep`.
-`origen` no entra a propósito. Efecto lateral conocido: dos cuentas del mismo
-tipo con un movimiento idéntico se fusionarían (hito A3 del roadmap).
+**Deduplicación:** clave `fecha|descripción|importe|tipo|cuenta` más `n_rep`.
+`origen` no entra a propósito. `cuenta` (hito A3) se declara en
+`ajustes/cuentas.json`, por patrón contra el NOMBRE DEL FICHERO; sin
+declarar nada es `""` para todos y el comportamiento es el de siempre (dos
+cuentas del mismo tipo con un movimiento idéntico se fusionan).
 
 ## Al terminar un cambio de comportamiento
 

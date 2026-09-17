@@ -585,6 +585,124 @@ def prueba_informe_vacio(e):
               "no aparece nada si todo está clasificado", salida)
 
 
+@caso("tarjeta-detecta", "Detecta el recibo con que la cuenta paga la tarjeta")
+def prueba_tarjeta_detecta(e):
+    e.escribir_config("exclude_patterns.json", [])   # precondición: vacío
+
+    tarjeta = [("05/04/2026", "COMPRA A", -50.00),
+              ("12/04/2026", "COMPRA B", -30.25),
+              ("20/04/2026", "COMPRA C", -15.05)]     # total -95.30
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+
+    cuenta = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+             ("05/05/2026", "LIQUIDACION TARJETA VISA 778899", -95.30)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    salida = e.ejecutar()
+
+    comprobar("ningún patrón en" in salida, "avisa de que no hay exclusiones",
+              salida)
+    comprobar("2026-04" in salida and "95.30" in salida,
+              "identifica el mes y el importe que cuadra", salida)
+    comprobar('"liquidacion tarjeta visa"' in salida,
+              "propone la parte fija del recibo, sin el número de referencia",
+              salida)
+
+
+@caso("tarjeta-ya-excluido", "No propone nada si ya hay exclusiones puestas")
+def prueba_tarjeta_ya_excluido(e):
+    # el propio andamiaje de pruebas deja "liquidacion tarjeta credito" puesto
+    # por defecto: es justo la precondición de "ya resuelto".
+    tarjeta = [("05/04/2026", "COMPRA A", -50.00)]
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+    cuenta = [("05/05/2026", "LIQUIDACION TARJETA CREDITO 778899", -50.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    salida = e.ejecutar()
+
+    comprobar("ningún patrón en" not in salida,
+              "no dice nada: se asume que ya está resuelto", salida)
+
+
+@caso("tarjeta-sin-tarjeta", "Sin movimientos de tarjeta, no hay nada que detectar")
+def prueba_tarjeta_sin_tarjeta(e):
+    e.escribir_config("exclude_patterns.json", [])
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:2], cabecera_saldo=True)
+    salida = e.ejecutar()
+
+    comprobar("ningún patrón en" not in salida,
+              "no hay tarjeta que pueda duplicarse, así que calla", salida)
+
+
+@caso("tarjeta-ambigua", "Un mes con dos cargos que cuadran no propone nada")
+def prueba_tarjeta_ambigua(e):
+    e.escribir_config("exclude_patterns.json", [])
+
+    tarjeta = [("05/04/2026", "COMPRA A", -50.00)]
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+
+    # dos cargos de cuenta por el mismo importe en la ventana: no hay forma de
+    # saber cuál es el recibo, así que no se debe proponer ninguno.
+    cuenta = [("07/05/2026", "PAGO ALQUILER PISO", -50.00),
+             ("09/05/2026", "LIQUIDACION TARJETA", -50.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    salida = e.ejecutar()
+
+    comprobar("ningún patrón en" in salida, "sigue avisando de la precondición",
+              salida)
+    comprobar("no lo he sabido encontrar" in salida,
+              "pero no adivina entre los dos candidatos ambiguos", salida)
+    comprobar("Añade esto a exclude_patterns.json" not in salida,
+              "y no llega a proponer ninguna clave", salida)
+
+
+@caso("tarjeta-tolerancia", "Tolera céntimos de redondeo, pero no una diferencia real")
+def prueba_tarjeta_tolerancia(e):
+    e.escribir_config("exclude_patterns.json", [])
+
+    tarjeta = [("05/04/2026", "COMPRA A", -40.00),      # abril: -40.00
+              ("05/05/2026", "COMPRA B", -60.00)]       # mayo:  -60.00
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+
+    cuenta = [
+        ("06/05/2026", "LIQUIDACION TARJETA ABRIL 111222", -40.02),  # 2 cent.: sí
+        ("06/06/2026", "LIQUIDACION TARJETA MAYO 333444", -60.10),   # 10 cent.: no
+    ]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    salida = e.ejecutar()
+
+    comprobar("2026-04" in salida and "40.00" in salida,
+              "el cuadre a 2 céntimos sí se acepta (redondeo)", salida)
+    comprobar("2026-05:" not in salida,
+              "el cuadre a 10 céntimos no, no es un simple redondeo", salida)
+
+
+@caso("tarjeta-varios-meses", "La clave sugerida no arrastra el número de referencia")
+def prueba_tarjeta_varios_meses(e):
+    e.escribir_config("exclude_patterns.json", [])
+
+    tarjeta = [("05/04/2026", "COMPRA A", -70.00), ("06/04/2026", "COMPRA B", -50.00),
+              ("05/05/2026", "COMPRA C", -80.00)]
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+
+    # la referencia (los números) cambia de un mes a otro; lo demás, no.
+    cuenta = [
+        ("03/05/2026", "ADEUDO TARJETA 445566 LIQUIDACION ABRIL", -120.00),
+        ("03/06/2026", "ADEUDO TARJETA 998877 LIQUIDACION MAYO", -80.00),
+    ]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    salida = e.ejecutar()
+
+    comprobar("2026-04" in salida and "2026-05" in salida,
+              "encuentra el recibo de los dos meses", salida)
+    comprobar('"adeudo tarjeta"' in salida,
+              "la clave es lo que de verdad se repite, sin el número ni las "
+              "palabras que solo aparecían en un mes", salida)
+
+
 @caso("iso", "Las fechas aaaa-mm-dd no se invierten")
 def prueba_iso(e):
     datos = [("02/04/2026", "COMPRA MERCADONA MADRID", -10.00)]

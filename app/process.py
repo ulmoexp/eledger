@@ -9,6 +9,7 @@ Uso normal:
 Todo el procesamiento es local; no se conecta a internet.
 """
 
+import difflib
 import json
 import os
 import re
@@ -371,6 +372,140 @@ def informe_sin_clasificar(df):
         print()
 
 
+# ========= DETECCIÓN DEL RECIBO DE LA TARJETA (hito A2 del roadmap) =========
+# El fallo #1 del programa (ver LEEME.txt): si la cuenta paga la tarjeta con
+# un recibo sin excluir, cada gasto de la tarjeta cuenta DOS VECES (una en el
+# extracto de la tarjeta, otra en el de la cuenta) y el resumen infla los
+# gastos en silencio.
+#
+# Aquí se prioriza no equivocarse antes que acertar siempre: un mes con más
+# de un cargo que cuadra se descarta entero en vez de adivinar cuál es
+# (_candidato_liquidacion), y la clave que se sugiere se valida contra el
+# resto de los movimientos de cuenta antes de proponerla, igual que en
+# informe_sin_clasificar(). Proponer una exclusión que se lleve por delante
+# un gasto real sería peor que no proponer nada.
+_TOLERANCIA_RECIBO = 0.02           # 2 céntimos: cubre el redondeo de sumar
+                                    # muchos apuntes en coma flotante, sin
+                                    # abrirse a cuadres que no lo son de verdad.
+_MARGEN_DIAS_LIQUIDACION = 45       # del día 1 del mes de la tarjeta a 45 días
+                                    # después de que acabe ese mes: cubre
+                                    # liquidar dentro del mismo mes o a
+                                    # principios del siguiente sin saber el
+                                    # día de corte real de cada banco.
+_LONGITUD_MINIMA_CLAVE_RECIBO = 5   # por debajo de esto no hay frase de
+                                    # verdad que proponer, solo una letra o
+                                    # dos sueltas.
+
+
+def _meses_tarjeta(todo):
+    """(mes -> importe neto) de cada mes con movimientos de tarjeta. Neto y
+    con signo: lo que de verdad debe la tarjeta ese mes, ya restadas las
+    devoluciones que haya habido dentro del propio mes de tarjeta."""
+    tarjeta = todo[todo["tipo"] == "tarjeta"]
+    return tarjeta.groupby("mes")["importe"].sum()
+
+
+def _candidato_liquidacion(cuenta, mes, importe_tarjeta):
+    """
+    La fila de cuenta, si hay UNA sola, cuyo importe cuadra (con tolerancia)
+    con lo que debe la tarjeta ese mes, dentro de la ventana de liquidación.
+    Los dos son un GASTO, así que llevan el MISMO signo (negativo), no signos
+    opuestos: la tarjeta dice que gastaste 95,30 € y la cuenta paga 95,30 €.
+
+    Ambiguo (más de una fila encaja) o ninguna -> None. Mejor no proponer
+    nada que proponer lo que no toca.
+    """
+    inicio = pd.Timestamp(mes + "-01")
+    fin = inicio + pd.offsets.MonthEnd(1) + pd.Timedelta(days=_MARGEN_DIAS_LIQUIDACION)
+    en_ventana = cuenta[(cuenta["fecha"] >= inicio) & (cuenta["fecha"] <= fin)]
+    # el +1e-9 es solo para que sumar en coma flotante no eche fuera un
+    # cuadre que a céntimos SÍ lo es (-40.02 - -40.00 da 0.020000000000003,
+    # no 0.02 exactos, y por 3e-15 no puede quedar fuera de la tolerancia).
+    encaja = en_ventana[(en_ventana["importe"] - importe_tarjeta).abs()
+                        <= _TOLERANCIA_RECIBO + 1e-9]
+    return encaja.iloc[0] if len(encaja) == 1 else None
+
+
+def _sin_numeros(texto):
+    """Cada tramo de dígitos (la referencia del recibo, que cambia de un mes
+    a otro) se cambia por DOS espacios, para poder distinguirlo luego (con
+    \\s{2,}) de un simple espacio entre dos palabras que sí son fijas."""
+    return re.sub(r"\d+", "  ", texto)
+
+
+def _clave_liquidacion(descripciones):
+    """
+    La parte del texto que NO cambia de un mes a otro. Con más de una
+    descripción, se queda con lo que tengan en común todas (la referencia,
+    que sí cambia, ya se ha marcado aparte con _sin_numeros); con una sola,
+    con el trozo más largo que le queda tras quitar la referencia.
+
+    Se conserva tal cual aparece en el texto original, sin reordenar ni
+    pegar palabras que no estaban juntas: si se uniera "tarjeta" y "credito"
+    saltándose el número de en medio, la clave ya no encontraría ese hueco el
+    mes que viene, que va a traer OTRO número.
+    """
+    limpias = [_sin_numeros(normalizar(d)) for d in descripciones]
+    comun = limpias[0]
+    for otra in limpias[1:]:
+        i, _, n = difflib.SequenceMatcher(None, comun, otra).find_longest_match(
+            0, len(comun), 0, len(otra))
+        comun = comun[i:i + n]
+    trozos = re.split(r"\s{2,}", comun)
+    return max(trozos, key=len).strip()
+
+
+def detectar_recibo_tarjeta(todo):
+    """Hito A2 del roadmap. Solo actúa si exclude_patterns.json está vacío:
+    con cualquier patrón ya puesto se asume resuelto, sea o no el de la
+    tarjeta (así lo pide el roadmap, y evitar el aviso es tan fácil como
+    excluir el recibo, que es justo lo que se está pidiendo)."""
+    if excluidor.patrones:
+        return
+    tarjeta_por_mes = _meses_tarjeta(todo)
+    if tarjeta_por_mes.empty:
+        return
+
+    cuenta = todo[todo["tipo"] == "cuenta"]
+    candidatos = {}
+    for mes, importe in tarjeta_por_mes.items():
+        fila = _candidato_liquidacion(cuenta, mes, importe)
+        if fila is not None:
+            candidatos[mes] = fila
+
+    print("\n💳 Tienes movimientos de tarjeta y ningún patrón en "
+          "exclude_patterns.json.")
+    if not candidatos:
+        print("   Si tu cuenta paga la tarjeta con un recibo, cada gasto se "
+              "está contando DOS VECES y no lo he sabido encontrar solo.")
+        print("   Revísalo a mano: LEEME.txt explica cómo excluirlo.")
+        return
+
+    print("   Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
+          "Esto parece el recibo:\n")
+    for mes, fila in sorted(candidatos.items()):
+        print(f"   {mes}: la tarjeta suma {-tarjeta_por_mes[mes]:,.2f} € y tu "
+              f"cuenta tiene un cargo de {-fila['importe']:,.2f} € el "
+              f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
+
+    ya_usadas = {f.name for f in candidatos.values()}
+    otras = [normalizar(d) for i, d in cuenta["descripcion"].items()
+            if i not in ya_usadas]
+
+    clave = _clave_liquidacion([f["descripcion"] for f in candidatos.values()])
+    segura = False
+    if len(clave) >= _LONGITUD_MINIMA_CLAVE_RECIBO:
+        patron, _ = compilar(clave)
+        segura = not any(patron.search(d) for d in otras)
+
+    if segura:
+        print(f'\n   Añade esto a exclude_patterns.json:  "{clave}"')
+    else:
+        print("\n   No encuentro una clave segura que proponer (podría "
+              "excluir algún otro movimiento tuyo); añádelo tú a mano con lo "
+              "que ves arriba.")
+
+
 # ========= MAIN =========
 def arrancar():
     """
@@ -518,6 +653,10 @@ def main():
     if ajustadas:
         print(f"   {ajustadas} con el mes contable ajustado"
               f"  (el resumen agrupa por '{catalogo.columna_mes}')")
+
+    # antes de enseñar los totales: si se están contando dos veces los gastos
+    # de la tarjeta, que se sepa ANTES de fiarse de las cifras de abajo.
+    detectar_recibo_tarjeta(todo)
 
     if not resumen.empty:
         print()

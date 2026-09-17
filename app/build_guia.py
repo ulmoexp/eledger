@@ -540,6 +540,12 @@ story += [Paragraph(
     "dentro y ningún patrón activo: es lo primero que hay que configurar.", S["pmini"])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
+    "No hace falta buscarlo a ojo: si el fichero está vacío y hay movimientos de "
+    "tarjeta, al terminar el script busca en la cuenta un cargo que cuadre con lo "
+    "que suma la tarjeta ese mes y propone la línea lista para pegar aquí. Con "
+    "cualquier patrón ya puesto, no dice nada más.", S["pmini"])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
     "Lo descartado no se pierde: acaba en "
     "<font face='Mono' size='8.2'>movimientos_excluidos.xlsx</font> para que puedas "
     "comprobar que no se ha ido nada de más.", S["pmini"])]

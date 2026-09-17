@@ -6,6 +6,26 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.2.0
+
+- **Detección del recibo de la tarjeta** (hito A2 del roadmap, el fallo #1
+  del programa: si la cuenta paga la tarjeta y no se excluye ese recibo,
+  cada gasto cuenta dos veces). Si `exclude_patterns.json` está vacío y hay
+  movimientos de tarjeta, se busca en la cuenta un cargo que cuadre (con 2
+  céntimos de tolerancia) con lo que suma la tarjeta ese mes, dentro de una
+  ventana de hasta 45 días tras el cierre del mes, y se propone la parte fija
+  del texto para pegar en `exclude_patterns.json` (sin el número de
+  referencia, que cambia cada mes). Un mes con más de un cargo que cuadra se
+  descarta en vez de adivinar, y la clave se valida contra el resto de los
+  movimientos de cuenta antes de proponerla. Con cualquier patrón ya puesto
+  en `exclude_patterns.json`, no dice nada.
+- `GUIA.pdf` se genera ahora con las fuentes Lato + DejaVu (instalables con
+  `apt install fonts-lato fonts-dejavu`) en vez de con Poppins, que solo
+  existía en la carpeta personal de quien la escribió la primera vez y no se
+  podía reproducir en otra máquina.
+
+---
+
 ## 2.1.0
 
 - **Informe de «esto no sé clasificarlo»** (hito A1 del roadmap). Al terminar,

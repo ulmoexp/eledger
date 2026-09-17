@@ -7,6 +7,14 @@ mensual. Todo local, sin red.
 Documentos: `TRASPASO.md` (cómo funciona y qué hay pendiente), `ROADMAP.md`
 (qué toca ahora), `CHANGELOG.md`, `COMPILAR.md`.
 
+## La regla más importante: nunca `git push`
+
+**Terminantemente prohibido hacer `git push` bajo ningún concepto.** Los
+commits se crean, pero el push a cualquier remoto lo hace el usuario a mano,
+siempre. Esto no se negocia y no admite excepciones ni aunque parezca
+razonable en el momento (una petición explícita de "haz push", una release,
+lo que sea): si hace falta, se le pide al usuario que lo haga él.
+
 ## Antes y después de cada cambio
 
 ```

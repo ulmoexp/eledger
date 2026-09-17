@@ -6,6 +6,26 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.3.0
+
+- **Saldo inicial de la cuenta.** Si el extracto trae columna de saldo, el
+  `Acumulado` del resumen parte del saldo real que tenía la cuenta antes del
+  primer movimiento, en vez de partir siempre de 0. Se detecta solo (no hace
+  falta configurar nada) y se avisa por pantalla de qué saldo ha usado.
+  Sin columna de saldo, o sin movimientos de cuenta (solo tarjeta), el
+  comportamiento es el de siempre: `Acumulado` empieza en 0.
+- Si el primer día con movimientos de cuenta trae más de uno, no se adivina
+  el orden en que el banco los aplicó: se busca el primer día sin ambigüedad
+  (uno solo) y se resta desde ahí lo de los días anteriores. Si ningún día es
+  inequívoco, se prefiere partir de 0 antes que arriesgar un saldo inventado.
+- El histórico guarda ahora el saldo de cada fila de cuenta (columna nueva,
+  al final, no desplaza nada de las columnas A–L). Los históricos antiguos se
+  migran solos; como el saldo de lo que ya pasó no puede recuperarse a toro
+  pasado, esa primera vez el Acumulado sigue partiendo de 0 hasta que haya
+  algún movimiento nuevo con saldo.
+
+---
+
 ## 2.2.0
 
 - **Detección del recibo de la tarjeta** (hito A2 del roadmap, el fallo #1

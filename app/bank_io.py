@@ -304,6 +304,11 @@ ALIAS_COLUMNAS = {
         "importe en euros", "importe", "importe movimiento", "cantidad",
         "euros", "amount",
     ],
+    # opcional: no está en `requeridas`, así que su ausencia nunca hace fallar
+    # la lectura. Cuando aparece, es lo que permite calcular_saldo_inicial()
+    # en process.py: con qué dinero empezaba la cuenta antes del primer
+    # movimiento que se tiene.
+    "saldo": ["saldo", "saldo posterior", "saldo disponible"],
 }
 
 
@@ -460,7 +465,8 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
                         verbose: bool = True) -> pd.DataFrame:
     """
     Lee cualquier extracto bancario y devuelve un DataFrame con las columnas
-    'fecha' (datetime), 'descripcion' (str) e 'importe' (float).
+    'fecha' (datetime), 'descripcion' (str) e 'importe' (float), más 'saldo'
+    (float, NaN si el extracto no trae esa columna).
     """
     fmt, tablas = leer_tablas_crudas(ruta)
     nombre = os.path.basename(ruta)
@@ -487,6 +493,12 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
             f"Cabecera detectada: {[c for c in cabecera if str(c).strip()]}"
         )
 
+    # el saldo es opcional: si el banco no lo trae, la lectura no falla, solo
+    # no se podrá calcular el saldo inicial de la cuenta más adelante.
+    mapa_saldo = mapear_columnas(cabecera, ("saldo",))
+    if "saldo" in mapa_saldo and mapa_saldo["saldo"] not in mapa.values():
+        mapa["saldo"] = mapa_saldo["saldo"]
+
     registros = []
     for fila in tabla[idx_cab + 1:]:
         if not any(str(c).strip() for c in fila if c is not None):
@@ -496,9 +508,10 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
             reg[campo] = fila[col] if col < len(fila) else None
         registros.append(reg)
 
-    df = pd.DataFrame(registros, columns=list(requeridas))
+    df = pd.DataFrame(registros, columns=list(requeridas) + ["saldo"])
     df["fecha"] = df["fecha"].map(parsear_fecha)
     df["importe"] = df["importe"].map(parsear_importe)
+    df["saldo"] = df["saldo"].map(parsear_importe)
     df["descripcion"] = df["descripcion"].map(
         lambda v: "" if v is None else str(v).strip()
     )
@@ -523,7 +536,9 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
 # =====================================================================
 
 # Pistas por CONTENIDO (nombres de columna). Mandan sobre el nombre del fichero.
-PISTAS_CUENTA_COL = ("saldo", "saldo posterior", "saldo disponible")
+# Los mismos alias que ALIAS_COLUMNAS["saldo"]: una columna de saldo es la
+# pista más fiable de que esto es una cuenta y no una tarjeta.
+PISTAS_CUENTA_COL = tuple(ALIAS_COLUMNAS["saldo"])
 PISTAS_TARJETA_COL = ("importe de la operacion", "importe operacion",
                       "numero de tarjeta", "tarjeta")
 

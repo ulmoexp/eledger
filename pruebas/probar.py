@@ -373,7 +373,9 @@ def prueba_exclusion(e):
 
 @caso("totales", "Los totales del resumen mensual")
 def prueba_totales(e):
-    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
+    # sin columna de saldo a propósito: este caso es sobre los totales por
+    # categoría, no sobre el saldo inicial (que tiene sus propios casos).
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL, cabecera_saldo=False)
     e.ejecutar()
     res = e.resumen()
 
@@ -395,6 +397,115 @@ def prueba_totales(e):
               str(f["Acumulado"]))
     comprobar(abs(f["Deuda"]) < 0.005 and abs(f["Extras"]) < 0.005,
               "el primer mes no arrastra nada")
+
+
+@caso("saldo-inicial", "El Acumulado parte del saldo real de la cuenta, no de 0")
+def prueba_saldo_inicial(e):
+    # escribir_html simula el saldo real de la cuenta partiendo de 5000 € y
+    # aplicando cada movimiento en el orden dado (ver fixtures.py).
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])   # nomina + 2 compras
+    salida = e.ejecutar()
+    res = e.resumen()
+
+    comprobar("Saldo inicial detectado" in salida and "5,000.00" in salida,
+              "lo dice por pantalla", salida)
+
+    f = res.iloc[0]
+    balance = float(f["Balance"])
+    comprobar(abs(f["Acumulado"] - (5000 + balance)) < 0.005,
+              "Acumulado = saldo inicial + balance del mes, no solo el balance",
+              str(f["Acumulado"]))
+    comprobar(abs(f["Extras"] - 5000) < 0.005 and abs(f["Deuda"]) < 0.005,
+              "el primer mes ya arrastra el saldo con que empezaba la cuenta",
+              f"Extras={f['Extras']} Deuda={f['Deuda']}")
+
+
+@caso("saldo-inicial-sin-cuenta", "Sin movimientos de cuenta, el Acumulado sigue en 0")
+def prueba_saldo_inicial_sin_cuenta(e):
+    # solo tarjeta: no hay saldo de cuenta que leer, así que ni se menciona.
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", [("05/04/2026", "COMPRA A", -20.00)],
+                       tarjeta=True)
+    salida = e.ejecutar()
+    res = e.resumen()
+
+    comprobar("Saldo inicial detectado" not in salida,
+              "no hay cuenta de la que sacar un saldo", salida)
+    comprobar(abs(res.iloc[0]["Acumulado"] - res.iloc[0]["Balance"]) < 0.005,
+              "Acumulado = Balance a secas, como siempre", str(res.iloc[0]["Acumulado"]))
+
+
+@caso("saldo-inicial-sin-columna", "Cuenta sin columna de saldo: se sigue empezando en 0")
+def prueba_saldo_inicial_sin_columna(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3], cabecera_saldo=False)
+    salida = e.ejecutar()
+    res = e.resumen()
+
+    comprobar("Saldo inicial detectado" not in salida,
+              "sin columna de saldo no hay nada que detectar", salida)
+    comprobar(abs(res.iloc[0]["Acumulado"] - res.iloc[0]["Balance"]) < 0.005,
+              "Acumulado = Balance a secas", str(res.iloc[0]["Acumulado"]))
+
+
+@caso("saldo-inicial-ambiguo-resoluble", "Dos movimientos el primer día no impiden calcularlo")
+def prueba_saldo_inicial_ambiguo_resoluble(e):
+    # el primer DÍA trae dos movimientos: no se sabe en qué orden los aplicó
+    # el banco, así que ese día no puede ser el ancla. El segundo día solo
+    # trae uno, y desde ahí sí se puede restar lo del primero (con o sin
+    # saber su orden interno, la suma del día es la misma).
+    datos = [("01/04/2026", "COMPRA A", -30.00),
+             ("01/04/2026", "COMPRA B", -20.00),
+             ("02/04/2026", "COMPRA C", -10.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    # saldo real antes de TODO: 5000 (lo fija fixtures.escribir_html)
+    comprobar("Saldo inicial detectado: 5,000.00" in salida,
+              "resuelve el ambiguo apoyándose en el día siguiente, sin ambigüedad",
+              salida)
+
+
+@caso("saldo-inicial-totalmente-ambiguo", "Si NINGÚN día es inequívoco, no se arriesga")
+def prueba_saldo_inicial_totalmente_ambiguo(e):
+    # los dos únicos días con saldo tienen más de un movimiento cada uno: no
+    # hay ancla segura en ningún sitio, así que mejor 0 que un cuadre inventado.
+    datos = [("01/04/2026", "COMPRA A", -30.00),
+             ("01/04/2026", "COMPRA B", -20.00),
+             ("02/04/2026", "COMPRA C", -10.00),
+             ("02/04/2026", "COMPRA D", -5.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+    res = e.resumen()
+
+    comprobar("Saldo inicial detectado" not in salida,
+              "ningún día es inequívoco, así que no propone nada", salida)
+    comprobar(abs(res.iloc[0]["Acumulado"] - res.iloc[0]["Balance"]) < 0.005,
+              "Acumulado = Balance a secas, sin arriesgar un saldo inventado",
+              str(res.iloc[0]["Acumulado"]))
+
+
+@caso("saldo-inicial-migracion", "Un histórico viejo sin columna «saldo» se actualiza")
+def prueba_saldo_inicial_migracion(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    antes = len(e.historico())
+
+    import pandas as pd
+    movimientos = pd.read_excel(e.ruta_historico, sheet_name="MOVIMIENTOS")
+    movimientos = movimientos.drop(columns=["saldo"])
+    with pd.ExcelWriter(e.ruta_historico, engine="openpyxl") as w:
+        movimientos.to_excel(w, sheet_name="MOVIMIENTOS", index=False)
+
+    e.vaciar_entrada()
+    salida = e.ejecutar()
+
+    comprobar("saldo" in salida and "actualizado" in salida,
+              "dice qué migración ha aplicado", salida)
+    df = e.historico()
+    comprobar(len(df) == antes, "sin perder movimientos", f"{len(df)} en vez de {antes}")
+    comprobar("saldo" in df.columns, "y la columna vuelve a estar")
+    comprobar("Saldo inicial detectado" not in salida,
+              "el saldo viejo no puede recuperarse a toro pasado, así que "
+              "esta vez el Acumulado vuelve a partir de 0", salida)
 
 
 @caso("gastos-signo", "Una devolución sale en negativo, no disfrazada de gasto")
@@ -825,10 +936,10 @@ def prueba_columnas(e):
 
     esperado = ["fecha", "descripcion", "importe", "tipo", "mes", "mes_ajustado",
                 "categoria", "categoria_manual", "excluido", "origen", "regla",
-                "n_rep"]
+                "n_rep", "saldo"]
     real = list(e.historico().columns)
     comprobar(real == esperado,
-              "A-L en el orden que esperan las fórmulas del usuario",
+              "A-G fijas para las fórmulas del usuario, lo demás detrás",
               f"salió {real}")
 
     limpios = None

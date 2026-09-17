@@ -410,16 +410,23 @@ story += [tabla(
      ["E", "mes", "el mes real de la fecha"],
      ["F", "mes_ajustado", "el mes contable (ver «Ajuste de mes»)"],
      ["G", "categoria", "resultado de aplicar rules.json"],
-     ["H", "origen", "de qué fichero salió la fila"],
-     ["I", "regla", "qué clave de rules.json la clasificó"]],
+     ["H", "categoria_manual", "la ÚNICA columna que escribes tú: fuerza una "
+      "categoría, o «(excluido)» para sacarla de los totales"],
+     ["I", "excluido", "TRUE si exclude_patterns.json o categoria_manual la "
+      "sacó de los totales"],
+     ["J", "origen", "de qué fichero salió la fila"],
+     ["K", "regla", "qué clave de rules.json la clasificó, o «(manual)»"],
+     ["L", "n_rep", "0, 1, 2... para distinguir cargos idénticos el mismo día"],
+     ["M", "saldo", "el saldo que traía el extracto tras esa fila, si lo "
+      "traía (ver «De dónde parte el Acumulado»)"]],
     [ANCHO * 0.08, ANCHO * 0.24, ANCHO * 0.68],
     ["celdaB", "celdaM", "celda"])]
 story += [Spacer(1, 7)]
 story += [aviso(
     "No cambies el orden de A–G",
     "Las fórmulas de la hoja MOVIMIENTOS apuntan a columnas concretas: C (importe), "
-    "F (mes_ajustado) y G (categoria). H e I son de diagnóstico y van al final "
-    "justamente para no desplazarlas.")]
+    "F (mes_ajustado) y G (categoria). De H en adelante son de diagnóstico y van al "
+    "final justamente para no desplazarlas.")]
 
 story += [h1("rules.json · cómo se clasifica"), E]
 story += [p(
@@ -675,6 +682,15 @@ story += [Paragraph(
     "Los gastos se muestran en positivo cambiándoles el signo, no con valor absoluto. "
     "La diferencia importa cuando una categoría acaba el mes en positivo por una "
     "devolución: sale como negativa, en vez de disfrazarse de gasto.", S["pmini"])]
+story += [Spacer(1, 5)]
+story += [aviso(
+    "De dónde parte el Acumulado",
+    "Si tu extracto de cuenta trae columna de saldo, el Acumulado del primer mes no "
+    "empieza en 0: empieza en el saldo real que tenía la cuenta antes de tu primer "
+    "movimiento. Se detecta solo y se avisa por pantalla de qué saldo ha usado. Sin "
+    "esa columna, o si solo subes extractos de tarjeta, sigue empezando en 0 como "
+    "siempre.",
+    ACENTO, ACENTO_CL)]
 story += [EE]
 
 story += [h1("Ajuste de mes · mes_contable.json"), E]

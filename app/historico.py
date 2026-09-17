@@ -32,7 +32,7 @@ VERSION_SIN_SELLO = "1.0.0"
 # Bizum que un mes es un regalo y otro la parte del alquiler. Se lee del
 # histórico anterior y se conserva, ejecución tras ejecución.
 COLUMNAS_CRUDAS = ["fecha", "descripcion", "importe", "tipo", "origen", "n_rep",
-                   "categoria_manual"]
+                   "categoria_manual", "saldo"]
 
 # Valor especial de 'categoria_manual' para sacar una línea de los totales.
 MARCA_EXCLUIDO = "(excluido)"
@@ -77,9 +77,21 @@ def _añadir_categoria_manual(df):
     return df, True
 
 
+def _añadir_saldo(df):
+    """2.2.0 -> 2.3.0. El saldo que traía el extracto de cuenta en cada fila,
+    si lo traía: en blanco para lo que ya hubiera, que no puede saberse a
+    toro pasado. calcular_saldo_inicial() en process.py ya sabe vivir sin
+    él (usa 0 si no encuentra ninguno)."""
+    if "saldo" in df.columns:
+        return df, False
+    df["saldo"] = pd.NA
+    return df, True
+
+
 # (versión en la que se introdujo, qué hace, función)
 MIGRACIONES = [
     ("1.1.0", "añadida la columna «categoria_manual»", _añadir_categoria_manual),
+    ("2.3.0", "añadida la columna «saldo»", _añadir_saldo),
 ]
 
 
@@ -164,6 +176,9 @@ def cargar(ruta: str) -> pd.DataFrame:
     # si el fichero ha pasado por Excel u OnlyOffice, n_rep puede volver como
     # 0.0 en vez de 0, y entonces la clave de duplicados dejaría de casar
     df["n_rep"] = pd.to_numeric(df["n_rep"], errors="coerce").fillna(0).astype(int)
+    # a diferencia de n_rep, aquí NO se rellena con 0: un saldo desconocido y
+    # uno de 0 € son cosas distintas para calcular_saldo_inicial().
+    df["saldo"] = pd.to_numeric(df["saldo"], errors="coerce")
     return df
 
 
@@ -208,7 +223,7 @@ def fusionar(historico: pd.DataFrame, nuevos: list[pd.DataFrame]):
 # RESUMEN MENSUAL
 # =====================================================================
 
-def construir_resumen(df: pd.DataFrame, catalogo) -> pd.DataFrame:
+def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) -> pd.DataFrame:
     """
     Matriz mes × categoría, con los totales y el arrastre entre meses.
 
@@ -222,6 +237,13 @@ def construir_resumen(df: pd.DataFrame, catalogo) -> pd.DataFrame:
         Extras       = lo que se arrastra a favor del mes anterior
         Deuda        = lo que se arrastra en contra del mes anterior
         Acumulado    = Extras - Deuda + Balance
+
+    saldo_inicial es de dónde parte el Acumulado antes del primer mes: 0 si no
+    se conoce el saldo real de la cuenta en ese punto (lo decide
+    calcular_saldo_inicial() en process.py), o ese saldo si se conoce. No hace
+    falta ningún caso especial para el primer mes: Deuda y Extras salen solos
+    del signo de saldo_inicial, igual que saldrían del arrastre de cualquier
+    otro mes.
     """
     col_mes = catalogo.columna_mes
     if df.empty:
@@ -231,7 +253,7 @@ def construir_resumen(df: pd.DataFrame, catalogo) -> pd.DataFrame:
                          values="importe", aggfunc="sum")
 
     filas = []
-    acumulado = 0.0
+    acumulado = float(saldo_inicial)
     for mes in sorted(piv.index):
         fila = {"Mes": mes}
 
@@ -332,10 +354,10 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
     ws = wb[HOJA_MOVIMIENTOS]
     anchos = {"fecha": 11, "descripcion": 42, "importe": 12, "tipo": 10,
               "mes": 10, "mes_ajustado": 13, "categoria": 22, "origen": 24,
-              "regla": 22, "n_rep": 7, "excluido": 10}
+              "regla": 22, "n_rep": 7, "excluido": 10, "saldo": 12}
     for i, col in enumerate(movimientos.columns, 1):
         ws.column_dimensions[get_column_letter(i)].width = anchos.get(col, 14)
-        if col == "importe":
+        if col in ("importe", "saldo"):
             for c in ws[get_column_letter(i)][1:]:
                 c.number_format = '#,##0.00 €'
         if col == "fecha":

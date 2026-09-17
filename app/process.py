@@ -53,7 +53,7 @@ EXTENSIONES = (".xls", ".xlsx", ".xlsm", ".csv", ".txt", ".tsv", ".ods", ".htm",
 COLUMNAS_BASE = ["fecha", "descripcion", "importe", "tipo",
                  "mes", "mes_ajustado", "categoria"]
 COLUMNAS_HISTORICO = COLUMNAS_BASE + ["categoria_manual", "excluido",
-                                      "origen", "regla", "n_rep"]
+                                      "origen", "regla", "n_rep", "saldo"]
 
 # ========= REGLAS =========
 # Se cargan dentro de main(), NO al importar el módulo: antes hay que dejar las
@@ -235,6 +235,43 @@ def clasificar(df, categorias_validas=None):
     df.loc[df["excluido"], "categoria"] = hist.MARCA_EXCLUIDO
 
     return df.sort_values("fecha").reset_index(drop=True)
+
+
+# ========= SALDO INICIAL DE LA CUENTA =========
+# Si el extracto trae columna de saldo, el Acumulado del resumen puede partir
+# del saldo real de la cuenta en vez de partir de 0. Sin esto, alguien que
+# empieza a usar la herramienta con 10.000 € ya en la cuenta ve un Acumulado
+# que arranca en 0 y no vuelve a coincidir con su banco hasta que lo entiende.
+def calcular_saldo_inicial(todo) -> float:
+    """
+    El saldo de la cuenta justo ANTES del primer movimiento que se tiene. 0.0
+    si no hay ningún movimiento de cuenta con saldo conocido (solo tarjeta, o
+    un extracto de cuenta sin esa columna): mismo comportamiento que hasta
+    ahora, Acumulado empieza de cero.
+
+    El único sitio delicado es el primer DÍA con más de un movimiento de
+    cuenta: el saldo que trae cada fila es el que queda TRAS ella, y sin saber
+    el orden real en que el banco los aplicó ese día no se puede invertir uno
+    cualquiera con garantías. Por eso se busca el primer día que tenga
+    saldo conocido y UN SOLO movimiento (sin ambigüedad posible) y se resta
+    desde ahí lo de los días anteriores, que si son días completos enteros sí
+    se pueden sumar sin importar el orden dentro de cada uno. Si ni un solo
+    día es así de simple, mejor 0.0 que un cuadre inventado.
+    """
+    cuenta = todo[todo["tipo"] == "cuenta"]
+    con_saldo = cuenta[cuenta["saldo"].notna()]
+    if con_saldo.empty:
+        return 0.0
+
+    un_solo_movimiento = con_saldo.groupby("fecha").size()
+    fechas_sin_ambiguedad = sorted(un_solo_movimiento[un_solo_movimiento == 1].index)
+    if not fechas_sin_ambiguedad:
+        return 0.0
+
+    ancla_fecha = fechas_sin_ambiguedad[0]
+    ancla = con_saldo[con_saldo["fecha"] == ancla_fecha].iloc[0]
+    anteriores = cuenta.loc[cuenta["fecha"] < ancla_fecha, "importe"].sum()
+    return float(ancla["saldo"] - ancla["importe"] - anteriores)
 
 
 # ========= INFORME DE LO SIN CLASIFICAR (hito A1 del roadmap) =========
@@ -618,7 +655,12 @@ def main():
     # --- salidas ---
     # el histórico guarda TODO (incluido lo excluido); el resumen y el fichero
     # que pegas en Excel, solo lo que cuenta.
-    resumen = hist.construir_resumen(df, catalogo)
+    saldo_inicial = calcular_saldo_inicial(todo)
+    if abs(saldo_inicial) >= 0.005:      # no avisar por ruido de coma flotante
+        print(f"\n💰 Saldo inicial detectado: {saldo_inicial:,.2f} € (el que "
+              f"tenía tu cuenta antes del primer movimiento que hay). El "
+              f"Acumulado del resumen parte de ahí, no de 0.")
+    resumen = hist.construir_resumen(df, catalogo, saldo_inicial)
     if os.path.exists(rutas.HISTORICO):
         sync.copia_de_seguridad(rutas.HISTORICO, cfg_sync.copias_de_seguridad)
     hist.guardar(rutas.HISTORICO, todo[COLUMNAS_HISTORICO], resumen, catalogo,

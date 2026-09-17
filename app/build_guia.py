@@ -843,7 +843,8 @@ story += [tabla(
       "(abajo) y añade el nombre a <font face='Mono'>ALIAS_COLUMNAS</font> en "
       "<font face='Mono'>bank_io.py</font>."],
      ["Demasiadas filas en «Otros»",
-      "El script lista al final los conceptos sin regla. Cópialos y añádelos a "
+      "El script agrupa al final los conceptos sin regla por palabra común, de "
+      "mayor a menor importe, con una línea lista para pegar en "
       "<font face='Mono'>rules.json</font>."],
      ["Un movimiento cae en la categoría equivocada",
       "Mira la columna <b>I (regla)</b>: te dice exactamente qué clave lo clasificó. "

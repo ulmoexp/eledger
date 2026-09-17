@@ -6,6 +6,26 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.1.0
+
+- **Informe de «esto no sé clasificarlo»** (hito A1 del roadmap). Al terminar,
+  si quedan movimientos que han caído en Otros sin que ninguna regla casara
+  (no cuenta lo que una regla manda explícitamente a Otros, eso ya está
+  clasificado), se agrupan por la palabra más repetida, se ordenan por
+  importe de mayor a menor y se enseñan los 10 grupos más gordos, cada uno
+  con una línea lista para pegar en `rules.json`.
+- La clave que se sugiere se valida antes de proponerla: se comprueba con el
+  propio motor de reglas que no capturaría ningún movimiento que ya tiene
+  categoría por otra regla. Si la palabra más repetida del grupo colisiona
+  (p.ej. "barcelona" dentro de un movimiento que ya clasifica "taxi"), se
+  prueba con otra palabra del mismo grupo; si todas colisionan, no se sugiere
+  nada y se avisa de que hay que revisarlo a mano.
+- El relleno típico del banco (compra, pago, recibo, tarj, tarjeta,
+  transferencia) y los números sueltos (referencias, dígitos de tarjeta)
+  nunca se proponen como clave.
+
+---
+
 ## 2.0.1
 
 - Los lanzadores comprueban que la carpeta está completa antes de hacer nada.

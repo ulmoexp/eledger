@@ -157,9 +157,9 @@ class Entorno:
         """Copia lo que exportar.py espera encontrar en la raíz."""
         shutil.copy2(RAIZ / DIR_APP / "exportar.py",
                      self.dir / DIR_APP / "exportar.py")
-        for f in ("LEEME.txt", "CHANGELOG.md", "GUIA.pdf", "ejecutar.bat",
-                  "ejecutar.command", "ejecutar.sh", "exportar.bat",
-                  "exportar.command", "exportar.sh"):
+        for f in ("LEEME.txt", "CHANGELOG.md", "GUIA.pdf", "LICENSE",
+                  "ejecutar.bat", "ejecutar.command", "ejecutar.sh",
+                  "exportar.bat", "exportar.command", "exportar.sh"):
             origen = RAIZ / f
             if origen.exists():
                 shutil.copy2(origen, self.dir / f)
@@ -1630,6 +1630,7 @@ def prueba_exportar(e):
               "y las plantillas de configuración")
     comprobar("GUIA.pdf" in nombres and "CHANGELOG.md" in nombres,
               "más la guía y el changelog")
+    comprobar("LICENSE" in nombres, "y la licencia", str(nombres))
     comprobar(not any(".pyc" in n or "__pycache__" in n for n in nombres),
               "sin cachés de Python")
 

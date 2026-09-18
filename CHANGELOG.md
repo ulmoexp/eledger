@@ -19,6 +19,9 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 - El histórico guarda la cuenta de cada fila (columna nueva, al final, no
   desplaza nada de A–L). Los históricos antiguos se migran solos, sin
   identificar (no se puede saber a toro pasado de qué cuenta era cada fila).
+- Primera versión pública: repositorio abierto bajo licencia MIT
+  (`LICENSE`), `README.md` para GitHub, y el ZIP repartible (`exportar.py`)
+  lleva ahora la licencia dentro.
 
 ---
 

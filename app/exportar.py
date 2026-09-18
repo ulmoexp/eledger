@@ -18,6 +18,7 @@ Lo que se lleva:
     LEEME.txt       instrucciones
     GUIA.pdf        la guía
     CHANGELOG.md    qué cambió en cada versión
+    LICENSE         la licencia (MIT)
     pruebas/        opcional (--con-pruebas)
 
 Lo que NO se lleva, en ningún caso:
@@ -47,7 +48,7 @@ FICHEROS_PERMITIDOS = ["ejecutar.bat", "ejecutar.command", "ejecutar.sh",
                        "instalar.bat", "instalar.command", "instalar.sh",
                        "compilar.bat", "movimientos.spec", "requisitos.txt",
                        "LEEME.txt", "GUIA.pdf", "CHANGELOG.md", "COMPILAR.md",
-                       "TRASPASO.md"]
+                       "TRASPASO.md", "LICENSE"]
 
 # Cuando esto corre dentro del .exe no hay carpeta app/ que copiar: el programa
 # ES el ejecutable. Se reparte él y las cuatro cosas que lo acompañan.

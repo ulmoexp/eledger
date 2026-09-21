@@ -242,8 +242,10 @@ story += [pasos([
     "<font face='Body' color='#5C6672'>(Mac)</font> o "
     "<font face='Mono' size='9'>ejecutar.sh</font> "
     "<font face='Body' color='#5C6672'>(Linux)</font>",
-    "Revisa el resumen en pantalla: qué ha leído de cada fichero, repetidos, "
-    "excluidos y movimientos sin regla",
+    "Revisa el resumen en pantalla: qué ha leído de cada fichero, el resultado, "
+    "lo que se repite y lo que falta por clasificar; los avisos, juntos al final",
+    "Pulsa <b>1</b> para abrir el histórico, o <b>2</b> para abrir su carpeta "
+    "<font face='Body' color='#5C6672'>(Intro cierra la ventana)</font>",
     "Abre tu fichero de contabilidad: los movimientos ya están dentro "
     "<font face='Body' color='#5C6672'>(si tienes la sincronización activada)</font>",
 ])]

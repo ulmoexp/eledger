@@ -40,10 +40,17 @@ set "PY=python"
 if exist "app\.venv\Scripts\python.exe" set "PY=app\.venv\Scripts\python.exe"
 
 "%PY%" app\process.py %*
-if errorlevel 1 (
-  echo.
-  echo *** Algo ha ido mal. Lee el mensaje de arriba. ***
-  echo Si dice que falta pandas o openpyxl, ejecuta primero  instalar.bat
-)
+set "CODIGO=%errorlevel%"
+
+REM 0 = ha ido bien y 2 = error ya explicado: en los dos casos el programa ya
+REM ha esperado a que se leyera todo (menu final o "Pulsa Intro"), y pausar
+REM aqui otra vez obligaria a pulsar dos veces. Cualquier otro codigo es que
+REM ni siquiera ha podido arrancar (Python roto o ausente): aqui si se para.
+if "%CODIGO%"=="0" exit /b 0
+if "%CODIGO%"=="2" exit /b 2
+echo.
+echo *** Algo ha ido mal. Lee el mensaje de arriba. ***
+echo Si dice que falta pandas o openpyxl, ejecuta primero  instalar.bat
 echo.
 pause
+exit /b %CODIGO%

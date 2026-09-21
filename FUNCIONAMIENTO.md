@@ -259,22 +259,58 @@ Acumulado                = Extras - Deuda + Balance
    (apartado 7). Si falla, avisa y deja ese fichero intacto; el resto de la
    ejecución ya está guardado.
 
-### 3.9 Lo que se cuenta por pantalla al final
+### 3.9 Lo que se cuenta por pantalla
 
-En este orden:
+La pantalla va por bloques, siempre en este orden:
 
-1. **Dónde está cada cosa**, cuántos movimientos y excluidos, de qué fecha a
-   qué fecha, y cuántos tienen el mes contable ajustado.
-2. **Aviso del recibo de la tarjeta** (apartado 5.1), antes de los totales,
-   para que se sepa si están inflados antes de fiarse de ellos.
-3. **Totales del último mes** y Acumulado.
-4. **Cargos que se repiten** (apartado 5.2).
-5. **Lo que se ha quedado sin clasificar** (apartado 5.3). Va lo último
-   porque es lo único que pide hacer algo.
+1. **Cabecera**: nombre y versión (siempre la primera línea: es lo primero
+   que hace falta saber si algo va mal), lo que haya hecho la preparación de
+   la carpeta (3.1) y cuántas reglas hay.
+2. **Leyendo entrada/**: cada fichero con su formato, dónde estaba la
+   cabecera, cuántos movimientos y si es cuenta o tarjeta (y por qué). Luego,
+   cuántos había en el histórico, cuántos son nuevos y cuántos repetidos.
+3. **Resultado**: dónde se ha guardado cada cosa, la sincronización,
+   cuántos movimientos y excluidos, de qué fecha a qué fecha, el mes contable
+   ajustado, el saldo inicial detectado, y los totales del último mes y el
+   Acumulado. Si puede que el recibo de la tarjeta esté contando gastos dos
+   veces, se señala aquí mismo, junto a los totales, para no fiarse de ellos
+   sin saberlo.
+4. **Cargos que se repiten** (apartado 5.2), si hay.
+5. **Sin clasificar** (apartado 5.3), si hay.
+6. **Avisos**, todos juntos y contados: categorías que no cuadran,
+   correcciones manuales inválidas, ficheros que no se han podido leer, la
+   sincronización que no se ha hecho, el recibo de la tarjeta (5.1)... Se
+   van guardando durante la ejecución y salen al final, en vez de en el
+   momento en que se detectan: antes aparecían mezclados con todo, a menudo
+   lo primero de la pantalla, que es justo donde menos se leen.
 
-Si algo falla por el camino, sale un mensaje con ❌ explicando qué pasa, en
-lenguaje llano, y la ventana espera a que se pulse Intro para no cerrarse
-sin que dé tiempo a leerlo.
+**Al terminar bien**, la ventana no se cierra sola. Ofrece:
+
+```
+   1      Abrir el histórico  (datos/historico.xlsx)
+   2      Abrir la carpeta  datos/
+   Intro  Cerrar
+```
+
+Se pueden elegir varias opciones seguidas; Intro cierra. Abre el fichero o la
+carpeta con el programa que tenga asignado el sistema (Excel, el
+explorador...).
+
+**Si algo falla**, primero salen los avisos que ya hubiera (pueden explicar
+el error), luego un mensaje con ❌ en lenguaje llano, y la ventana espera a
+que se pulse Intro.
+
+El menú y las esperas solo ocurren **si hay una persona delante** (se ha
+abierto con doble clic o desde una consola). Si la salida va a otro programa
+(las pruebas, un script), no pregunta nada, para no quedarse esperando para
+siempre.
+
+**Los lanzadores** (`ejecutar.*`) no vuelven a pausar cuando el programa
+termina bien o con un error ya explicado (la herramienta sale con un código
+que lo indica), para que no haya que pulsar dos veces. Solo pausan ellos si el
+programa ni siquiera ha podido arrancar (falta Python, falta la carpeta
+`app/`...). Con el `.exe` no hay lanzador: es el propio programa el que
+espera.
 
 ---
 
@@ -432,7 +468,14 @@ Las siete primeras columnas (de fecha a categoria) están siempre en ese orden,
 porque hay hojas de usuario con fórmulas que apuntan a ellas por posición.
 
 **RESUMEN** — la tabla del apartado 3.7, con un gráfico de línea del
-Acumulado al lado. Sin anotaciones ni texto generado: solo el gráfico.
+Acumulado **debajo**, a dos filas de la tabla. Sin anotaciones ni texto
+generado: solo el gráfico. El gráfico lleva dentro una copia de sus valores
+y de los meses, además de la referencia a las celdas: Excel lo recalcula al
+abrir, pero otros programas (OnlyOffice) lo dibujan con esa copia, y sin
+ella salía vacío.
+
+Orden de las hojas: **RESUMEN primero** (y es la que se ve al abrir el
+fichero), luego MOVIMIENTOS y por último _meta.
 
 **_meta** — qué versión escribió el fichero, cuándo y con cuántos
 movimientos. Es lo que permite migrar un histórico antiguo y negarse a tocar

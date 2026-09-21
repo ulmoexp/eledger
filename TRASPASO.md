@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.8.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.9.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          79 casos, 306 comprobaciones, ~2 min
+python pruebas/probar.py          81 casos, 318 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -133,6 +133,23 @@ Solo sale lo que sigue vivo y lo que es de categorías de gasto (un traspaso
 mensual a ahorro, neutro, no cuenta). El texto se limita a «esto se repite y
 suma X € al año»: nada de «deberías cancelarlo». Es una restricción de
 producto, no de estilo, y el caso `recurrentes-mensual` la vigila.
+
+**Pantalla, menú final y código de salida 2 (2.9.0).** Los avisos no se
+imprimen al detectarse: se guardan con `avisar()` y salen juntos al final
+(`mostrar_avisos()`). Si añades un aviso nuevo, usa `avisar()`, no `print`.
+Al terminar bien, `menu_final()` ofrece abrir el histórico o su carpeta; al
+fallar, se espera a Intro y se sale con `CODIGO_ERROR_EXPLICADO` (2). Los
+lanzadores **no** pausan con 0 ni con 2, solo con cualquier otro código (el
+programa ni ha arrancado); si cambias ese número, cámbialo en los tres
+sitios (el caso `lanzadores` lo vigila). Menú y esperas solo si stdin y
+stdout son una terminal: las pruebas capturan la salida y no se cuelgan.
+**Probado solo en Linux con una terminal simulada: falta probarlo en
+Windows** (doble clic en `ejecutar.bat` y en el `.exe`).
+
+**Gráfico con caché (2.9.0).** El gráfico de RESUMEN lleva `numCache` y
+`strCache` escritos a mano: openpyxl solo escribe la referencia, Excel
+recalcula, pero OnlyOffice dibuja con la caché y salía vacío. Si se toca el
+gráfico, que siga llevándola (el caso `resumen-primero` lo comprueba).
 
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y

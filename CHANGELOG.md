@@ -6,6 +6,25 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.9.0
+
+- **El gráfico de RESUMEN salía vacío en OnlyOffice** (y en cualquier
+  programa que no lo recalcule al abrir). Ahora lleva sus valores dentro,
+  además de la referencia a las celdas, y los meses van como texto.
+- El gráfico va **debajo de la tabla**, no a su derecha.
+- `historico.xlsx` **se abre por RESUMEN**: es la primera hoja y la que se ve
+  al abrir. MOVIMIENTOS va después.
+- **La ventana ya no se cierra sola al terminar**, tampoco con el `.exe`. Al
+  acabar bien, ofrece abrir el histórico, abrir su carpeta o cerrar. Si algo
+  falla, espera a que se pulse Intro.
+- **La pantalla se lee mejor**: va por bloques (qué ha leído, resultado,
+  cargos que se repiten, sin clasificar) y **los avisos salen juntos al
+  final**, contados, en vez de mezclados con todo y muchas veces lo primero.
+  Si el recibo de la tarjeta podría estar contando gastos dos veces, se
+  señala junto a los totales y el detalle va con los avisos.
+
+---
+
 ## 2.8.0
 
 - **Cargos que se repiten.** Al terminar, se listan por pantalla los cargos

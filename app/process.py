@@ -13,7 +13,9 @@ import difflib
 import json
 import os
 import re
+import subprocess
 import sys
+import textwrap
 
 # Antes que nada, comprobar que están las librerías. Un ModuleNotFoundError con
 # su traceback no le dice nada a quien no ha usado una terminal en su vida, y
@@ -29,7 +31,13 @@ except ImportError:
         print("   Cierra esta ventana y haz doble clic en  instalar.command")
         print("   Es lo que hay que hacer una vez, la primera.\n")
     print("   (Si sabes lo que haces:  pip install -r requisitos.txt)\n")
-    sys.exit(1)
+    # la ventana no se cierra hasta que se ha leído (ver menu_final())
+    if sys.stdin.isatty() and sys.stdout.isatty():
+        try:
+            input("Pulsa Intro para cerrar...")
+        except EOFError:
+            pass
+    sys.exit(2)
 
 import historico as hist
 import sincronizar as sync
@@ -42,6 +50,111 @@ try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
+
+# ========= PANTALLA =========
+# Lo que se cuenta por pantalla va en bloques, en este orden: lo que va
+# haciendo, el resultado, lo que ha encontrado (los informes) y, al final,
+# juntos y contados, los avisos. Antes cada aviso salía en cuanto se
+# detectaba, mezclado con todo lo demás y a menudo lo primero de la
+# pantalla: justo donde menos se lee y donde más asusta sin motivo.
+_avisos = []
+
+# Código de salida cuando el propio programa ya ha explicado el error y ha
+# esperado a que se leyera. Los lanzadores lo usan para no pedir otra vez
+# «Pulsa una tecla»: solo esperan ellos si el programa ni siquiera ha podido
+# arrancar (Python roto, falta un fichero).
+CODIGO_ERROR_EXPLICADO = 2
+
+
+def avisar(titulo, lineas=()):
+    """Guarda un aviso para enseñarlo al final, con los demás."""
+    _avisos.append((titulo, list(lineas)))
+
+
+def seccion(titulo):
+    print(f"\n── {titulo} {'─' * max(3, 60 - len(titulo))}\n")
+
+
+def mostrar_avisos():
+    if not _avisos:
+        return
+    seccion(f"Avisos ({len(_avisos)})")
+    for titulo, lineas in _avisos:
+        print(textwrap.fill(f"⚠️  {titulo}", 78, subsequent_indent="    "))
+        for linea in lineas:
+            # las viñetas llevan una sangría más en las líneas partidas, para
+            # que se vea dónde empieza cada punto
+            sangria = "      " if linea.startswith("· ") else "    "
+            print(textwrap.fill(linea, 78, initial_indent="    ",
+                                subsequent_indent=sangria))
+        print()
+
+
+def _interactiva() -> bool:
+    """Hay una persona delante: se ha abierto con doble clic o desde una
+    consola. Con la salida redirigida (las pruebas, un script) no se pregunta
+    nada, o se quedaría esperando para siempre."""
+    try:
+        return sys.stdin.isatty() and sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def _esperar(texto="Pulsa Intro para cerrar..."):
+    try:
+        return input(texto).strip()
+    except (EOFError, KeyboardInterrupt):
+        return ""
+
+
+def _abrir(ruta):
+    """Abre un fichero o una carpeta con el programa que tenga asignado el
+    sistema (Excel, el explorador...), sin esperar a que se cierre."""
+    if os.name == "nt":
+        os.startfile(str(ruta))
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(ruta)])
+    else:
+        subprocess.Popen(["xdg-open", str(ruta)], stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL)
+
+
+def menu_final():
+    """
+    Al terminar bien, la ventana se queda abierta hasta que se decida qué
+    hacer. Con el .exe no hay lanzador que haga una pausa, y la ventana se
+    cerraba sola antes de poder leer nada.
+    """
+    if not _interactiva():
+        return
+    opciones = {}
+    if rutas.HISTORICO.exists():
+        opciones["1"] = (f"Abrir el histórico  ({rutas.relativa(rutas.HISTORICO)})",
+                         rutas.HISTORICO)
+        opciones["2"] = (f"Abrir la carpeta  {rutas.relativa(rutas.DATOS)}/",
+                         rutas.DATOS)
+    if not opciones:
+        _esperar("\nPulsa Intro para cerrar...")
+        return
+
+    seccion("¿Y ahora?")
+    for tecla, (texto, _) in opciones.items():
+        print(f"   {tecla}      {texto}")
+    print("   Intro  Cerrar")
+    while True:
+        eleccion = _esperar("\n   > ")
+        if not eleccion:
+            return
+        if eleccion not in opciones:
+            print("   Escribe 1 o 2, o pulsa Intro para cerrar.")
+            continue
+        try:
+            _abrir(opciones[eleccion][1])
+            print("   Abierto. Puedes elegir otra opción, o Intro para cerrar.")
+        except Exception as e:
+            print(f"   No he podido abrirlo ({e}). Está en "
+                  f"{opciones[eleccion][1]}")
+
 
 # ========= CONFIG =========
 # Todas las rutas viven en rutas.py y cuelgan de la carpeta del programa, no
@@ -163,10 +276,14 @@ def leer_entrada():
     si el histórico ya tiene datos, una ejecución sin ficheros nuevos es válida."""
     dfs = []
     for ruta in localizar_ficheros():
+        nombre = os.path.basename(ruta)
         try:
             df = leer_tabla_bancaria(ruta)
             if df.empty:
-                print("     ⚠️  sin movimientos utilizables, lo salto")
+                print("     → sin movimientos utilizables, lo salto")
+                avisar(f"{nombre} no tiene ningún movimiento utilizable",
+                       ["Lo he saltado. Si debería tenerlos, mira el diagnóstico "
+                        "de la guía («Cuando algo no sale»)."])
                 continue
             tipo, motivo = detectar_tipo(df)
             df["tipo"] = tipo
@@ -180,7 +297,9 @@ def leer_entrada():
             print(f"     → {tipo} ({motivo}){extra}")
             dfs.append(df)
         except Exception as e:
-            print(f"   ⚠️  Error leyendo {os.path.basename(ruta)}: {e}")
+            print(f"   · {nombre}: ✗ no se ha podido leer (el motivo, en los "
+                  f"avisos del final)")
+            avisar(f"No he podido leer {nombre}", str(e).splitlines())
     return dfs
 
 
@@ -407,7 +526,8 @@ def informe_sin_clasificar(df):
     clasificados = df.loc[~df["regla"].isin(("", "(manual)")), "descripcion"]
     normalizados = [normalizar(d) for d in clasificados]
 
-    print(f"\nℹ️  {len(sin_regla)} movimientos sin ninguna regla, en "
+    seccion("Sin clasificar")
+    print(f"ℹ️  {len(sin_regla)} movimientos sin ninguna regla, en "
           f"{len(grupos)} grupos por palabra común:")
     if len(grupos) > _MAX_GRUPOS_SIN_CLASIFICAR:
         print(f"   (se muestran los {_MAX_GRUPOS_SIN_CLASIFICAR} de más importe)")
@@ -515,12 +635,15 @@ def detectar_recibo_tarjeta(todo):
     """Hito A2 del roadmap. Solo actúa si exclude_patterns.json está vacío:
     con cualquier patrón ya puesto se asume resuelto, sea o no el de la
     tarjeta (así lo pide el roadmap, y evitar el aviso es tan fácil como
-    excluir el recibo, que es justo lo que se está pidiendo)."""
+    excluir el recibo, que es justo lo que se está pidiendo).
+
+    No imprime nada: deja el aviso para el final, con los demás, y devuelve
+    si lo ha dejado, para poder señalarlo junto a los totales."""
     if excluidor.patrones:
-        return
+        return False
     tarjeta_por_mes = _meses_tarjeta(todo)
     if tarjeta_por_mes.empty:
-        return
+        return False
 
     cuenta = todo[todo["tipo"] == "cuenta"]
     candidatos = {}
@@ -529,20 +652,21 @@ def detectar_recibo_tarjeta(todo):
         if fila is not None:
             candidatos[mes] = fila
 
-    print("\n💳 Tienes movimientos de tarjeta y ningún patrón en "
-          "exclude_patterns.json.")
+    titulo = ("Tienes movimientos de tarjeta y ningún patrón en "
+              "exclude_patterns.json")
     if not candidatos:
-        print("   Si tu cuenta paga la tarjeta con un recibo, cada gasto se "
-              "está contando DOS VECES y no lo he sabido encontrar solo.")
-        print("   Revísalo a mano: LEEME.txt explica cómo excluirlo.")
-        return
+        avisar(titulo, [
+            "Si tu cuenta paga la tarjeta con un recibo, cada gasto se está "
+            "contando DOS VECES y no lo he sabido encontrar solo.",
+            "Revísalo a mano: LEEME.txt explica cómo excluirlo."])
+        return True
 
-    print("   Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
-          "Esto parece el recibo:\n")
+    lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
+              "Esto parece el recibo:"]
     for mes, fila in sorted(candidatos.items()):
-        print(f"   {mes}: la tarjeta suma {-tarjeta_por_mes[mes]:,.2f} € y tu "
-              f"cuenta tiene un cargo de {-fila['importe']:,.2f} € el "
-              f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
+        lineas.append(f"· {mes}: la tarjeta suma {-tarjeta_por_mes[mes]:,.2f} € y "
+                      f"tu cuenta tiene un cargo de {-fila['importe']:,.2f} € el "
+                      f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
 
     ya_usadas = {f.name for f in candidatos.values()}
     otras = [normalizar(d) for i, d in cuenta["descripcion"].items()
@@ -555,11 +679,13 @@ def detectar_recibo_tarjeta(todo):
         segura = not any(patron.search(d) for d in otras)
 
     if segura:
-        print(f'\n   Añade esto a exclude_patterns.json:  "{clave}"')
+        lineas.append(f'Añade esto a exclude_patterns.json:  "{clave}"')
     else:
-        print("\n   No encuentro una clave segura que proponer (podría "
-              "excluir algún otro movimiento tuyo); añádelo tú a mano con lo "
-              "que ves arriba.")
+        lineas.append("No encuentro una clave segura que proponer (podría "
+                      "excluir algún otro movimiento tuyo); añádelo tú a mano "
+                      "con lo que ves arriba.")
+    avisar(titulo, lineas)
+    return True
 
 
 # ========= CARGOS QUE SE REPITEN (suscripciones, cuotas, seguros) =========
@@ -664,7 +790,8 @@ def informe_recurrentes(df, categorias_gasto):
     total = sum(e[0] for e in encontrados)
     cuantos = ("1 cargo que se repite" if len(encontrados) == 1
                else f"{len(encontrados)} cargos que se repiten")
-    print(f"\n🔁 {cuantos}; al importe de hoy suma{'n' if len(encontrados) > 1 else ''} "
+    seccion("Cargos que se repiten")
+    print(f"🔁 {cuantos}; al importe de hoy suma{'n' if len(encontrados) > 1 else ''} "
           f"{total:,.2f} € al año:")
     if len(encontrados) > _MAX_RECURRENTES:
         print(f"   (se muestran los {_MAX_RECURRENTES} que más suman)")
@@ -720,9 +847,14 @@ def arrancar():
 
 
 def main():
+    # la cabecera primero: la versión es lo primero que hace falta saber si
+    # algo va mal, y lo que arrancar() tenga que contar va debajo
+    titulo = f"Movimientos bancarios · versión {rutas.version()}"
+    print(titulo)
+    print("═" * len(titulo) + "\n")
+
     arrancar()
 
-    print(f"Movimientos bancarios · versión {rutas.version()}")
     print(f"Reglas: {clasificador.n_propias} tuyas + {clasificador.n_base} de la "
           f"base.")
     if clasificador.desactivadas:
@@ -731,19 +863,17 @@ def main():
         print(f"   {len(clasificador.descartadas_de_base)} reglas de la base "
               f"descartadas: apuntan a categorías que no tienes en "
               f"categorias.json.")
-        print(f"   ({', '.join(clasificador.descartadas_de_base[:6])}"
-              f"{'...' if len(clasificador.descartadas_de_base) > 6 else ''})")
-    print()
 
     avisos = catalogo.validar(clasificador)
     if avisos:
-        print("⚠️  Las categorías de rules.json y categorias.json no cuadran:\n")
-        for a in avisos:
-            print(f"   · {a}")
-        print("\n   Sigo adelante, pero revísalo o el resumen no cuadrará.\n")
+        avisar("Las categorías de rules.json y categorias.json no cuadran",
+               [f"· {a}" for a in avisos]
+               + ["Sigo adelante, pero revísalo o el resumen no cuadrará."])
 
-    print(f"Leyendo ficheros de '{rutas.relativa(rutas.ENTRADA)}/'...\n")
+    seccion(f"Leyendo {rutas.relativa(rutas.ENTRADA)}/")
     nuevos = leer_entrada()
+    if not nuevos:
+        print("   (no hay ficheros nuevos)")
 
     hist.comprobar_version(rutas.HISTORICO, rutas.version())
     previo = hist.cargar(rutas.HISTORICO)
@@ -765,7 +895,7 @@ def main():
         print("➕ Ningún movimiento nuevo: ya estaba todo en el histórico.")
 
     if crudos.empty:
-        print("❌ No hay ningún movimiento que procesar.")
+        print("\n❌ No hay ningún movimiento que procesar.")
         return
 
     validas = set(catalogo.todas) | {hist.MARCA_EXCLUIDO}
@@ -774,32 +904,21 @@ def main():
     manuales = todo.loc[todo["categoria_manual"].ne(""), "categoria_manual"]
     invalidas = sorted(set(manuales) - validas)
     if invalidas:
-        print(f"\n⚠️  Correcciones manuales con una categoría que no existe: "
-              f"{', '.join(invalidas)}")
-        print(f"   Tiene que ser una de categorias.json, o «{hist.MARCA_EXCLUIDO}» "
-              f"para sacarla de los totales.")
-        print(f"   Las he IGNORADO y he dejado que manden las reglas, para que no "
-              f"desaparezcan de los totales sin avisar. Corrige la columna "
-              f"categoria_manual y vuelve a ejecutar.")
+        avisar(f"Correcciones manuales con una categoría que no existe: "
+               f"{', '.join(invalidas)}", [
+                   f"Tiene que ser una de categorias.json, o "
+                   f"«{hist.MARCA_EXCLUIDO}» para sacarla de los totales.",
+                   "Las he IGNORADO y he dejado que manden las reglas, para que "
+                   "no desaparezcan de los totales sin avisar. Corrige la "
+                   "columna categoria_manual y vuelve a ejecutar."])
     df = todo[~todo["excluido"]].reset_index(drop=True)      # lo que cuenta
     excluidos = todo[todo["excluido"]].reset_index(drop=True)
 
     # --- salidas ---
     # el histórico guarda TODO (incluido lo excluido); el resumen y el fichero
     # que pegas en Excel, solo lo que cuenta.
+    seccion("Resultado")
     saldos_por_cuenta = calcular_saldo_inicial(todo)
-    # ruido de coma flotante aparte: solo cuenta lo que de verdad se detectó
-    detectados = {c: s for c, s in saldos_por_cuenta.items() if abs(s) >= 0.005}
-    if len(detectados) == 1:
-        print(f"\n💰 Saldo inicial detectado: {next(iter(detectados.values())):,.2f} "
-              f"€ (el que tenía tu cuenta antes del primer movimiento que "
-              f"hay). El Acumulado del resumen parte de ahí, no de 0.")
-    elif detectados:
-        print(f"\n💰 Saldo inicial detectado en {len(detectados)} cuentas "
-              f"(ver ajustes/cuentas.json); el Acumulado del resumen parte "
-              f"de la suma:")
-        for id_cuenta, saldo in sorted(detectados.items()):
-            print(f"   {id_cuenta or '(sin identificar)'}: {saldo:,.2f} €")
     saldo_inicial = sum(saldos_por_cuenta.values())
     resumen = hist.construir_resumen(df, catalogo, saldo_inicial)
     if os.path.exists(rutas.HISTORICO):
@@ -811,22 +930,25 @@ def main():
         guardar_excel(excluidos[["fecha", "descripcion", "importe", "tipo",
                                  "origen", "regla"]], rutas.EXCLUIDOS)
 
-    # --- resumen en pantalla ---
+    print(f"✅ {rutas.relativa(rutas.HISTORICO)}  ·  hojas {hist.HOJA_RESUMEN} y "
+          f"{hist.HOJA_MOVIMIENTOS}")
+    print(f"   {rutas.relativa(rutas.LIMPIOS)}  ·  lo que pegas en A-G")
+
     # --- volcado directo en el fichero de contabilidad ---
     if cfg_sync.activa:
-        print()
         try:
             a_volcar = todo if cfg_sync.incluir_excluidos else df
             copia, filas = sync.escribir(cfg_sync, a_volcar[COLUMNAS_BASE])
             print(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: {filas} filas escritas")
             print(f"   copia de seguridad en {copia}")
         except Exception as e:
-            print(f"⚠️  {e}")
-            print("   Tu fichero de contabilidad NO se ha tocado. "
-                  "Usa movimientos_limpios.xlsx mientras tanto.")
+            print(f"📗 {cfg_sync.archivo}: ✗ no sincronizado (el motivo, en los "
+                  f"avisos del final)")
+            avisar(f"No he sincronizado con {cfg_sync.archivo}",
+                   str(e).splitlines()
+                   + ["Tu fichero de contabilidad NO se ha tocado. Usa "
+                      "movimientos_limpios.xlsx mientras tanto."])
 
-    print(f"\n✅ {rutas.relativa(rutas.HISTORICO)}  ·  hojas {hist.HOJA_MOVIMIENTOS} y {hist.HOJA_RESUMEN}")
-    print(f"   {rutas.relativa(rutas.LIMPIOS)}  ·  lo que pegas en A-G")
     print(f"\n   {len(df)} movimientos · {len(excluidos)} excluidos")
     if not df.empty:
         print(f"   del {df['fecha'].min():%d/%m/%Y} al {df['fecha'].max():%d/%m/%Y}"
@@ -837,9 +959,22 @@ def main():
         print(f"   {ajustadas} con el mes contable ajustado"
               f"  (el resumen agrupa por '{catalogo.columna_mes}')")
 
-    # antes de enseñar los totales: si se están contando dos veces los gastos
-    # de la tarjeta, que se sepa ANTES de fiarse de las cifras de abajo.
-    detectar_recibo_tarjeta(todo)
+    # ruido de coma flotante aparte: solo cuenta lo que de verdad se detectó
+    detectados = {c: s for c, s in saldos_por_cuenta.items() if abs(s) >= 0.005}
+    if len(detectados) == 1:
+        print(f"\n💰 Saldo inicial detectado: {next(iter(detectados.values())):,.2f} €")
+        print("   Lo que tenía tu cuenta antes del primer movimiento que hay. "
+              "El Acumulado\n   del resumen parte de ahí, no de 0.")
+    elif detectados:
+        print(f"\n💰 Saldo inicial detectado en {len(detectados)} cuentas "
+              f"(ver ajustes/cuentas.json); el Acumulado del resumen parte "
+              f"de la suma:")
+        for id_cuenta, saldo in sorted(detectados.items()):
+            print(f"   {id_cuenta or '(sin identificar)'}: {saldo:,.2f} €")
+
+    # si se están contando dos veces los gastos de la tarjeta, que se sepa
+    # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
+    doble_tarjeta = detectar_recibo_tarjeta(todo)
 
     # orden_resumen puede haber quitado cualquiera de estas columnas del
     # resumen: se enseña solo lo que haya. Pedirlas a pelo rompía aquí,
@@ -856,10 +991,15 @@ def main():
             print(f"\n   Último mes{mes}:  " + " · ".join(partes))
         if "Acumulado" in resumen.columns:
             print(f"   Acumulado desde el principio: {ult['Acumulado']:+,.2f} €")
+        if doble_tarjeta:
+            print("\n   ⚠️  Ojo: puede que los gastos de la tarjeta se estén "
+                  "contando dos veces. Mira los avisos del final.")
 
     informe_recurrentes(df, catalogo.gastos)
-    # lo último, porque es lo único de aquí que pide hacer algo
     informe_sin_clasificar(df)
+    # los avisos, lo último antes de salir: juntos, contados y separados de
+    # lo demás, que es lo que se lee cuando la ejecución termina
+    mostrar_avisos()
 
 
 # ========= RUN =========
@@ -867,5 +1007,11 @@ if __name__ == "__main__":
     try:
         main()
     except Exception as e:
+        # los avisos que ya hubiera pueden explicar el error: van antes, para
+        # que el ❌ sea lo último que se ve
+        mostrar_avisos()
         print(f"\n❌ {e}")
-        sys.exit(1)
+        if _interactiva():
+            _esperar("\nPulsa Intro para cerrar...")
+        sys.exit(CODIGO_ERROR_EXPLICADO)
+    menu_final()

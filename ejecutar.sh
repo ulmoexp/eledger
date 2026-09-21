@@ -27,11 +27,18 @@ PY="python3"
 
 "$PY" app/process.py "$@"
 codigo=$?
-if [ $codigo -ne 0 ]; then
-  echo
-  echo "*** Algo ha ido mal. Lee el mensaje de arriba. ***"
-  echo "Si dice que falta pandas u openpyxl, ejecuta primero  instalar.command"
+
+# 0 = ha ido bien y 2 = error ya explicado: en los dos casos el programa ya
+# ha esperado a que se leyera todo (menu final o "Pulsa Intro"), y pausar
+# aqui otra vez obligaria a pulsar dos veces. Cualquier otro codigo es que ni
+# siquiera ha podido arrancar (Python roto o ausente): aqui si se para.
+if [ $codigo -eq 0 ] || [ $codigo -eq 2 ]; then
+  exit $codigo
 fi
+echo
+echo "*** Algo ha ido mal. Lee el mensaje de arriba. ***"
+echo "Si dice que falta pandas u openpyxl, ejecuta primero el instalar"
+echo "(instalar.command en Mac, instalar.sh en Linux)."
 echo
 read -r -p "Pulsa Intro para cerrar..."
 exit $codigo

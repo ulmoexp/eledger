@@ -161,6 +161,10 @@ lista. Hasta ahora:
 - **2.8.0** — informe de cargos que se repiten (suscripciones, cuotas,
   seguros), solo por pantalla y sin opinar. Salió del estudio de mercado como
   el hueco más claro en herramientas de este tipo.
+- **2.9.0** — arreglos tras la primera prueba en Windows: gráfico vacío en
+  OnlyOffice y debajo de la tabla, el histórico se abre por RESUMEN, la
+  ventana no se cierra sola (menú final) y pantalla por bloques con los
+  avisos al final.
 
 ## Lo que queda fuera a propósito
 

@@ -367,7 +367,6 @@ def _texto_seguro(ws):
 
 def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
             catalogo, version: str = VERSION_SIN_SELLO) -> None:
-    from openpyxl.chart import LineChart, Reference
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
@@ -433,20 +432,65 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
         # Solo si Acumulado sigue en el resumen (orden_resumen puede haberla
         # quitado, y entonces no hay nada que dibujar). Sin anotaciones ni
         # texto generado: un gráfico, nada de "consejos".
-        columnas = list(resumen.columns)
-        if "Acumulado" in columnas:
-            col_acumulado = columnas.index("Acumulado") + 1
-            col_mes = columnas.index("Mes") + 1 if "Mes" in columnas else 1
-            grafico = LineChart()
-            grafico.title = "Acumulado"
-            grafico.height, grafico.width = 7, 16
-            grafico.legend = None
-            datos = Reference(ws, min_col=col_acumulado, min_row=1,
-                              max_row=ws.max_row)
-            meses = Reference(ws, min_col=col_mes, min_row=2, max_row=ws.max_row)
-            grafico.add_data(datos, titles_from_data=True)
-            grafico.set_categories(meses)
-            ws.add_chart(grafico, get_column_letter(len(columnas) + 2) + "2")
+        if "Acumulado" in resumen.columns:
+            _grafico_acumulado(ws, resumen)
+
+    # RESUMEN es lo que se viene a mirar: primera hoja y la que se ve al
+    # abrir. MOVIMIENTOS es el detalle, para cuando haga falta. _meta la
+    # última, que no es para leerla a diario.
+    if HOJA_RESUMEN in wb.sheetnames:
+        wb.move_sheet(HOJA_RESUMEN, offset=-wb.sheetnames.index(HOJA_RESUMEN))
+        for hoja in wb.worksheets:
+            hoja.sheet_view.tabSelected = hoja.title == HOJA_RESUMEN
+        wb.active = wb.sheetnames.index(HOJA_RESUMEN)
 
     wb.save(ruta)
     wb.close()
+
+
+def _grafico_acumulado(ws, resumen: pd.DataFrame) -> None:
+    """
+    Línea del Acumulado mes a mes, DEBAJO de la tabla.
+
+    Los valores van también copiados DENTRO del gráfico, no solo la
+    referencia a las celdas. Excel recalcula el gráfico desde las celdas al
+    abrir, pero otros programas (OnlyOffice) lo dibujan con esa copia, y sin
+    ella el gráfico salía vacío. Los meses («2026-04») van como texto: son
+    etiquetas, no números.
+    """
+    from openpyxl.chart import LineChart, Series
+    from openpyxl.chart.data_source import (AxDataSource, NumData, NumVal, StrData,
+                                            StrRef, StrVal)
+    from openpyxl.chart.series import SeriesLabel
+    from openpyxl.utils import get_column_letter
+
+    columnas = list(resumen.columns)
+    n = len(resumen)
+    primera, ultima = 2, n + 1          # la fila 1 es la cabecera
+    hoja = f"'{ws.title}'"
+
+    letra = get_column_letter(columnas.index("Acumulado") + 1)
+    serie = Series(f"{hoja}!${letra}${primera}:${letra}${ultima}", title=None)
+    serie.val.numRef.numCache = NumData(formatCode="General", ptCount=n, pt=[
+        NumVal(idx=i, v=float(v)) for i, v in enumerate(resumen["Acumulado"])])
+    serie.tx = SeriesLabel(v="Acumulado")
+    serie.smooth = False
+
+    if "Mes" in columnas:
+        letra = get_column_letter(columnas.index("Mes") + 1)
+        serie.cat = AxDataSource(strRef=StrRef(
+            f=f"{hoja}!${letra}${primera}:${letra}${ultima}",
+            strCache=StrData(ptCount=n, pt=[
+                StrVal(idx=i, v=str(m)) for i, m in enumerate(resumen["Mes"])])))
+
+    grafico = LineChart()
+    grafico.series.append(serie)
+    grafico.title = "Acumulado"
+    grafico.legend = None
+    grafico.height, grafico.width = 8, 18
+    # sin esto, algunas versiones esconden los ejes y queda una línea suelta
+    grafico.x_axis.delete = False
+    grafico.y_axis.delete = False
+    grafico.y_axis.number_format = '#,##0 €'
+    # dos filas de aire entre la tabla y el gráfico
+    ws.add_chart(grafico, f"A{ultima + 3}")

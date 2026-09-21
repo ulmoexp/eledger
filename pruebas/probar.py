@@ -1490,6 +1490,66 @@ def prueba_resumen_desglose_avisos(e):
               "y el total no pierde nada", str(e.resumen().iloc[0]["Ingresos"]))
 
 
+@caso("resumen-primero", "El histórico se abre por RESUMEN, con el gráfico debajo y con sus datos")
+def prueba_resumen_primero(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
+    e.ejecutar()
+
+    from openpyxl import load_workbook
+    wb = load_workbook(e.ruta_historico)
+    comprobar(wb.sheetnames[0] == "RESUMEN" and wb.sheetnames[-1] == "_meta",
+              "RESUMEN es la primera hoja (y _meta sigue la última)",
+              str(wb.sheetnames))
+    comprobar(wb.active.title == "RESUMEN", "y la que se ve al abrir",
+              wb.active.title)
+    filas = wb["RESUMEN"].max_row
+    wb.close()
+
+    import re
+    import zipfile
+    with zipfile.ZipFile(e.ruta_historico) as z:
+        graficos = [n for n in z.namelist() if n.startswith("xl/charts/chart")]
+        dibujos = [n for n in z.namelist()
+                   if n.startswith("xl/drawings/drawing") and n.endswith(".xml")]
+        grafico = z.read(graficos[0]).decode() if graficos else ""
+        dibujo = z.read(dibujos[0]).decode() if dibujos else ""
+    comprobar(len(graficos) == 1, "hay un gráfico", str(graficos))
+
+    # sin los valores copiados dentro, OnlyOffice lo dibujaba vacío: Excel
+    # los recalcula desde las celdas, pero no todos los programas lo hacen
+    acumulado = float(e.resumen()["Acumulado"].iloc[-1])
+    cache = grafico[grafico.find("numCache"):]
+    guardados = [float(v) for v in re.findall(r"<(?:\w+:)?v>(-?[\d.eE+-]+)<", cache)]
+    comprobar(bool(guardados) and abs(guardados[-1] - acumulado) < 0.01,
+              "el gráfico lleva dentro los valores del Acumulado",
+              f"{guardados} / {acumulado}")
+    comprobar("strRef" in grafico and "strCache" in grafico and "2026-04" in grafico,
+              "y los meses, como texto", grafico[:400])
+
+    fila = re.search(r"<(?:\w+:)?from>.*?<(?:\w+:)?row>(\d+)<", dibujo, re.S)
+    columna = re.search(r"<(?:\w+:)?from>.*?<(?:\w+:)?col>(\d+)<", dibujo, re.S)
+    comprobar(bool(fila and columna) and int(fila.group(1)) >= filas
+              and int(columna.group(1)) == 0,
+              "colocado DEBAJO de la tabla, no a su derecha", dibujo[:300])
+
+
+@caso("pantalla-orden", "Por pantalla: versión arriba, avisos juntos al final")
+def prueba_pantalla_orden(e):
+    e.escribir_config("rules.json", {"mercadona": "Categoria Inventada"})
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
+    salida = e.ejecutar()
+
+    comprobar("Avisos (" in salida, "hay un bloque de avisos", salida)
+    comprobar("Avisos (" in salida
+              and salida.index("✅") < salida.index("Avisos (")
+              < salida.index("Categoria Inventada"),
+              "después del resultado: ni mezclado con él ni lo primero de todo",
+              salida)
+    comprobar(e.ultimo_codigo == 0 and "¿Y ahora?" not in salida,
+              "sin nadie delante no pregunta nada (no se queda esperando)",
+              salida[-300:])
+
+
 def _meses(dia, concepto, importes, año=2026, desde_mes=1):
     """Un cargo al mes, el mismo día, con los importes dados (uno por mes)."""
     return [(f"{dia:02d}/{desde_mes + i:02d}/{año}", concepto, imp)
@@ -1786,6 +1846,10 @@ def prueba_version_futura(e):
     salida = e.ejecutar()
 
     comprobar(e.ultimo_codigo != 0, "se planta en vez de escribir")
+    # 2 = "ya lo he explicado y he esperado a que se leyera": los lanzadores
+    # lo usan para no pedir que se pulse una tecla dos veces
+    comprobar(e.ultimo_codigo == 2, "con el código de error ya explicado",
+              str(e.ultimo_codigo))
     comprobar("99.0.0" in salida and "copia" in salida,
               "dice qué versión hace falta y cómo salir del paso", salida)
     comprobar(e.ruta_historico.read_bytes() == antes,
@@ -2090,6 +2154,16 @@ def prueba_lanzadores(e):
     sh = (RAIZ / "ejecutar.sh").read_text(encoding="utf-8")
     comprobar(".venv/bin/python" in sh and "app/process.py" in sh,
               "y el de Linux hace lo mismo")
+
+    # el programa ya espera él solo (menú final, o "Pulsa Intro" si falla) y
+    # sale con 0 o 2; si el lanzador volviera a pausar en esos casos, habría
+    # que pulsar dos veces. El número tiene que ser el mismo en los tres sitios.
+    proceso = (RAIZ / DIR_APP / "process.py").read_text(encoding="utf-8")
+    comprobar("CODIGO_ERROR_EXPLICADO = 2" in proceso
+              and '"%CODIGO%"=="2"' in bat and "-eq 2" in sh,
+              "los lanzadores no pausan otra vez si el programa ya lo ha hecho")
+    comprobar(sh == (RAIZ / "ejecutar.command").read_text(encoding="utf-8"),
+              "ejecutar.command y ejecutar.sh son el mismo")
 
     # Mac y Linux ejecutan estos por doble clic de verdad (a diferencia de
     # .bat, que Windows abre por asociación): sin el bit +x no arrancan.

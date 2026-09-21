@@ -3,12 +3,16 @@ MOVIMIENTOS BANCARIOS
 
 La primera vez
 --------------
-Doble clic en  instalar.bat  (en Mac: instalar.command). Tarda un par de
-minutos y solo hay que hacerlo una vez: prepara las librerías en una carpeta
-propia, sin tocar nada de lo que tengas instalado.
+Doble clic en  instalar.bat  (en Mac: instalar.command; en Linux:
+instalar.sh). Tarda un par de minutos y solo hay que hacerlo una vez:
+prepara las librerías en una carpeta propia, sin tocar nada de lo que
+tengas instalado.
 
 Si te dice que no encuentra Python, instálalo desde python.org y marca la
 casilla "Add Python to PATH" durante la instalación.
+
+En Linux, si el doble clic no lo ejecuta, dale permisos desde una terminal
+en esta carpeta:  chmod +x instalar.sh && ./instalar.sh
 
 Si lo que tienes es un Movimientos.exe, sáltate este paso: no hace falta nada.
 
@@ -16,7 +20,7 @@ Cómo se usa
 -----------
 1. Descarga los extractos del banco y déjalos en la carpeta  entrada/
    Con el nombre y la extensión que traigan. No hay que renombrar nada.
-2. Doble clic en  ejecutar.bat   (en Mac: ejecutar.command)
+2. Doble clic en  ejecutar.bat   (en Mac: ejecutar.command; en Linux: ejecutar.sh)
 3. Abre  datos/historico.xlsx
 
 Puedes volver a ejecutarlo tantas veces como quieras. Los movimientos que ya
@@ -53,8 +57,9 @@ Si le pasas esto a alguien
 --------------------------
 NO comprimas la carpeta: le estarías dando tu histórico y tus reglas, que dicen
 bastante de ti (el colegio, el veterinario, el casero, los dígitos de tu
-tarjeta). Usa  exportar.bat  (Mac: exportar.command). Genera un ZIP con el
-programa, la guía y unas reglas de partida genéricas, y nada tuyo.
+tarjeta). Usa  exportar.bat  (Mac: exportar.command; Linux: exportar.sh).
+Genera un ZIP con el programa, la guía y unas reglas de partida genéricas,
+y nada tuyo.
 
 Qué versión tengo
 -----------------

@@ -13,16 +13,18 @@ bancarios a algo: que ese algo no los mande a ningún sitio.
 
 1. Descarga los extractos del banco (cuenta y tarjetas) y déjalos, tal cual,
    en la carpeta `entrada/`.
-2. Doble clic en `ejecutar.bat` (Windows) o `ejecutar.command` (Mac).
+2. Doble clic en `ejecutar.bat` (Windows), `ejecutar.command` (Mac) o
+   `ejecutar.sh` (Linux).
 3. Abre `datos/historico.xlsx`.
 
 Puedes volver a ejecutarlo cuantas veces quieras: lo que ya estuviera no se
 duplica, así que da igual si dos descargas se solapan.
 
-La primera vez hace falta `instalar.bat` (o `instalar.command`), que prepara
-las librerías necesarias sin tocar nada más de tu sistema. Todo esto está
-explicado con más detalle en [`LEEME.txt`](LEEME.txt) y, sección por sección,
-en [`GUIA.pdf`](GUIA.pdf).
+La primera vez hace falta `instalar.bat` (`instalar.command` en Mac,
+`instalar.sh` en Linux), que prepara las librerías necesarias sin tocar nada
+más de tu sistema. En Linux, si el doble clic no lo ejecuta, dale permisos
+primero: `chmod +x instalar.sh`. Todo esto está explicado con más detalle en
+[`LEEME.txt`](LEEME.txt) y, sección por sección, en [`GUIA.pdf`](GUIA.pdf).
 
 ## Descarga
 
@@ -60,9 +62,9 @@ datos/          historico.xlsx y sus copias — lo único insustituible
 ```
 
 `ajustes/`, `entrada/`, `salida/` y `datos/` son tuyos una vez instalado: si
-compartes la carpeta con alguien, usa `exportar.bat` (genera un ZIP con el
-programa y unas reglas de partida genéricas, sin nada tuyo dentro) en vez de
-comprimir la carpeta entera.
+compartes la carpeta con alguien, usa `exportar.bat` (`.command` en Mac,
+`.sh` en Linux) en vez de comprimir la carpeta entera — genera un ZIP con
+el programa y unas reglas de partida genéricas, sin nada tuyo dentro.
 
 ## Si vas a tocar el código
 

@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.5.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.6.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          72 casos, 268 comprobaciones, ~2 min
+python pruebas/probar.py          72 casos, 280 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -119,6 +119,19 @@ mismo patrón que el resto de avisos de `Catalogo`.
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y
 `sincronizar.py` se niega a escribir en una hoja con fórmulas, y no borra filas
 enteras si hay datos del usuario fuera del bloque volcado.
+
+**Permiso de ejecución de `.sh`/`.command` (2.6.0).** Mac y Linux arrancan
+estos lanzadores ejecutándolos de verdad al hacer doble clic (a diferencia de
+`.bat`, que Windows abre por asociación de tipo de fichero), así que sin el
+bit `+x` no hacen nada. `git` ya los trackea con ese permiso, pero **si algún
+día se reemplaza alguno de estos seis ficheros hay que volver a
+`chmod +x`** antes de comitear, o el siguiente ZIP los repartirá rotos otra
+vez. `exportar.py` no depende de que el sistema de ficheros de origen lo
+tenga bien puesto: fuerza `0o755` a mano en `LANZADORES_EJECUTABLES` al
+escribir el ZIP, precisamente porque generar el ZIP desde Windows no
+preserva permisos que Windows ni siquiera tiene. El caso `lanzadores` vigila
+el repositorio y el caso `exportar` vigila el ZIP; si alguno falla después de
+tocar estos ficheros, es casi seguro que por esto.
 
 **Privacidad.** El `rules.json` del usuario es un retrato de su vida. `app/` y
 `pruebas/` se reparten, así que **no pueden llevar datos reales**: nada de

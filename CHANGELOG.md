@@ -6,6 +6,22 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.6.0
+
+- **Linux, documentado y funcionando de verdad.** `instalar.sh`,
+  `ejecutar.sh` y `exportar.sh` ya existían pero no se mencionaban en
+  `LEEME.txt`, `README.md` ni la web. Además tenían el mismo fallo que los
+  `.command` de Mac: ninguno de los dos llevaba el permiso de ejecución, así
+  que el doble clic no los arrancaba en un ZIP recién descomprimido.
+  `exportar.py` ahora fuerza ese permiso al generar el ZIP repartible,
+  **sin importar en qué sistema operativo se genere** (Windows no tiene ese
+  concepto de permisos, así que antes se perdía si el ZIP se creaba ahí).
+- Los propios ficheros del repositorio (`.sh` y `.command`) llevan ya el
+  bit de ejecución, para que un `git clone` o la descarga directa de GitHub
+  también funcionen a la primera.
+
+---
+
 ## 2.5.0
 
 - **Personalizar la hoja RESUMEN.** Dos campos opcionales nuevos en

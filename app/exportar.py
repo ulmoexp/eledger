@@ -64,6 +64,16 @@ NOMBRES_FUERA = {"__pycache__", ".venv", ".git", ".DS_Store", "Thumbs.db",
 CARPETAS_PROHIBIDAS = {"entrada", "salida", "datos", "ajustes", "copias",
                        "tarjetas"}
 
+# Mac y Linux arrancan estos por doble clic ejecutándolos de verdad (a
+# diferencia de .bat, que Windows abre por asociación de tipo de fichero), así
+# que necesitan el bit de ejecución. Si quien genera el ZIP lo hace desde
+# Windows, el sistema de ficheros de origen no tiene ese concepto y
+# zipfile.write() no lo pondría solo: se fuerza aquí a mano para que el ZIP
+# sea correcto pase lo que pase en la máquina donde se generó.
+LANZADORES_EJECUTABLES = {"instalar.sh", "ejecutar.sh", "exportar.sh",
+                          "instalar.command", "ejecutar.command",
+                          "exportar.command"}
+
 
 def _admisible(ruta: Path) -> bool:
     partes = set(ruta.parts)
@@ -145,7 +155,15 @@ def exportar(con_pruebas=False) -> Path:
 
     with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
         for origen, relativa in piezas:
-            z.write(origen, str(relativa).replace("\\", "/"))
+            arcname = str(relativa).replace("\\", "/")
+            if relativa.name in LANZADORES_EJECUTABLES:
+                info = zipfile.ZipInfo.from_file(origen, arcname)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = (0o755 & 0xFFFF) << 16
+                with open(origen, "rb") as f:
+                    z.writestr(info, f.read())
+            else:
+                z.write(origen, arcname)
 
     return destino
 

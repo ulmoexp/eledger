@@ -158,6 +158,7 @@ class Entorno:
         shutil.copy2(RAIZ / DIR_APP / "exportar.py",
                      self.dir / DIR_APP / "exportar.py")
         for f in ("LEEME.txt", "CHANGELOG.md", "GUIA.pdf", "LICENSE",
+                  "instalar.bat", "instalar.command", "instalar.sh",
                   "ejecutar.bat", "ejecutar.command", "ejecutar.sh",
                   "exportar.bat", "exportar.command", "exportar.sh"):
             origen = RAIZ / f
@@ -1678,6 +1679,16 @@ def prueba_exportar(e):
     comprobar(not any(".pyc" in n or "__pycache__" in n for n in nombres),
               "sin cachés de Python")
 
+    with zipfile.ZipFile(zips[0]) as z:
+        for nombre in ("instalar.sh", "ejecutar.sh", "exportar.sh",
+                       "instalar.command", "ejecutar.command",
+                       "exportar.command"):
+            modo = z.getinfo(nombre).external_attr >> 16
+            comprobar(modo & 0o111 != 0,
+                      f"{nombre} lleva el permiso de ejecución dentro del ZIP "
+                      f"(da igual el sistema operativo donde se generó)",
+                      oct(modo))
+
     version = (RAIZ / DIR_APP / "VERSION").read_text(encoding="utf-8").strip()
     comprobar(version in zips[0].name,
               "el nombre del ZIP lleva la versión", zips[0].name)
@@ -1903,7 +1914,15 @@ def prueba_lanzadores(e):
 
     sh = (RAIZ / "ejecutar.sh").read_text(encoding="utf-8")
     comprobar(".venv/bin/python" in sh and "app/process.py" in sh,
-              "y el de Mac hace lo mismo")
+              "y el de Linux hace lo mismo")
+
+    # Mac y Linux ejecutan estos por doble clic de verdad (a diferencia de
+    # .bat, que Windows abre por asociación): sin el bit +x no arrancan.
+    import os as _os
+    for nombre in ("instalar.sh", "ejecutar.sh", "exportar.sh",
+                   "instalar.command", "ejecutar.command", "exportar.command"):
+        comprobar(_os.access(RAIZ / nombre, _os.X_OK),
+                  f"{nombre} tiene permiso de ejecución en el repositorio")
 
     # Si alguien descarga los ficheros de uno en uno se pierden las carpetas y
     # todo queda plano. «python -m venv app\.venv» crea entonces la carpeta app\

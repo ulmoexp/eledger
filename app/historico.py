@@ -260,6 +260,10 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
     falta ningún caso especial para el primer mes: Deuda y Extras salen solos
     del signo de saldo_inicial, igual que saldrían del arrastre de cualquier
     otro mes.
+
+    Qué columnas salen, en qué orden y con qué nombre se puede personalizar
+    en categorias.json ('orden_resumen' y 'etiquetas'); sin ellos, sale
+    exactamente lo de siempre.
     """
     col_mes = catalogo.columna_mes
     if df.empty:
@@ -299,7 +303,21 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
 
     orden = (["Mes"] + catalogo.gastos
              + ["Deuda", "Extras", "Total Gastos", "Ingresos", "Balance", "Acumulado"])
-    return pd.DataFrame(filas)[orden]
+
+    # orden_resumen (opcional, en categorias.json) deja elegir qué columnas
+    # salen y en qué orden, incluidas las de sistema (Balance, Acumulado...),
+    # normalmente fijas al final. Un nombre mal escrito se descarta en
+    # silencio aquí: Catalogo.validar() ya avisa de eso por separado.
+    if catalogo.orden_resumen is not None:
+        orden = [c for c in catalogo.orden_resumen if c in orden]
+
+    resultado = pd.DataFrame(filas)[orden]
+
+    # el renombrado a etiqueta visible es solo de presentación: el cálculo de
+    # arriba y Catalogo.validar() siguen trabajando con el nombre interno de
+    # la categoría, que es el que de verdad tiene que cuadrar con rules.json.
+    etiquetas = {c: catalogo.etiqueta(c) for c in orden if c in catalogo.gastos}
+    return resultado.rename(columns=etiquetas)
 
 
 # =====================================================================
@@ -337,6 +355,7 @@ def _texto_seguro(ws):
 
 def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
             catalogo, version: str = VERSION_SIN_SELLO) -> None:
+    from openpyxl.chart import LineChart, Reference
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
@@ -397,6 +416,25 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
                     c.font = Font(bold=True, size=10)
                 if j % 2 == 0 and col not in destacadas:
                     c.fill = suave
+
+        # gráfico: la pregunta que de verdad importa, "¿voy bien o voy mal?".
+        # Solo si Acumulado sigue en el resumen (orden_resumen puede haberla
+        # quitado, y entonces no hay nada que dibujar). Sin anotaciones ni
+        # texto generado: un gráfico, nada de "consejos".
+        columnas = list(resumen.columns)
+        if "Acumulado" in columnas:
+            col_acumulado = columnas.index("Acumulado") + 1
+            col_mes = columnas.index("Mes") + 1 if "Mes" in columnas else 1
+            grafico = LineChart()
+            grafico.title = "Acumulado"
+            grafico.height, grafico.width = 7, 16
+            grafico.legend = None
+            datos = Reference(ws, min_col=col_acumulado, min_row=1,
+                              max_row=ws.max_row)
+            meses = Reference(ws, min_col=col_mes, min_row=2, max_row=ws.max_row)
+            grafico.add_data(datos, titles_from_data=True)
+            grafico.set_categories(meses)
+            ws.add_chart(grafico, get_column_letter(len(columnas) + 2) + "2")
 
     wb.save(ruta)
     wb.close()

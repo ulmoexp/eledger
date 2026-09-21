@@ -1346,6 +1346,50 @@ def prueba_capas_categoria(e):
               str(res.iloc[0]["Total Gastos"]))
 
 
+@caso("resumen-personalizado", "orden_resumen y etiquetas cambian el Excel sin tocar el cálculo")
+def prueba_resumen_personalizado(e):
+    e.escribir_config("categorias.json", {
+        "gastos": ["Comida", "Otros"],
+        "ingresos": ["Ingresos"],
+        "neutras": ["Transferencias internas"],
+        "columna_mes": "mes_ajustado",
+        "etiquetas": {"Comida": "🍔 Comida"},
+        "orden_resumen": ["Mes", "Comida", "Otros", "Balance", "Acumulado"]})
+    e.escribir_config("rules.json", {"mercadona": "Comida", "nomina": "Ingresos"})
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                      ("09/04/2026", "NOMINA EMPRESA SL", 2000.00)])
+    e.ejecutar()
+
+    res = e.resumen()
+    comprobar(list(res.columns) == ["Mes", "🍔 Comida", "Otros", "Balance", "Acumulado"],
+              "las columnas salen en el orden pedido, con la etiqueta puesta",
+              str(list(res.columns)))
+    comprobar(abs(res.iloc[0]["🍔 Comida"] - 100) < 0.005,
+              "el cálculo sigue siendo el mismo bajo el nombre nuevo",
+              str(res.iloc[0]["🍔 Comida"]))
+
+
+@caso("resumen-orden-invalido", "Un nombre mal escrito en orden_resumen avisa, no rompe")
+def prueba_resumen_orden_invalido(e):
+    e.escribir_config("categorias.json", {
+        "gastos": ["Comida", "Otros"],
+        "ingresos": ["Ingresos"],
+        "neutras": ["Transferencias internas"],
+        "columna_mes": "mes_ajustado",
+        "orden_resumen": ["Mes", "Komida", "Balance"]})
+    e.escribir_config("rules.json", {"mercadona": "Comida"})
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+    salida = e.ejecutar()
+
+    comprobar("Komida" in salida and "orden_resumen" in salida,
+              "avisa del nombre que no reconoce", salida)
+    res = e.resumen()
+    comprobar(list(res.columns) == ["Mes", "Balance"],
+              "y el resto del orden pedido sí se aplica", str(list(res.columns)))
+
+
 @caso("signo", "Un Bizum recibido no es lo mismo que uno enviado")
 def prueba_signo(e):
     datos = [("07/04/2026", "BIZUM A MARTA CENA", -18.00),

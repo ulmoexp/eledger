@@ -235,17 +235,37 @@ class Catalogo:
     de rules.json y el criterio de la fórmula de Excel no coinciden letra por
     letra, la celda devuelve 0 y no avisa nadie. «Higiene» y «Limpieza/Higiene»
     son categorías distintas; «Luz/agua» y «Luz/Agua» también.
+
+    Dos campos opcionales personalizan cómo se ve RESUMEN sin tocar cómo se
+    calcula: 'etiquetas' (nombre interno -> texto de columna, para no tener
+    que arriesgar el cuadre letra-por-letra solo por cambiar cómo se ve una
+    columna) y 'orden_resumen' (qué columnas salen y en qué orden, incluidas
+    las de sistema como Balance o Acumulado, hoy fijas al final). Ninguno de
+    los dos existía antes de esta versión: si no se ponen, el resumen sale
+    exactamente igual que siempre.
     """
+
+    COLUMNAS_SISTEMA = ["Mes", "Deuda", "Extras", "Total Gastos", "Ingresos",
+                        "Balance", "Acumulado"]
 
     def __init__(self, datos: dict):
         self.gastos = list(datos.get("gastos", []))
         self.ingresos = list(datos.get("ingresos", []))
         self.neutras = list(datos.get("neutras", []))
         self.columna_mes = datos.get("columna_mes", "mes_ajustado")
+        self.etiquetas = dict(datos.get("etiquetas", {}))
+        # None = sin personalizar (orden de siempre). Una lista, aunque esté
+        # vacía, significa que el usuario SÍ ha decidido qué mostrar.
+        self.orden_resumen = datos.get("orden_resumen")
 
     @property
     def todas(self):
         return self.gastos + self.ingresos + self.neutras
+
+    def etiqueta(self, categoria: str) -> str:
+        """El texto que se ve en la columna, o el nombre interno si no se ha
+        declarado uno propio en 'etiquetas'."""
+        return self.etiquetas.get(categoria, categoria)
 
     @classmethod
     def desde_json(cls, ruta):
@@ -288,6 +308,17 @@ class Catalogo:
         repes = [c for c in self.todas if self.todas.count(c) > 1]
         for c in sorted(set(repes)):
             avisos.append(f"«{c}» aparece más de una vez en categorias.json.")
+
+        # orden_resumen es opcional: si no se declara, no hay nada que
+        # validar (el orden de siempre no puede tener nombres mal escritos).
+        if self.orden_resumen is not None:
+            conocidas = set(self.COLUMNAS_SISTEMA) | set(self.gastos)
+            for nombre in self.orden_resumen:
+                if nombre not in conocidas:
+                    avisos.append(
+                        f"«{nombre}» en orden_resumen no es ni una columna de "
+                        f"sistema ni una categoría de gastos declarada: se "
+                        f"ignora.")
 
         return avisos
 

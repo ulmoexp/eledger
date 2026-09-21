@@ -669,7 +669,14 @@ story += [tabla(
       "tus propias cuentas, que no son dinero que salga ni entre."],
      ["<font face='Mono'>columna_mes</font>",
       "<font face='Mono'>mes</font> o <font face='Mono'>mes_ajustado</font>: con cuál "
-      "se agrupa el resumen."]],
+      "se agrupa el resumen."],
+     ["<font face='Mono'>etiquetas</font>",
+      "<i>Opcional.</i> Nombre interno → texto de columna, para cambiar cómo se ve "
+      "una columna sin arriesgar el cuadre letra-por-letra con rules.json."],
+     ["<font face='Mono'>orden_resumen</font>",
+      "<i>Opcional.</i> Qué columnas salen y en qué orden, incluidas las de sistema "
+      "(Balance, Acumulado...), normalmente fijas al final. Sin él, el orden de "
+      "siempre."]],
     [ANCHO * 0.24, ANCHO * 0.76])]
 story += [Spacer(1, 7)]
 story += [aviso(
@@ -703,7 +710,8 @@ story += [Paragraph(
     "<b>Extras</b> y <b>Deuda</b> son acumulativos, no solo del mes justo anterior: "
     "reflejan cómo vas desde el principio. En un mes cualquiera solo uno de los dos "
     "tiene valor. <b>Balance</b> es el resultado del mes por sí solo, sin arrastre; "
-    "<b>Acumulado</b> es el que responde a «¿voy bien o voy mal?».", S["pmini"])]
+    "<b>Acumulado</b> es el que responde a «¿voy bien o voy mal?». Por eso la hoja "
+    "RESUMEN trae un gráfico de esa columna: para verlo de un vistazo.", S["pmini"])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
     "Los gastos se muestran en positivo cambiándoles el signo, no con valor absoluto. "

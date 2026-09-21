@@ -152,7 +152,15 @@ Este documento es el plan original, no un registro de cambios — para eso está
 `CHANGELOG.md`. Alguna mejora ha salido de conversaciones con el usuario sin
 mapear a ningún hito de aquí (p. ej. personalizar columnas de RESUMEN y el
 gráfico de Acumulado, en la 2.5.0): mirar ahí para lo que no aparezca en esta
-lista.
+lista. Hasta ahora:
+
+- **2.5.0** — personalizar columnas de RESUMEN (`etiquetas`, `orden_resumen`)
+  y gráfico de Acumulado.
+- **2.7.0** — desglosar los ingresos por categoría en RESUMEN
+  (`desglosar_ingresos`).
+- **2.8.0** — informe de cargos que se repiten (suscripciones, cuotas,
+  seguros), solo por pantalla y sin opinar. Salió del estudio de mercado como
+  el hueco más claro en herramientas de este tipo.
 
 ## Lo que queda fuera a propósito
 

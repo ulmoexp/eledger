@@ -6,6 +6,17 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.8.0
+
+- **Cargos que se repiten.** Al terminar, se listan por pantalla los cargos
+  que pasan cada mes o cada año con un importe parecido (suscripciones,
+  cuotas, seguros), con lo que suman al año al precio de hoy y de más a
+  menos. Solo informa: no dice qué hacer con ninguno. Un anual aparece con
+  dos cargos, así que hace falta algo más de un año de histórico para verlo.
+  Lo que se ha dejado de cobrar ya no sale.
+
+---
+
 ## 2.7.0
 
 - **Desglosar los ingresos en RESUMEN.** Nuevo campo opcional en

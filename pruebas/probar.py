@@ -1490,6 +1490,82 @@ def prueba_resumen_desglose_avisos(e):
               "y el total no pierde nada", str(e.resumen().iloc[0]["Ingresos"]))
 
 
+def _meses(dia, concepto, importes, año=2026, desde_mes=1):
+    """Un cargo al mes, el mismo día, con los importes dados (uno por mes)."""
+    return [(f"{dia:02d}/{desde_mes + i:02d}/{año}", concepto, imp)
+            for i, imp in enumerate(importes)]
+
+
+@caso("recurrentes-mensual", "Un cargo de cada mes sale, con lo que suma al año al precio de hoy")
+def prueba_recurrentes_mensual(e):
+    e.escribir_config("rules.json", {"netflix": "Ocio", "gimnasio": "Ocio",
+                                     "mercadona": "Comida"})
+    # sube de precio a mitad; la referencia del recibo cambia cada mes; el
+    # de marzo pasa el día 2 en vez del 1 (fin de semana)
+    datos = (_meses(3, "NETFLIX.COM", [-12.99, -12.99, -12.99, -13.99, -13.99, -13.99])
+             + [(f"{d}/{m:02d}/2026", f"RECIBO GIMNASIO REF {m}{m}731", -35.00)
+                for d, m in (("01", 2), ("02", 3), ("01", 4), ("01", 5), ("01", 6))]
+             + [("20/06/2026", "COMPRA MERCADONA MADRID", -60.00)])
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar("🔁 2 cargos que se repiten" in salida,
+              "encuentra los dos, y nada más", salida)
+    comprobar("167.88 €/año" in salida and "13.99 € mensual" in salida,
+              "al importe de hoy (13,99 × 12), no al antiguo", salida)
+    comprobar("420.00 €/año" in salida,
+              "y agrupa el recibo aunque la referencia cambie cada mes", salida)
+    comprobar(salida.index("420.00 €/año") < salida.index("167.88 €/año"),
+              "de más a menos coste al año", salida)
+    for palabra in ("deberías", "cancela", "ahorra"):
+        comprobar(palabra not in salida.lower(),
+                  f"sin opinar: no dice «{palabra}»", salida)
+
+
+@caso("recurrentes-no", "Lo que no es un cargo regular no sale")
+def prueba_recurrentes_no(e):
+    datos = (
+        # la compra: muchas veces, fechas e importes irregulares
+        [(f"{d:02d}/{m:02d}/2026", "COMPRA MERCADONA MADRID", -(40 + d + m))
+         for m in range(1, 7) for d in (4, 11, 19, 26)]
+        # solo dos cargos: todavía no es una serie
+        + _meses(5, "SPOTIFY", [-10.99, -10.99], desde_mes=5)
+        # cada mes, pero con importes que no se parecen de nada
+        + _meses(8, "CINE YELMO", [-9.00, -45.00, -18.00, -80.00])
+        # regular, pero es un traspaso a otra cuenta tuya, no un gasto
+        + _meses(1, "TRASPASO A AHORRO", [-200.0] * 6)
+        # regular... hasta que se dio de baja en febrero
+        + _meses(10, "HBO MAX", [-8.99] * 4, año=2025, desde_mes=9)
+        + _meses(10, "HBO MAX", [-8.99, -8.99])
+        # el de control: este sí, para saber que el informe se ha ejecutado
+        + _meses(3, "NETFLIX.COM", [-13.99] * 6))
+    e.escribir_config("rules.json", {"mercadona": "Comida", "spotify": "Ocio",
+                                     "cine": "Ocio", "traspaso": "Transferencias internas",
+                                     "hbo": "Ocio", "netflix": "Ocio"})
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar("🔁 1 cargo que se repite" in salida and "NETFLIX" in salida,
+              "solo sale el de control", salida)
+    informe = salida[salida.find("🔁"):]
+    for concepto in ("MERCADONA", "SPOTIFY", "CINE", "TRASPASO", "HBO"):
+        comprobar(concepto not in informe, f"{concepto} no sale", informe)
+
+
+@caso("recurrentes-anual", "Un seguro anual sale con solo dos cargos")
+def prueba_recurrentes_anual(e):
+    e.escribir_config("rules.json", {"seguro hogar": "Piso",
+                                     "mercadona": "Comida"})
+    datos = [("15/03/2025", "SEGURO HOGAR POLIZA 88123", -280.00),
+             ("14/03/2026", "SEGURO HOGAR POLIZA 88124", -295.00),
+             ("20/06/2026", "COMPRA MERCADONA MADRID", -60.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    salida = e.ejecutar()
+
+    comprobar("295.00 €/año" in salida and "anual" in salida,
+              "sale como anual, al importe del último", salida)
+
+
 @caso("signo", "Un Bizum recibido no es lo mismo que uno enviado")
 def prueba_signo(e):
     datos = [("07/04/2026", "BIZUM A MARTA CENA", -18.00),

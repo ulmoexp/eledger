@@ -5,7 +5,9 @@ el usuario descarga del banco y produce un Excel con histórico y resumen
 mensual. Todo local, sin red.
 
 Documentos: `TRASPASO.md` (cómo funciona y qué hay pendiente), `ROADMAP.md`
-(qué toca ahora), `CHANGELOG.md`, `COMPILAR.md`.
+(qué toca ahora), `CHANGELOG.md`, `COMPILAR.md`, y `FUNCIONAMIENTO.md` (qué
+hace la herramienta por dentro, sin código: la referencia del propio
+desarrollador para acordarse de cómo funciona algo).
 
 ## La regla más importante: nunca `git push`
 
@@ -18,7 +20,7 @@ lo que sea): si hace falta, se le pide al usuario que lo haga él.
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        76 casos, 292 comprobaciones, ~2 min
+python pruebas/probar.py        79 casos, 306 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se
@@ -82,6 +84,10 @@ cuentas del mismo tipo con un movimiento idéntico se fusionan).
 3. Si cambia el formato del histórico, añade la migración en `historico.py`
    (lista `MIGRACIONES`), no un parche del tipo "si la columna no existe".
 4. Regenera la guía: `python app/build_guia.py`.
+5. Si cambia lo que la herramienta hace (no solo cómo está escrito), corrige
+   `FUNCIONAMIENTO.md`: tiene que seguir describiendo el comportamiento real.
+6. Si no corresponde a ningún hito, anótalo en `ROADMAP.md`, en «Lo que se ha
+   hecho fuera de este roadmap».
 
 ## Windows
 

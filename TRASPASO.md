@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.7.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.8.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          76 casos, 292 comprobaciones, ~2 min
+python pruebas/probar.py          79 casos, 306 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -125,6 +125,15 @@ que vale en `etiquetas` y `orden_resumen`. La traducción vive en un solo
 sitio, `Catalogo.columnas_ingreso`; no la dupliques. Cualquier otro choque de
 nombre de columna lo avisa `Catalogo.validar()`.
 
+**Cargos recurrentes (2.8.0): informar, nunca opinar.** `informe_recurrentes()`
+en `process.py` agrupa los gastos por la descripción ENTERA sin números
+(para no mezclar «PAYPAL *NETFLIX» con «PAYPAL *SPOTIFY») y recorre cada
+grupo hacia atrás desde el último cargo mientras intervalo e importe cuadren.
+Solo sale lo que sigue vivo y lo que es de categorías de gasto (un traspaso
+mensual a ahorro, neutro, no cuenta). El texto se limita a «esto se repite y
+suma X € al año»: nada de «deberías cancelarlo». Es una restricción de
+producto, no de estilo, y el caso `recurrentes-mensual` la vigila.
+
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y
 `sincronizar.py` se niega a escribir en una hoja con fórmulas, y no borra filas
@@ -169,16 +178,11 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 4. Ideas menores: un registro de diagnóstico (que **no** incluya descripciones
    de movimientos), y firmar el `.exe` para evitar SmartScreen (cuesta dinero).
 
-5. **Detección de recibos/cargos recurrentes** (suscripciones, cuotas...).
-   Diseño completo (algoritmo, restricciones de producto, casos límite) en
-   `/root/.claude/plans/quiero-que-continuemos-con-replicated-dragon.md`,
-   sección "Diseño: detección de recibos/cargos recurrentes". Reutiliza
-   `normalizar()` y `_sin_numeros()` (ya existen, en `reglas.py` y
-   `process.py`), agrupa por descripción enmascarada, exige regularidad de
-   intervalos (mensual ≈28-33 días con 3+ apariciones, anual ≈350-380 días
-   con 2+), informe por consola ordenado por coste anualizado, sin opinar
-   ("esto se repite y suma X€/año", nunca "deberías cancelarlo"). Sin
-   implementar.
+5. **Cargos recurrentes: afinar con uso real.** Implementado en 2.8.0 solo
+   por consola. Los márgenes (26-35 días, ±15% o ±3 €) están fijados con
+   datos inventados; si con extractos reales salen falsos positivos o se
+   escapan recibos, se ajustan ahí. Pasar a una hoja `RECURRENTES` en el
+   Excel queda aparcado hasta ver que el informe aporta de verdad.
 
 ## 6. Cómo trabajar aquí
 

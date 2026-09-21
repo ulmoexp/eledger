@@ -562,6 +562,119 @@ def detectar_recibo_tarjeta(todo):
               "que ves arriba.")
 
 
+# ========= CARGOS QUE SE REPITEN (suscripciones, cuotas, seguros) =========
+# Un cargo pequeño y olvidado ("solo son 8,99 €") pesa de verdad cuando se ve
+# lo que suma al año. Este informe solo dice eso: qué se repite y cuánto suma.
+# NUNCA opina ("deberías cancelarlo"): un alquiler o un gimnasio que sí se usa
+# salen igual que una suscripción olvidada, y la decisión es de quien lo lee.
+# Opinar es justo lo que diferencia a una app de "consejos" de un Excel propio.
+#
+# Mismo principio que A1 y A2: mejor callarse que equivocarse. Por eso se
+# exige a la vez regularidad en las fechas y estabilidad en el importe, y
+# un grupo que no cumple las dos cosas no sale, aunque "parezca" recurrente.
+_CADENCIAS = (
+    # (nombre, días mínimos y máximos entre dos cargos, cargos mínimos, veces al año)
+    # El margen de días cubre que el banco pase un recibo del día 1 al lunes
+    # siguiente si cae en fin de semana, y los meses de 28 a 31 días.
+    ("mensual", 26, 35, 3, 12),
+    # Anual con solo DOS cargos: exigir tres obligaría a tener tres años de
+    # histórico para ver un seguro, que es justo el caso que más interesa.
+    ("anual", 350, 380, 2, 1),
+)
+_TOLERANCIA_RELATIVA_RECURRENTE = 0.15   # una suscripción sube de precio, un
+_TOLERANCIA_ABSOLUTA_RECURRENTE = 3.0    # seguro varía la prima: lo que sea
+                                         # mayor de los dos, de cargo a cargo.
+_MAX_RECURRENTES = 10
+
+
+def _clave_recurrente(descripcion):
+    """La descripción sin lo que cambia de un cargo a otro (la referencia del
+    recibo, la fecha que meten algunos bancos en el concepto). Se agrupa por
+    el texto ENTERO que queda, no por una palabra suelta como en A1: así
+    «PAYPAL *NETFLIX» y «PAYPAL *SPOTIFY» no acaban en el mismo grupo."""
+    return " ".join(_sin_numeros(normalizar(descripcion)).split())
+
+
+def _importe_parecido(a, b):
+    margen = max(_TOLERANCIA_ABSOLUTA_RECURRENTE,
+                 _TOLERANCIA_RELATIVA_RECURRENTE * max(abs(a), abs(b)))
+    return abs(a - b) <= margen
+
+
+def _serie_recurrente(cargos, ultima_fecha):
+    """
+    Si los cargos de un grupo (ordenados por fecha) terminan en una serie
+    regular, devuelve (cadencia, veces_al_año, serie); si no, None.
+
+    Se recorre HACIA ATRÁS desde el último cargo mientras intervalo e importe
+    sigan cuadrando: lo que importa es lo que se paga hoy, así que un precio
+    antiguo muy distinto, o un hueco de hace un año, no tiran abajo una
+    suscripción que lleva meses regular. Y la serie tiene que seguir viva:
+    si el último cargo queda más lejos de la fecha del histórico de lo que
+    toca, eso ya se dio de baja y no hay nada que contar.
+    """
+    fechas = list(cargos["fecha"])
+    importes = list(cargos["importe"])
+    if len(fechas) < 2:
+        return None
+    ultimo_intervalo = (fechas[-1] - fechas[-2]).days
+    for nombre, minimo, maximo, cargos_minimos, veces in _CADENCIAS:
+        if not minimo <= ultimo_intervalo <= maximo:
+            continue
+        if (ultima_fecha - fechas[-1]).days > maximo:
+            return None
+        inicio = len(fechas) - 1
+        while (inicio > 0
+               and minimo <= (fechas[inicio] - fechas[inicio - 1]).days <= maximo
+               and _importe_parecido(importes[inicio], importes[inicio - 1])):
+            inicio -= 1
+        serie = cargos.iloc[inicio:]
+        return (nombre, veces, serie) if len(serie) >= cargos_minimos else None
+    return None
+
+
+def informe_recurrentes(df, categorias_gasto):
+    """
+    Cargos que se repiten con regularidad: cada mes o cada año, mismo
+    concepto y un importe parecido. Solo gastos, y solo de las categorías de
+    gasto: un traspaso mensual a tu cuenta de ahorro (neutra) también es
+    regular, pero no es algo que se "pague".
+
+    Ordenado por lo que suma al año al importe del ÚLTIMO cargo, que es el
+    precio de hoy, no por la cuota suelta: 8,99 €/mes se ve como 107,88 €/año.
+    """
+    gastos = df[(df["importe"] < 0) & df["categoria"].isin(categorias_gasto)]
+    if gastos.empty:
+        return
+    ultima_fecha = df["fecha"].max()
+
+    encontrados = []
+    for _, cargos in gastos.groupby(gastos["descripcion"].map(_clave_recurrente)):
+        resultado = _serie_recurrente(cargos.sort_values("fecha"), ultima_fecha)
+        if resultado is None:
+            continue
+        cadencia, veces, serie = resultado
+        ultimo = serie.iloc[-1]
+        encontrados.append((-ultimo["importe"] * veces, cadencia,
+                            -ultimo["importe"], serie["fecha"].iloc[0], ultimo))
+    if not encontrados:
+        return
+
+    encontrados.sort(key=lambda e: -e[0])
+    total = sum(e[0] for e in encontrados)
+    cuantos = ("1 cargo que se repite" if len(encontrados) == 1
+               else f"{len(encontrados)} cargos que se repiten")
+    print(f"\n🔁 {cuantos}; al importe de hoy suma{'n' if len(encontrados) > 1 else ''} "
+          f"{total:,.2f} € al año:")
+    if len(encontrados) > _MAX_RECURRENTES:
+        print(f"   (se muestran los {_MAX_RECURRENTES} que más suman)")
+    print()
+    for al_año, cadencia, importe, desde, ultimo in encontrados[:_MAX_RECURRENTES]:
+        print(f"   {al_año:>10,.2f} €/año  ·  {importe:,.2f} € {cadencia}  ·  "
+              f"desde {desde:%m/%Y}  ·  {ultimo['categoria']}")
+        print(f"      {ultimo['descripcion']}")
+
+
 # ========= MAIN =========
 def arrancar():
     """
@@ -744,6 +857,8 @@ def main():
         if "Acumulado" in resumen.columns:
             print(f"   Acumulado desde el principio: {ult['Acumulado']:+,.2f} €")
 
+    informe_recurrentes(df, catalogo.gastos)
+    # lo último, porque es lo único de aquí que pide hacer algo
     informe_sin_clasificar(df)
 
 

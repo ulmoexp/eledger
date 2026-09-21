@@ -44,7 +44,8 @@ pasos de arriba.
   una base de comercios conocidos en toda España, que se actualiza con cada
   versión sin tocar las tuyas.
 - Al terminar, te dice qué se ha quedado sin clasificar, agrupado y con una
-  línea lista para pegar en tus reglas.
+  línea lista para pegar en tus reglas. Y qué cargos se repiten cada mes o
+  cada año (suscripciones, cuotas, seguros), con lo que suman al año.
 - Si tu extracto trae el saldo de la cuenta, el resumen parte de ese saldo
   real en vez de partir de 0.
 - Todo el histórico se recalcula en cada ejecución: si afinas una regla, se

@@ -214,6 +214,22 @@ story += [
     Spacer(1, 7 * mm),
 ]
 
+# la privacidad va lo primero, antes incluso de la chuleta: es la promesa
+# central de la herramienta (igual que en la portada y la guía de la web)
+story += [
+    h1("Privacidad"),
+    E,
+    p("Todo el procesamiento ocurre en tu ordenador. La herramienta no abre ninguna "
+      "conexión de red, no envía datos a ningún servicio y no deja copias fuera de la "
+      "carpeta del proyecto. Las únicas librerías externas son "
+      "<font face='Mono' size='8.6'>pandas</font>, "
+      "<font face='Mono' size='8.6'>openpyxl</font> y "
+      "<font face='Mono' size='8.6'>xlrd</font>, todas de lectura y escritura local."),
+    p("Si mueves la carpeta a otro ordenador, cópiala entera y vuelve a instalar las "
+      "dependencias. No hay nada más que configurar."),
+]
+story += [EE]
+
 story += [h1("Chuleta"), E]
 story += [pasos([
     "Descarga del banco los extractos de <b>cuenta</b> y de <b>tarjeta</b>",
@@ -221,9 +237,11 @@ story += [pasos([
     "<font face='Body' color='#5C6672'>tal cual: sin renombrar, sin convertir, "
     "sin separar por tipo</font>",
     "Doble clic en <font face='Mono' size='9'>ejecutar.bat</font> "
-    "<font face='Body' color='#5C6672'>(Windows)</font> o "
+    "<font face='Body' color='#5C6672'>(Windows)</font>, "
     "<font face='Mono' size='9'>ejecutar.command</font> "
-    "<font face='Body' color='#5C6672'>(Mac)</font>",
+    "<font face='Body' color='#5C6672'>(Mac)</font> o "
+    "<font face='Mono' size='9'>ejecutar.sh</font> "
+    "<font face='Body' color='#5C6672'>(Linux)</font>",
     "Revisa el resumen en pantalla: qué ha leído de cada fichero, repetidos, "
     "excluidos y movimientos sin regla",
     "Abre tu fichero de contabilidad: los movimientos ya están dentro "
@@ -243,7 +261,9 @@ story += [h1("Qué hace"), E]
 story += [p(
     "Lee los movimientos de la cuenta y de todas las tarjetas, los junta en una sola "
     "tabla, descarta los movimientos que no quieres contar, los clasifica por "
-    "categorías y genera un Excel listo para pegar en tu hoja de cálculo.")]
+    "categorías y genera un Excel listo para pegar en tu hoja de cálculo. Al terminar, "
+    "te enseña qué cargos se repiten cada mes o cada año (suscripciones, cuotas, "
+    "seguros) y cuánto suman al año; sin opinar sobre ninguno.")]
 
 flujo = Table([[
     Paragraph("<b>Entrada</b><br/><font size='8' color='#5C6672'>cuenta + tarjetas<br/>"
@@ -928,20 +948,6 @@ story += [h1("Diagnóstico de un fichero"), E]
 story += [p("Enseña qué formato es realmente, dónde está la cabecera y qué columnas ha "
             "reconocido. No modifica nada:")]
 story += [codigo("python bank_io.py movimientos.xls")]
-story += [EE]
-
-story += [
-    h1("Privacidad"),
-    E,
-    p("Todo el procesamiento ocurre en tu ordenador. La herramienta no abre ninguna "
-      "conexión de red, no envía datos a ningún servicio y no deja copias fuera de la "
-      "carpeta del proyecto. Las únicas librerías externas son "
-      "<font face='Mono' size='8.6'>pandas</font>, "
-      "<font face='Mono' size='8.6'>openpyxl</font> y "
-      "<font face='Mono' size='8.6'>xlrd</font>, todas de lectura y escritura local."),
-    p("Si mueves la carpeta a otro ordenador, cópiala entera y vuelve a instalar las "
-      "dependencias. No hay nada más que configurar."),
-]
 
 # --------------------------------------------- agrupar secciones
 UMBRAL = 340   # pt: por encima de esto, la sección puede partirse

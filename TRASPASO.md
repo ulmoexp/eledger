@@ -159,6 +159,24 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 4. Ideas menores: un registro de diagnóstico (que **no** incluya descripciones
    de movimientos), y firmar el `.exe` para evitar SmartScreen (cuesta dinero).
 
+5. **Desglosar ingresos por categoría en RESUMEN** (llamado "1c" en las
+   conversaciones de esta fase). Hoy los ingresos suman en una única columna
+   `Ingresos`; falta un flag opt-in en `categorias.json`
+   (`"desglosar_ingresos": true`, por defecto `false`) que añada un bucle en
+   `construir_resumen()` sobre `catalogo.ingresos` análogo al de gastos, una
+   columna por categoría de ingreso. Ya diseñado, sin implementar.
+
+6. **Detección de recibos/cargos recurrentes** (suscripciones, cuotas...).
+   Diseño completo (algoritmo, restricciones de producto, casos límite) en
+   `/root/.claude/plans/quiero-que-continuemos-con-replicated-dragon.md`,
+   sección "Diseño: detección de recibos/cargos recurrentes". Reutiliza
+   `normalizar()` y `_sin_numeros()` (ya existen, en `reglas.py` y
+   `process.py`), agrupa por descripción enmascarada, exige regularidad de
+   intervalos (mensual ≈28-33 días con 3+ apariciones, anual ≈350-380 días
+   con 2+), informe por consola ordenado por coste anualizado, sin opinar
+   ("esto se repite y suma X€/año", nunca "deberías cancelarlo"). Sin
+   implementar.
+
 ## 6. Cómo trabajar aquí
 
 - El usuario quiere **entender el porqué**, no solo el resultado. Explica las

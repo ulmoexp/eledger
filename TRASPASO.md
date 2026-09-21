@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.4.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.5.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          70 casos, 263 comprobaciones, ~2 min
+python pruebas/probar.py          72 casos, 268 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -103,6 +103,17 @@ cerrojo.**
 **El resumen muestra los gastos en positivo** (es `-suma`). Una categoría que
 acabe a favor sale negativa. No lo "arregles": hubo un `ABS()` que disfrazaba
 las devoluciones de gasto.
+
+**Personalizar RESUMEN sin poner en riesgo el cuadre (2.5.0).**
+`categorias.json` admite `etiquetas` y `orden_resumen`, pero el cálculo de
+`construir_resumen()` sigue trabajando **siempre con el nombre interno de la
+categoría** — el renombrado a etiqueta visible es el último paso, ya sobre el
+DataFrame terminado. Si algún día el cálculo empezara a usar la etiqueta en
+vez del nombre interno, `Catalogo.validar()` dejaría de poder comparar contra
+`rules.json` y volvería el fallo de la tilde que cuadra a 0€ que esos avisos
+existen para evitar. Un nombre mal escrito en `orden_resumen` se descarta en
+silencio al construir el resumen (no rompe la ejecución) y se avisa aparte,
+mismo patrón que el resto de avisos de `Catalogo`.
 
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y

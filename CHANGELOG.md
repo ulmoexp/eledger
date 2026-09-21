@@ -6,6 +6,22 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.5.0
+
+- **Personalizar la hoja RESUMEN.** Dos campos opcionales nuevos en
+  `categorias.json`: `etiquetas` (nombre interno → texto de columna, para
+  cambiar cómo se ve una columna sin arriesgar el cuadre letra-por-letra con
+  `rules.json`) y `orden_resumen` (qué columnas salen y en qué orden,
+  incluidas las de sistema como `Balance` o `Acumulado`, antes fijas al
+  final). Sin ninguno de los dos, el resumen sale exactamente igual que
+  siempre. Un nombre mal escrito en `orden_resumen` avisa por pantalla, no
+  rompe la ejecución.
+- La hoja RESUMEN incluye ahora un gráfico de línea de **Acumulado**, para
+  ver de un vistazo si vas bien o vas mal. Sin anotaciones ni consejos
+  generados: solo el gráfico.
+
+---
+
 ## 2.4.0
 
 - **Identificador de cuenta en la deduplicación** (hito A3 del roadmap). Dos

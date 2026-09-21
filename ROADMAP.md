@@ -13,7 +13,7 @@ Supuestos: repositorio público en GitHub, en español, público pequeño
 
 ## Parte A — Producto
 
-### A1. Informe de «esto no sé clasificarlo»
+### A1. Informe de «esto no sé clasificarlo» ✅ cerrado
 
 Al terminar, listar los movimientos que han caído en `Otros`, ordenados por
 importe, agrupando los que comparten palabras. Con una línea sugerida para
@@ -26,7 +26,7 @@ Es la mejora con más efecto por menos código.
 *Hecho cuando:* con un extracto sin reglas, el informe señala los tres gastos
 mayores sin clasificar y la regla propuesta funciona al pegarla.
 
-### A2. Detección del recibo de la tarjeta
+### A2. Detección del recibo de la tarjeta ✅ cerrado
 
 Si `exclude_patterns.json` está vacío y hay movimientos de tarjeta, buscar en
 la cuenta cargos cuyo importe cuadre con la suma de la tarjeta de ese mes y
@@ -39,7 +39,7 @@ de que la persona lea el LEEME.
 *Hecho cuando:* con un par de extractos de ejemplo, propone el recibo correcto
 y no propone nada cuando ya hay exclusiones puestas.
 
-### A3. Identificador de cuenta en la deduplicación
+### A3. Identificador de cuenta en la deduplicación ✅ cerrado
 
 Añadir `cuenta` a la clave de deduplicación, deducida del fichero o declarada
 en `ajustes/`. Migración del histórico incluida.
@@ -73,14 +73,20 @@ rechaza un JSON mal formado.
 Estática, sin base de datos, sin cuentas, sin formularios. El producto se
 descarga de GitHub; la web solo explica y enlaza.
 
-### B1. Preparar el terreno
+### B1. Preparar el terreno ⏳ parcial
 
 Repositorio público, licencia (MIT vale), primera release con el ZIP y el
 `.exe` adjuntos, y decidir el nombre y el dominio.
 
 *Hecho cuando:* alguien puede descargar la herramienta desde una URL.
 
-### B2. Portada
+*Estado:* `LICENSE` y `README.md` listos y comiteados. Pendiente de acciones
+que no hace la IA (ver `CLAUDE.md`): que el usuario haga `git push`, ponga el
+repo en público, y cree la release. El `.exe` sigue sin compilar (hay que
+hacerlo en Windows, ver `TRASPASO.md` §5) — la release puede salir solo con
+el ZIP mientras tanto.
+
+### B2. Portada ✅ contenido cerrado
 
 Una página. Qué hace, para quién, y **la privacidad arriba del todo**: todo se
 procesa en tu ordenador, no hay servidor, no hay cuenta, no sale nada a
@@ -91,7 +97,11 @@ pantalla no responde «¿dónde acaban mis datos?», no pasa de ahí.
 
 *Hecho cuando:* se entiende qué es y se descarga sin hacer scroll de más.
 
-### B3. La guía, en HTML
+*Estado:* contenido y diseño comiteados en `eledger-web`. El botón de
+descarga apunta a la release de GitHub — no funciona de verdad hasta que B1
+tenga una release publicada.
+
+### B3. La guía, en HTML ✅ contenido cerrado
 
 Pasar el contenido de `GUIA.pdf` a páginas web. El PDF se sigue generando para
 llevarlo dentro del ZIP.
@@ -102,19 +112,28 @@ es donde está la respuesta a casi todo.
 *Hecho cuando:* se puede enlazar una sección concreta y se lee bien en móvil.
 
 *Ojo:* se genera desde la misma fuente que el PDF, o los dos se separan en tres
-versiones.
+versiones. Contenido deliberadamente recortado frente al PDF (ver B4 y el
+propio `eledger-web`): la web vende «simple», el PDF puede ser exhaustivo.
 
-### B4. Página de reglas
+### B4. Página de reglas ✅ contenido cerrado
 
 La sintaxis explicada con ejemplos, las trampas del límite de palabra, las
 reglas por signo, y cómo contribuir a la base (enlaza con A4).
 
 *Hecho cuando:* alguien escribe su primera regla sin preguntar nada.
 
+*Estado:* `reglas.html` es ahora la referencia canónica de sintaxis (la guía
+enlaza aquí en vez de repetirla). «Cómo contribuir a la base» queda como
+«próximamente», sin enlazar a un proceso que no existe hasta que A4 se haga.
+
 ### B5. Publicar
 
 Desplegar, comprobar en móvil, y dejarlo. Sin analítica: sería incoherente con
 lo que dice la portada.
+
+*Estado:* pendiente — activar GitHub Pages es una acción del usuario, no de
+la IA (ver `CLAUDE.md` de `eledger-web`: nunca se hace `git push` ni se toca
+la configuración de GitHub desde aquí).
 
 ---
 
@@ -126,6 +145,14 @@ A1 → A2 → B1 → B2 → B3 → (A3 / A4 / B4 según haga falta)
 
 A1 y A2 primero porque cambian lo que la web tiene que contar. B1 antes que B2
 porque una portada sin descarga no sirve de nada.
+
+## Lo que se ha hecho fuera de este roadmap
+
+Este documento es el plan original, no un registro de cambios — para eso está
+`CHANGELOG.md`. Alguna mejora ha salido de conversaciones con el usuario sin
+mapear a ningún hito de aquí (p. ej. personalizar columnas de RESUMEN y el
+gráfico de Acumulado, en la 2.5.0): mirar ahí para lo que no aparezca en esta
+lista.
 
 ## Lo que queda fuera a propósito
 

@@ -243,10 +243,22 @@ class Catalogo:
     las de sistema como Balance o Acumulado, hoy fijas al final). Ninguno de
     los dos existía antes de esta versión: si no se ponen, el resumen sale
     exactamente igual que siempre.
+
+    Un tercero, 'desglosar_ingresos', da a cada categoría de ingreso su propia
+    columna además del total Ingresos (por defecto no: una sola columna, como
+    siempre).
     """
 
     COLUMNAS_SISTEMA = ["Mes", "Deuda", "Extras", "Total Gastos", "Ingresos",
                         "Balance", "Acumulado"]
+
+    # La categoría de ingreso de la plantilla y de rules_base.json se llama
+    # «Ingresos», igual que la columna del total. Al desglosar, las dos no
+    # pueden compartir nombre, y obligar a renombrar la categoría supondría
+    # reescribir en rules.json todas las reglas de la base que la asignan. Así
+    # que su columna propia toma este nombre, que es lo que de verdad es: lo
+    # que entra y no tiene una categoría de ingreso más concreta.
+    COLUMNA_OTROS_INGRESOS = "Otros ingresos"
 
     def __init__(self, datos: dict):
         self.gastos = list(datos.get("gastos", []))
@@ -257,10 +269,21 @@ class Catalogo:
         # None = sin personalizar (orden de siempre). Una lista, aunque esté
         # vacía, significa que el usuario SÍ ha decidido qué mostrar.
         self.orden_resumen = datos.get("orden_resumen")
+        self.desglosar_ingresos = datos.get("desglosar_ingresos", False) is True
 
     @property
     def todas(self):
         return self.gastos + self.ingresos + self.neutras
+
+    @property
+    def columnas_ingreso(self) -> dict:
+        """Categoría de ingreso -> nombre de su columna en RESUMEN, o vacío si
+        no se desglosan. Ese nombre de columna es también el que se usa en
+        'orden_resumen' y en 'etiquetas'."""
+        if not self.desglosar_ingresos:
+            return {}
+        return {c: (self.COLUMNA_OTROS_INGRESOS if c == "Ingresos" else c)
+                for c in self.ingresos}
 
     def etiqueta(self, categoria: str) -> str:
         """El texto que se ve en la columna, o el nombre interno si no se ha
@@ -305,20 +328,41 @@ class Catalogo:
                     f"«{de}» está en categorias.json pero ninguna regla la asigna: "
                     f"su columna saldrá siempre a 0.")
 
-        repes = [c for c in self.todas if self.todas.count(c) > 1]
-        for c in sorted(set(repes)):
+        repes = {c for c in self.todas if self.todas.count(c) > 1}
+        for c in sorted(repes):
             avisos.append(f"«{c}» aparece más de una vez en categorias.json.")
+
+        # Cada columna del resumen es una clave de la misma fila: si una
+        # categoría se llama como otra columna (un gasto «Balance», o una
+        # categoría de ingreso «Otros ingresos» junto a «Ingresos» al
+        # desglosar), una pisa a la otra al construirla y desaparece del
+        # Excel. Los totales no cambian, pero la columna se pierde sin avisar.
+        ocupadas = set(self.COLUMNAS_SISTEMA)
+        for col in self.gastos + list(self.columnas_ingreso.values()):
+            if col in ocupadas and col not in repes:
+                avisos.append(
+                    f"«{col}» se llama igual que otra columna del resumen: "
+                    f"solo se verá una de las dos. Cámbiale el nombre en "
+                    f"categorias.json y en rules.json.")
+            ocupadas.add(col)
 
         # orden_resumen es opcional: si no se declara, no hay nada que
         # validar (el orden de siempre no puede tener nombres mal escritos).
         if self.orden_resumen is not None:
-            conocidas = set(self.COLUMNAS_SISTEMA) | set(self.gastos)
+            conocidas = (set(self.COLUMNAS_SISTEMA) | set(self.gastos)
+                         | set(self.columnas_ingreso.values()))
             for nombre in self.orden_resumen:
-                if nombre not in conocidas:
+                if nombre in conocidas:
+                    continue
+                if nombre in self.ingresos or nombre == self.COLUMNA_OTROS_INGRESOS:
+                    avisos.append(
+                        f"«{nombre}» en orden_resumen es una categoría de "
+                        f"ingreso, y solo tienen columna propia con "
+                        f"\"desglosar_ingresos\": true. Se ignora.")
+                else:
                     avisos.append(
                         f"«{nombre}» en orden_resumen no es ni una columna de "
-                        f"sistema ni una categoría de gastos declarada: se "
-                        f"ignora.")
+                        f"sistema ni una categoría declarada: se ignora.")
 
         return avisos
 

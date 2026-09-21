@@ -676,7 +676,12 @@ story += [tabla(
      ["<font face='Mono'>orden_resumen</font>",
       "<i>Opcional.</i> Qué columnas salen y en qué orden, incluidas las de sistema "
       "(Balance, Acumulado...), normalmente fijas al final. Sin él, el orden de "
-      "siempre."]],
+      "siempre."],
+     ["<font face='Mono'>desglosar_ingresos</font>",
+      "<i>Opcional.</i> Con <font face='Mono'>true</font>, cada categoría de ingreso "
+      "tiene su columna, además del total <b>Ingresos</b>. La que se llama "
+      "«Ingresos» sale como <b>Otros ingresos</b>, y así se la nombra en "
+      "etiquetas y orden_resumen."]],
     [ANCHO * 0.24, ANCHO * 0.76])]
 story += [Spacer(1, 7)]
 story += [aviso(

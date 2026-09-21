@@ -18,7 +18,7 @@ lo que sea): si hace falta, se le pide al usuario que lo haga él.
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        72 casos, 280 comprobaciones, ~2 min
+python pruebas/probar.py        76 casos, 292 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se

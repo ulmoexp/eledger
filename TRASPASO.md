@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.6.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.7.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          72 casos, 280 comprobaciones, ~2 min
+python pruebas/probar.py          76 casos, 292 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -115,6 +115,16 @@ existen para evitar. Un nombre mal escrito en `orden_resumen` se descarta en
 silencio al construir el resumen (no rompe la ejecución) y se avisa aparte,
 mismo patrón que el resto de avisos de `Catalogo`.
 
+**Desglose de ingresos y el choque «Ingresos» (2.7.0).** Con
+`"desglosar_ingresos": true` cada categoría de ingreso tiene columna propia,
+pero la categoría de la plantilla y de `rules_base.json` se llama igual que
+la columna del total. En vez de obligar a renombrarla (habría que reescribir
+todas las reglas de la base que la asignan), su columna se llama
+`Catalogo.COLUMNA_OTROS_INGRESOS` («Otros ingresos»), y ese es el nombre
+que vale en `etiquetas` y `orden_resumen`. La traducción vive en un solo
+sitio, `Catalogo.columnas_ingreso`; no la dupliques. Cualquier otro choque de
+nombre de columna lo avisa `Catalogo.validar()`.
+
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y
 `sincronizar.py` se niega a escribir en una hoja con fórmulas, y no borra filas
@@ -159,14 +169,7 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 4. Ideas menores: un registro de diagnóstico (que **no** incluya descripciones
    de movimientos), y firmar el `.exe` para evitar SmartScreen (cuesta dinero).
 
-5. **Desglosar ingresos por categoría en RESUMEN** (llamado "1c" en las
-   conversaciones de esta fase). Hoy los ingresos suman en una única columna
-   `Ingresos`; falta un flag opt-in en `categorias.json`
-   (`"desglosar_ingresos": true`, por defecto `false`) que añada un bucle en
-   `construir_resumen()` sobre `catalogo.ingresos` análogo al de gastos, una
-   columna por categoría de ingreso. Ya diseñado, sin implementar.
-
-6. **Detección de recibos/cargos recurrentes** (suscripciones, cuotas...).
+5. **Detección de recibos/cargos recurrentes** (suscripciones, cuotas...).
    Diseño completo (algoritmo, restricciones de producto, casos límite) en
    `/root/.claude/plans/quiero-que-continuemos-con-replicated-dragon.md`,
    sección "Diseño: detección de recibos/cargos recurrentes". Reutiliza

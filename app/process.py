@@ -728,12 +728,21 @@ def main():
     # de la tarjeta, que se sepa ANTES de fiarse de las cifras de abajo.
     detectar_recibo_tarjeta(todo)
 
+    # orden_resumen puede haber quitado cualquiera de estas columnas del
+    # resumen: se enseña solo lo que haya. Pedirlas a pelo rompía aquí,
+    # DESPUÉS de guardar, y se saltaba el informe de sin clasificar de abajo.
     if not resumen.empty:
-        print()
         ult = resumen.iloc[-1]
-        print(f"   Último mes ({ult['Mes']}):  gastos {ult['Total Gastos']:,.2f} € · "
-              f"ingresos {ult['Ingresos']:,.2f} € · balance {ult['Balance']:+,.2f} €")
-        print(f"   Acumulado desde el principio: {ult['Acumulado']:+,.2f} €")
+        partes = [f"{texto} {ult[col]:{formato}} €"
+                  for col, texto, formato in (("Total Gastos", "gastos", ",.2f"),
+                                              ("Ingresos", "ingresos", ",.2f"),
+                                              ("Balance", "balance", "+,.2f"))
+                  if col in resumen.columns]
+        mes = f" ({ult['Mes']})" if "Mes" in resumen.columns else ""
+        if partes:
+            print(f"\n   Último mes{mes}:  " + " · ".join(partes))
+        if "Acumulado" in resumen.columns:
+            print(f"   Acumulado desde el principio: {ult['Acumulado']:+,.2f} €")
 
     informe_sin_clasificar(df)
 

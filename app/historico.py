@@ -262,8 +262,8 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
     otro mes.
 
     Qué columnas salen, en qué orden y con qué nombre se puede personalizar
-    en categorias.json ('orden_resumen' y 'etiquetas'); sin ellos, sale
-    exactamente lo de siempre.
+    en categorias.json ('orden_resumen', 'etiquetas' y 'desglosar_ingresos');
+    sin ellos, sale exactamente lo de siempre.
     """
     col_mes = catalogo.columna_mes
     if df.empty:
@@ -272,6 +272,7 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
     piv = df.pivot_table(index=col_mes, columns="categoria",
                          values="importe", aggfunc="sum")
 
+    columnas_ingreso = catalogo.columnas_ingreso
     filas = []
     acumulado = float(saldo_inicial)
     for mes in sorted(piv.index):
@@ -283,10 +284,15 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
             fila[cat] = round(v, 2)
             total_gastos += v
 
+        # sin desglose, columnas_ingreso está vacío y solo sale el total.
+        # Los ingresos van con su signo tal cual (no se les da la vuelta como
+        # a los gastos): una devolución de nómina resta y se ve negativa.
         ingresos = 0.0
         for cat in catalogo.ingresos:
-            if cat in piv.columns and pd.notna(piv.at[mes, cat]):
-                ingresos += float(piv.at[mes, cat])
+            v = float(piv.at[mes, cat]) if cat in piv.columns and pd.notna(piv.at[mes, cat]) else 0.0
+            if cat in columnas_ingreso:
+                fila[columnas_ingreso[cat]] = round(v, 2)
+            ingresos += v
 
         balance = ingresos - total_gastos
 
@@ -301,8 +307,13 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
 
         filas.append(fila)
 
-    orden = (["Mes"] + catalogo.gastos
-             + ["Deuda", "Extras", "Total Gastos", "Ingresos", "Balance", "Acumulado"])
+    # las columnas desglosadas van justo antes del total que suman, para que
+    # se pueda comprobar a ojo que cuadran. dict.fromkeys quita repetidas: si
+    # dos categorías acaban con el mismo nombre de columna (ya se avisa en
+    # Catalogo.validar()), pandas no admite pedir dos veces la misma.
+    orden = list(dict.fromkeys(
+        ["Mes"] + catalogo.gastos + ["Deuda", "Extras", "Total Gastos"]
+        + list(columnas_ingreso.values()) + ["Ingresos", "Balance", "Acumulado"]))
 
     # orden_resumen (opcional, en categorias.json) deja elegir qué columnas
     # salen y en qué orden, incluidas las de sistema (Balance, Acumulado...),
@@ -316,7 +327,8 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
     # el renombrado a etiqueta visible es solo de presentación: el cálculo de
     # arriba y Catalogo.validar() siguen trabajando con el nombre interno de
     # la categoría, que es el que de verdad tiene que cuadrar con rules.json.
-    etiquetas = {c: catalogo.etiqueta(c) for c in orden if c in catalogo.gastos}
+    propias = set(catalogo.gastos) | set(columnas_ingreso.values())
+    etiquetas = {c: catalogo.etiqueta(c) for c in orden if c in propias}
     return resultado.rename(columns=etiquetas)
 
 

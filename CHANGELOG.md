@@ -6,6 +6,26 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.7.0
+
+- **Desglosar los ingresos en RESUMEN.** Nuevo campo opcional en
+  `categorias.json`: `"desglosar_ingresos": true` da a cada categoría de
+  ingreso su propia columna, justo antes del total **Ingresos**, que sigue
+  ahí y sigue sumando lo mismo. Sin el campo, una sola columna como siempre.
+  La categoría que se llama `Ingresos` (la de la plantilla, la que asignan
+  las reglas de la base) sale como **Otros ingresos**, para no chocar con el
+  total; con ese nombre se la cita también en `etiquetas` y `orden_resumen`.
+- Se avisa por pantalla si una categoría se llama igual que otra columna del
+  resumen (por ejemplo un gasto llamado `Balance`): una de las dos no se
+  vería. Y si `orden_resumen` pide una categoría de ingreso sin haber
+  activado el desglose, el aviso lo dice en vez de tratarla como una errata.
+- Arreglado: si `orden_resumen` quitaba `Total Gastos`, `Ingresos`,
+  `Balance` o `Acumulado`, el Excel se guardaba bien pero la ejecución
+  acababa con un error al enseñar el resumen por pantalla, y se saltaba el
+  listado de movimientos sin clasificar. Ahora se enseña solo lo que haya.
+
+---
+
 ## 2.6.0
 
 - **Linux, documentado y funcionando de verdad.** `instalar.sh`,

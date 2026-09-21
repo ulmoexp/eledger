@@ -1389,6 +1389,105 @@ def prueba_resumen_orden_invalido(e):
     res = e.resumen()
     comprobar(list(res.columns) == ["Mes", "Balance"],
               "y el resto del orden pedido sí se aplica", str(list(res.columns)))
+    comprobar("❌" not in salida,
+              "quitar Total Gastos o Ingresos del resumen no rompe el final de "
+              "la ejecución", salida)
+
+
+# dos categorías de ingreso, la de siempre («Ingresos», que es la que asigna
+# la base) y una más concreta: el caso normal de quien quiere desglosar.
+CATEGORIAS_DOS_INGRESOS = {
+    "gastos": ["Comida", "Otros"],
+    "ingresos": ["Nomina", "Ingresos"],
+    "neutras": ["Transferencias internas"],
+    "columna_mes": "mes_ajustado"}
+MOVIMIENTOS_DOS_INGRESOS = [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                            ("09/04/2026", "NOMINA EMPRESA SL", 2000.00),
+                            ("12/04/2026", "BIZUM DE MARTA ALQUILER", 350.00)]
+REGLAS_DOS_INGRESOS = {"mercadona": "Comida", "nomina": "Nomina",
+                       "bizum": {"+": "Ingresos", "-": "Otros"}}
+
+
+@caso("resumen-sin-desglose", "Sin desglosar_ingresos, una sola columna Ingresos como siempre")
+def prueba_resumen_sin_desglose(e):
+    e.escribir_config("categorias.json", CATEGORIAS_DOS_INGRESOS)
+    e.escribir_config("rules.json", REGLAS_DOS_INGRESOS)
+    fx.escribir_html(e.entrada / "cuenta.xls", MOVIMIENTOS_DOS_INGRESOS)
+    e.ejecutar()
+
+    res = e.resumen()
+    comprobar("Nomina" not in res.columns and "Otros ingresos" not in res.columns,
+              "las categorías de ingreso no tienen columna propia",
+              str(list(res.columns)))
+    comprobar(abs(res.iloc[0]["Ingresos"] - 2350) < 0.005,
+              "y el total suma las dos", str(res.iloc[0]["Ingresos"]))
+
+
+@caso("resumen-desglose-ingresos", "desglosar_ingresos da una columna a cada categoría de ingreso")
+def prueba_resumen_desglose_ingresos(e):
+    e.escribir_config("categorias.json",
+                      {**CATEGORIAS_DOS_INGRESOS, "desglosar_ingresos": True})
+    e.escribir_config("rules.json", REGLAS_DOS_INGRESOS)
+    fx.escribir_html(e.entrada / "cuenta.xls", MOVIMIENTOS_DOS_INGRESOS)
+    salida = e.ejecutar()
+
+    res = e.resumen()
+    comprobar(list(res.columns)[-6:] == ["Total Gastos", "Nomina", "Otros ingresos",
+                                         "Ingresos", "Balance", "Acumulado"],
+              "una columna por categoría, justo antes del total que suman; la "
+              "categoría «Ingresos» sale como «Otros ingresos» para no chocar "
+              "con el total", str(list(res.columns)))
+    f = res.iloc[0]
+    comprobar(abs(f["Nomina"] - 2000) < 0.005 and abs(f["Otros ingresos"] - 350) < 0.005,
+              "cada una con lo suyo", f"{f['Nomina']} / {f['Otros ingresos']}")
+    comprobar(abs(f["Ingresos"] - 2350) < 0.005 and abs(f["Balance"] - 2250) < 0.005,
+              "y el total y el balance no cambian por desglosar",
+              f"{f['Ingresos']} / {f['Balance']}")
+    comprobar("se llama igual" not in salida,
+              "sin avisos: el choque de nombres ya está resuelto", salida)
+
+
+@caso("resumen-desglose-personalizado", "Las columnas de ingreso admiten etiquetas y orden_resumen")
+def prueba_resumen_desglose_personalizado(e):
+    e.escribir_config("categorias.json", {
+        **CATEGORIAS_DOS_INGRESOS, "desglosar_ingresos": True,
+        "etiquetas": {"Nomina": "💶 Nómina", "Otros ingresos": "Resto"},
+        "orden_resumen": ["Mes", "Nomina", "Otros ingresos", "Ingresos"]})
+    e.escribir_config("rules.json", REGLAS_DOS_INGRESOS)
+    fx.escribir_html(e.entrada / "cuenta.xls", MOVIMIENTOS_DOS_INGRESOS)
+    salida = e.ejecutar()
+
+    res = e.resumen()
+    comprobar(list(res.columns) == ["Mes", "💶 Nómina", "Resto", "Ingresos"],
+              "se ordenan y se renombran por su nombre de columna",
+              str(list(res.columns)))
+    comprobar("orden_resumen" not in salida,
+              "sin avisos de nombres desconocidos", salida)
+
+
+@caso("resumen-desglose-avisos", "Nombres de columna que chocan o no existen sin desglosar avisan")
+def prueba_resumen_desglose_avisos(e):
+    # sin el flag, pedir una categoría de ingreso en orden_resumen no hace nada
+    e.escribir_config("categorias.json", {
+        **CATEGORIAS_DOS_INGRESOS, "orden_resumen": ["Mes", "Nomina", "Ingresos"]})
+    e.escribir_config("rules.json", REGLAS_DOS_INGRESOS)
+    fx.escribir_html(e.entrada / "cuenta.xls", MOVIMIENTOS_DOS_INGRESOS)
+    salida = e.ejecutar()
+    comprobar("desglosar_ingresos" in salida,
+              "avisa de que falta activar el desglose", salida)
+
+    # con el flag, una categoría que ya se llama «Otros ingresos» choca con
+    # la columna que toma «Ingresos»: se avisa, y el total sigue cuadrando
+    e.escribir_config("categorias.json", {
+        **CATEGORIAS_DOS_INGRESOS, "desglosar_ingresos": True,
+        "ingresos": ["Otros ingresos", "Ingresos"]})
+    e.escribir_config("rules.json", {"nomina": "Otros ingresos",
+                                     "bizum": {"+": "Ingresos", "-": "Otros"}})
+    salida = e.ejecutar()
+    comprobar("se llama igual" in salida and "Otros ingresos" in salida,
+              "avisa del choque de nombres", salida)
+    comprobar(abs(e.resumen().iloc[0]["Ingresos"] - 2350) < 0.005,
+              "y el total no pierde nada", str(e.resumen().iloc[0]["Ingresos"]))
 
 
 @caso("signo", "Un Bizum recibido no es lo mismo que uno enviado")

@@ -568,7 +568,9 @@ traicionero, porque el Excel cuadra por dentro y nadie se entera):
   licencia). `entrada/`, `salida/`, `datos/` y `ajustes/` no entran nunca, y
   una segunda comprobación aborta el ZIP si se hubiera colado algo que parezca
   un fichero de datos. Los lanzadores de Mac y Linux se marcan como
-  ejecutables dentro del ZIP aunque se genere desde Windows. Quien lo recibe
+  ejecutables dentro del ZIP aunque se genere desde Windows, y los saltos de
+  línea se fuerzan: los de Windows en los `.bat` y los de Linux/Mac en los
+  `.sh` y `.command`, vengan como vengan en la copia de origen. Quien lo recibe
   obtiene su propia configuración desde las plantillas la primera vez.
 - **Diagnóstico de un extracto**: `python app/bank_io.py fichero.xls` enseña
   qué formato es en realidad, las primeras filas de cada tabla, dónde ve la

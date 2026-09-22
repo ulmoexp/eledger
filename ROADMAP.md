@@ -168,6 +168,8 @@ lista. Hasta ahora:
 - **2.10.0** — base de reglas ampliada con cadenas genéricas de toda España,
   arreglado el orden de la base y retiradas tres reglas de transferencias
   que eran de una contabilidad concreta.
+- **2.10.1** — el ZIP para repartir fuerza los saltos de línea de cada
+  lanzador (salió al preparar la primera release).
 
 ## Lo que queda fuera a propósito
 

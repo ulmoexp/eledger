@@ -6,6 +6,16 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.10.1
+
+- **El ZIP para repartir lleva siempre los saltos de línea correctos**:
+  los de Windows en los `.bat` y los de Linux/Mac en los `.sh` y
+  `.command`, generes el ZIP donde lo generes. Antes dependían de la copia
+  de la que saliera, y un ZIP podía llevar `.bat` que fallasen en Windows o
+  `.sh` que no arrancasen en Linux.
+
+---
+
 ## 2.10.0
 
 - **Base de reglas ampliada** con cadenas genéricas de toda España:

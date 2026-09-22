@@ -74,6 +74,18 @@ LANZADORES_EJECUTABLES = {"instalar.sh", "ejecutar.sh", "exportar.sh",
                           "instalar.command", "ejecutar.command",
                           "exportar.command"}
 
+# Y los saltos de línea, por el mismo motivo: dependen de dónde se genere el
+# ZIP. .gitattributes los deja bien al descargar el repositorio, pero una
+# copia de trabajo que no se ha vuelto a descargar puede tenerlos mal (ya
+# pasó: los .bat del primer ZIP iban con los de Linux). Un .bat solo con LF
+# puede fallar en cmd de formas raras, y un .sh con CRLF no arranca en bash
+# (lee el \r como parte del comando). Se fuerzan aquí, pase lo que pase.
+SALTO_WINDOWS, SALTO_UNIX = b"\r\n", b"\n"
+
+
+def _con_saltos(datos: bytes, salto: bytes) -> bytes:
+    return datos.replace(b"\r\n", b"\n").replace(b"\n", salto)
+
 
 def _admisible(ruta: Path) -> bool:
     partes = set(ruta.parts)
@@ -156,12 +168,18 @@ def exportar(con_pruebas=False) -> Path:
     with zipfile.ZipFile(destino, "w", zipfile.ZIP_DEFLATED) as z:
         for origen, relativa in piezas:
             arcname = str(relativa).replace("\\", "/")
-            if relativa.name in LANZADORES_EJECUTABLES:
+            es_bat = relativa.suffix.lower() == ".bat"
+            if relativa.name in LANZADORES_EJECUTABLES or es_bat:
                 info = zipfile.ZipInfo.from_file(origen, arcname)
                 info.compress_type = zipfile.ZIP_DEFLATED
-                info.external_attr = (0o755 & 0xFFFF) << 16
                 with open(origen, "rb") as f:
-                    z.writestr(info, f.read())
+                    datos = f.read()
+                if es_bat:
+                    datos = _con_saltos(datos, SALTO_WINDOWS)
+                else:
+                    info.external_attr = (0o755 & 0xFFFF) << 16
+                    datos = _con_saltos(datos, SALTO_UNIX)
+                z.writestr(info, datos)
             else:
                 z.write(origen, arcname)
 

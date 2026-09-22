@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.10.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.10.1.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          82 casos, 330 comprobaciones, ~2 min
+python pruebas/probar.py          82 casos, 332 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -175,6 +175,14 @@ escribir el ZIP, precisamente porque generar el ZIP desde Windows no
 preserva permisos que Windows ni siquiera tiene. El caso `lanzadores` vigila
 el repositorio y el caso `exportar` vigila el ZIP; si alguno falla después de
 tocar estos ficheros, es casi seguro que por esto.
+
+**Saltos de línea de los lanzadores (2.10.1).** Misma idea: `.gitattributes`
+pide CRLF para `.bat` y LF para `.sh`/`.command`, pero solo se aplica al
+descargar; una copia de trabajo vieja puede tenerlos al revés (el primer ZIP
+de release salía con `.bat` solo LF). `exportar.py` los fuerza al escribir
+el ZIP (`_con_saltos()`), y el caso `exportar` lo comprueba estropeándolos a
+propósito antes de exportar. Para arreglar la copia de trabajo en sí: borrar
+los `.bat` y `git checkout --` de ellos.
 
 **Privacidad.** El `rules.json` del usuario es un retrato de su vida. `app/` y
 `pruebas/` se reparten, así que **no pueden llevar datos reales**: nada de

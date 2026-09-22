@@ -1924,6 +1924,11 @@ def prueba_exportar(e):
     comprobar(e.ruta_historico.exists(), "hay un histórico que proteger")
 
     e.preparar_exportacion()
+    # los saltos de línea al revés de como deben ir, como en una copia de
+    # trabajo que no se ha vuelto a descargar: el ZIP tiene que salir bien igual
+    bat, sh = e.dir / "ejecutar.bat", e.dir / "ejecutar.sh"
+    bat.write_bytes(bat.read_bytes().replace(b"\r\n", b"\n"))
+    sh.write_bytes(sh.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
     salida = e.exportar()
     comprobar(e.ultimo_codigo == 0, "el exportador termina bien", salida)
 
@@ -1931,6 +1936,15 @@ def prueba_exportar(e):
     comprobar(len(zips) == 1, "se crea un ZIP", f"{len(zips)} encontrados")
     if not zips:
         return
+
+    with zipfile.ZipFile(zips[0]) as z:
+        en_zip_bat = z.read("ejecutar.bat")
+        en_zip_sh = z.read("ejecutar.sh")
+    comprobar(b"\r\n" in en_zip_bat
+              and en_zip_bat.count(b"\n") == en_zip_bat.count(b"\r\n"),
+              "los .bat van con saltos de Windows, vengan como vengan")
+    comprobar(b"\r" not in en_zip_sh,
+              "y los .sh sin \\r, que bash no los arranca")
 
     with zipfile.ZipFile(zips[0]) as z:
         nombres = z.namelist()

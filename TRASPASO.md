@@ -153,10 +153,11 @@ stdout son una terminal: las pruebas capturan la salida y no se cuelgan.
 **Probado solo en Linux con una terminal simulada: falta probarlo en
 Windows** (doble clic en `ejecutar.bat` y en el `.exe`).
 
-**Gráfico con caché (2.9.0).** El gráfico de RESUMEN lleva `numCache` y
-`strCache` escritos a mano: openpyxl solo escribe la referencia, Excel
-recalcula, pero OnlyOffice dibuja con la caché y salía vacío. Si se toca el
-gráfico, que siga llevándola (el caso `resumen-primero` lo comprueba).
+**Gráfico con caché (2.9.0) — se va a quitar, ver §5.** El gráfico de
+RESUMEN lleva `numCache` y `strCache` escritos a mano: openpyxl solo escribe
+la referencia, Excel recalcula, pero OnlyOffice dibuja con la caché y salía
+vacío. **Ni con la caché funciona en OnlyOffice** (lo confirmó el usuario en
+Windows tras la 2.10.1), así que la decisión es quitarlo.
 
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y
@@ -192,13 +193,73 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-1. **Compilar el `.exe`.** Todo listo (`compilar.bat`, `movimientos.spec`,
-   `COMPILAR.md`), pero **hay que hacerlo en Windows** y no se ha podido
-   probar el binario. Lo que sí está probado es que `rutas.py` resuelve bien en
-   modo congelado (caso `congelado`, simulando las señales de PyInstaller) y
-   que el `.spec` apunta a ficheros que existen. Al compilar por primera vez,
-   comprobar: que las carpetas se crean junto al `.exe` y no en la temporal, que
-   `ajustes/` se rellena con las plantillas, y el tamaño (60–80 MB esperado).
+### Lo siguiente: dos mejoras ya decididas con el usuario (sesión del 22/09/2026)
+
+Pedidas y acordadas, **sin empezar**. Van juntas como **2.11.0**. Antes de
+tocar nada, la batería completa como línea base (82 casos, 332 comprobaciones).
+
+**A. Quitar el gráfico de RESUMEN.** El usuario lo ha probado en OnlyOffice
+(Windows) y sigue saliendo mal incluso con la caché de la 2.9.0. Su criterio:
+*mejor no mostrar nada que mostrarlo mal*. No volver a intentar arreglarlo.
+- `app/historico.py`: borrar `_grafico_acumulado()` y su llamada en
+  `guardar()` (el bloque `if "Acumulado" in resumen.columns`). Se queda todo
+  lo demás de esa versión: RESUMEN primera hoja y activa.
+- `pruebas/probar.py`, caso `resumen-primero`: quitar las comprobaciones del
+  gráfico (caché, meses como texto, posición) y poner una que diga que **no**
+  hay ningún `xl/charts/` en el fichero. Renombrar la descripción del caso.
+- Texto que habla del gráfico: `app/build_guia.py` (~línea 741, «Por eso la
+  hoja RESUMEN trae un gráfico de esa columna»), `FUNCIONAMIENTO.md` (§6
+  «RESUMEN — … gráfico … debajo»), esta nota de §4 (borrarla entera) y la
+  del 2.5.0 en `ROADMAP.md` si se quiere matizar. La web no lo menciona.
+
+**B. Colores en la salida del terminal**, para que se lea mejor.
+- Sin dependencias nuevas: códigos ANSI a mano (nada de `colorama`).
+- Solo si hay terminal de verdad (`sys.stdout.isatty()`) y no existe la
+  variable `NO_COLOR` (convención estándar). Con la salida capturada (las
+  pruebas) no sale ni un código de color, así que los textos que comprueban
+  las pruebas no cambian. Añadir un caso que lo compruebe (`\x1b[` no aparece
+  en `salida`).
+- **Windows**: la consola clásica (`conhost`) necesita que se active el modo
+  VT antes; hacerlo con `ctypes` (`kernel32.SetConsoleMode` con
+  `ENABLE_VIRTUAL_TERMINAL_PROCESSING`, 0x0004) al arrancar, dentro de un
+  `try` que si falla deja todo sin color. Windows Terminal ya lo soporta.
+  Vale igual para el `.exe` (consola de PyInstaller).
+- Qué colorear (propuesta, confirmar con el usuario si hay dudas): títulos
+  de sección (`seccion()`) en negrita + color del acento; ✅ y totales en
+  verde; bloque de avisos y `⚠️` en amarillo/naranja; `❌` en rojo; lo
+  secundario (motivo de cuenta/tarjeta, rutas, «(el motivo, en los avisos
+  del final)») atenuado; el menú final con la tecla resaltada.
+- Ojo con `mostrar_avisos()`: usa `textwrap.fill`, que cuenta los códigos
+  ANSI como caracteres. Colorear **después** de partir las líneas.
+- Todo está en `app/process.py` (sección `# ========= PANTALLA =========`:
+  `seccion()`, `mostrar_avisos()`, `menu_final()`). `app/exportar.py` y
+  `app/bank_io.py` también imprimen; decidir si se colorean o se dejan.
+- Probar de verdad en Windows (doble clic en `ejecutar.bat` y en el `.exe`):
+  aquí solo se puede simular con `script`.
+
+Al terminar: CHANGELOG, VERSION 2.11.0, esta sección, FUNCIONAMIENTO (§3.9 y
+§6), ROADMAP («fuera de este roadmap»), GUIA.pdf regenerada. Y el ZIP de la
+release nueva con `python app/exportar.py`.
+
+### Estado de la publicación (22/09/2026)
+
+- Release **v2.10.1** publicada en `ulmoexp/eledger` con dos ficheros:
+  `eledger_v2.10.1_20260922.zip` (el de `exportar.py`) y
+  `eledger_v2.10.1_20260922_windows.zip` (el `.exe`, compilado y subido por
+  el usuario). **Las notas de la release aún dicen que el `.exe` «llegará más
+  adelante»**: hay que ofrecerle un texto nuevo que diga qué descargar
+  según el caso.
+- El repo `eledger` sigue **privado**: la release y el botón «Descargar» de
+  la web solo funcionan para el usuario hasta que lo haga público (lo hace
+  él). `eledger-web` ya es público, pero **GitHub Pages no está activado**.
+- Nunca push, ni release, ni tocar la configuración de GitHub desde aquí.
+
+1. **Confirmar con el usuario cómo fue el primer `.exe`.** Ya está compilado
+   y en la release, pero no sabemos si comprobó lo que había que comprobar:
+   que las carpetas se crean junto al `.exe` y no en la temporal, que
+   `ajustes/` se rellena con las plantillas, el tamaño (60–80 MB esperado) y
+   que la ventana no se cierra sola (menú final). Tampoco hay confirmación de
+   `ejecutar.bat` con los cambios de pantalla de la 2.9.0.
 
 2. **Afinar el lado negativo de `mutua`** en `ajustes/rules.json`: está puesto a
    `Higiene` por suposición, el usuario tenía que confirmarlo.

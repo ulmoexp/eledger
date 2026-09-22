@@ -80,11 +80,11 @@ Repositorio público, licencia (MIT vale), primera release con el ZIP y el
 
 *Hecho cuando:* alguien puede descargar la herramienta desde una URL.
 
-*Estado:* `LICENSE` y `README.md` listos y comiteados. Pendiente de acciones
-que no hace la IA (ver `CLAUDE.md`): que el usuario haga `git push`, ponga el
-repo en público, y cree la release. El `.exe` sigue sin compilar (hay que
-hacerlo en Windows, ver `TRASPASO.md` §5) — la release puede salir solo con
-el ZIP mientras tanto.
+*Estado (22/09/2026):* release **v2.10.1** publicada con el ZIP y el `.exe`
+de Windows. Falta solo que el usuario ponga el repo en **público** (sigue
+privado, así que la descarga solo funciona para él) y actualizar las notas
+de la release, que aún anuncian el `.exe` como «más adelante». Ver
+`TRASPASO.md` §5.
 
 ### B2. Portada ✅ contenido cerrado
 
@@ -131,8 +131,8 @@ enlaza aquí en vez de repetirla). «Cómo contribuir a la base» queda como
 Desplegar, comprobar en móvil, y dejarlo. Sin analítica: sería incoherente con
 lo que dice la portada.
 
-*Estado:* pendiente — activar GitHub Pages es una acción del usuario, no de
-la IA (ver `CLAUDE.md` de `eledger-web`: nunca se hace `git push` ni se toca
+*Estado:* pendiente — `eledger-web` ya es público pero Pages sigue sin
+activar (22/09/2026). Activarlo es una acción del usuario, no de la IA (ver `CLAUDE.md` de `eledger-web`: nunca se hace `git push` ni se toca
 la configuración de GitHub desde aquí).
 
 ---

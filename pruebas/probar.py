@@ -1318,6 +1318,45 @@ def prueba_capas_null(e):
               "y se dice cuáles están apagadas", salida)
 
 
+@caso("base-orden", "En la base, la regla concreta gana a la general que la contiene")
+def prueba_base_orden(e):
+    # sin reglas propias: aquí se prueba solo la base, tal cual se reparte
+    e.escribir_config("rules.json", {})
+    fx.escribir_html(e.entrada / "cuenta.xls", [
+        ("02/04/2026", "ALQUILER DE VEHICULOS EUROPCAR", -120.00),
+        ("03/04/2026", "TRANSFERENCIA ALQUILER PISO ABRIL", -700.00),
+        ("04/04/2026", "UBER EATS PEDIDO", -18.00),
+        ("05/04/2026", "UBER BV TRIP", -12.00),
+        ("06/04/2026", "CLINICA VETERINARIA SAN ANTON", -45.00),
+        ("07/04/2026", "CLINICA DENTAL SONRISA", -60.00),
+        ("08/04/2026", "AMAZON PRIME VIDEO", -4.99),
+        ("09/04/2026", "AMAZON EU MARKETPLACE", -30.00),
+        ("10/04/2026", "SPAR EXPRESS", -15.00),
+        ("11/04/2026", "SPARKLE LAVANDERIA", -9.00),
+        ("12/04/2026", "IBERIAN JAMONES", -25.00),
+        ("14/04/2026", "HOSTAL PENSION LA ESTRELLA", -40.00),
+    ])
+    e.ejecutar()
+    df = e.historico()
+
+    for texto, esperada, por_que in [
+        ("EUROPCAR", "Transporte", "alquilar un coche no es el alquiler del piso"),
+        ("ALQUILER PISO", "Piso", "y el alquiler del piso sigue en Piso"),
+        ("UBER EATS", "Ocio", "un pedido de comida no es un viaje"),
+        ("UBER BV", "Transporte", "y un viaje sigue siendo Transporte"),
+        ("VETERINARIA", "Perros", "una clínica veterinaria no es la del médico"),
+        ("CLINICA DENTAL", "Higiene", "y el dentista sigue en Higiene"),
+        ("AMAZON PRIME", "Ocio", "la suscripción no es una compra de Amazon"),
+        ("AMAZON EU", "Otros", "y la compra sigue en Otros"),
+        ("SPAR EXPRESS", "Comida", "=spar pilla el supermercado"),
+        ("SPARKLE", "Otros", "pero no otra palabra que empiece igual"),
+        ("IBERIAN", "Otros", "=iberia no pilla IBERIAN"),
+        ("HOSTAL PENSION", "Otros", "pension solo es ingreso si es positiva"),
+    ]:
+        comprobar(categoria_de(df, texto) == esperada, por_que,
+                  f"{texto}: {categoria_de(df, texto)}")
+
+
 @caso("capas-categoria", "La base no puede inventar categorías que no tienes")
 def prueba_capas_categoria(e):
     # el usuario se queda con menos categorías de las que trae la base

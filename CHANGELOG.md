@@ -6,6 +6,29 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.10.0
+
+- **Base de reglas ampliada** con cadenas genéricas de toda España:
+  supermercados regionales (Bonpreu, bonÀrea, Gadis, Froiz, Condis,
+  Caprabo, Covirán, HiperDino, Spar...), gasolineras low cost, peajes,
+  trenes, autobuses y aerolíneas, alquiler de coches, comercializadoras de
+  luz y agua, operadores de móvil y fibra, IBI y alarmas, plataformas y
+  cines, cadenas de restauración y gimnasios, seguros de salud, tiendas de
+  mascotas, financieras y tiendas online. Todas van a las categorías que
+  trae la plantilla.
+- Ingresos que solo cuentan si son positivos: paro (SEPE), pensión (INSS o
+  «pensión») y devoluciones de Hacienda (AEAT).
+- **Arreglado el orden de la base**: el alquiler de un coche caía en Piso,
+  un pedido de Uber Eats en Transporte, una clínica veterinaria en Higiene y
+  Amazon Prime en Otros. Gana la primera regla que casa, así que las
+  concretas van ahora antes que las generales que las contienen.
+- **Retiradas de la base** tres reglas que mandaban las transferencias que
+  haces a «Transferencias internas»: dinero que envías no va por fuerza a
+  otra cuenta tuya, y marcado como neutro desaparecía del gasto.
+  Si alguna tuya sí lo es, decláralo en tu `rules.json`.
+
+---
+
 ## 2.9.0
 
 - **El gráfico de RESUMEN salía vacío en OnlyOffice** (y en cualquier

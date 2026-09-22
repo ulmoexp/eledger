@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.9.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.10.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          81 casos, 318 comprobaciones, ~2 min
+python pruebas/probar.py          82 casos, 330 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -85,7 +85,14 @@ MEDIA MARKT, `vida` no pilla NAVIDAD, `bar` no pilla BARCELONA. Hay casos de
 prueba para cada trampa; si alguno falla, has roto el motor.
 
 **Gana la primera regla que casa**, así que el orden importa. Las del usuario se
-miran antes que las de la base.
+miran antes que las de la base. Dentro de `rules_base.json`, las claves
+concretas van antes que las generales que las contienen (`uber eats` antes
+que `uber`, `clinica veterinaria` antes que `clinica`...): hasta la 2.10.0
+estaban al revés y nunca se aplicaban. Al añadir una clave a la base, mira
+si alguna de más arriba ya la pilla (`python app/reglas.py "TEXTO"`); el
+caso `base-orden` fija los conocidos. Y en la base solo va lo genérico: el
+caso `sin-datos-personales` salta si una clave de tu `ajustes/rules.json`
+aparece en `pruebas/` sin estar en la base.
 
 **Signo:** el valor de una regla puede ser `{"+": ..., "-": ...}`. Solo hace
 falta cuando el positivo es un concepto **distinto** del negativo (Bizum

@@ -165,6 +165,9 @@ lista. Hasta ahora:
   OnlyOffice y debajo de la tabla, el histórico se abre por RESUMEN, la
   ventana no se cierra sola (menú final) y pantalla por bloques con los
   avisos al final.
+- **2.10.0** — base de reglas ampliada con cadenas genéricas de toda España,
+  arreglado el orden de la base y retiradas tres reglas de transferencias
+  que eran de una contabilidad concreta.
 
 ## Lo que queda fuera a propósito
 

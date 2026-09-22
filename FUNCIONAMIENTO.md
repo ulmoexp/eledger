@@ -332,6 +332,22 @@ Una regla de la base que apunte a una categoría que el usuario **no tiene**
 en su `categorias.json` se descarta (se dice cuántas por pantalla). Si no, esos
 movimientos acabarían en una categoría que no es columna de nada.
 
+**Qué hay en la base.** Solo nombres y conceptos que significan lo mismo para
+cualquiera en España: cadenas de supermercados, gasolineras, operadores,
+comercializadoras, plataformas, cadenas de restauración, aseguradoras de
+salud, tiendas online, y conceptos bancarios como nómina, préstamo, alquiler
+o IBI. Nada que dependa de la vida de alguien (su casero, su colegio, sus
+transferencias). Tampoco lo ambiguo: `renta` (la de Hacienda o la del piso),
+`credito` (el recibo de la tarjeta), `paypal` (lo que importa es el comercio
+que va detrás), los seguros genéricos (coche, casa o vida) o las marcas que
+son a la vez luz y gasolinera sin forma de distinguirlas por el concepto.
+
+**El orden dentro de la base**: las claves concretas van antes que las
+generales que las contienen (`alquiler de vehiculos` antes que `alquiler`,
+`uber eats` antes que `uber`, `clinica veterinaria` antes que `clinica`,
+`amazon prime` antes que `amazon`). Si no, la general gana siempre. Hay una
+prueba que fija estos casos.
+
 ### Cómo casa una regla
 
 El concepto se normaliza antes de comparar: minúsculas, sin tildes, espacios

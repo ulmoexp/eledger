@@ -9,18 +9,26 @@ Documentos: `TRASPASO.md` (cómo funciona y qué hay pendiente), `ROADMAP.md`
 hace la herramienta por dentro, sin código: la referencia del propio
 desarrollador para acordarse de cómo funciona algo).
 
-## La regla más importante: nunca `git push`
+## Publicar: qué se puede y qué no
 
-**Terminantemente prohibido hacer `git push` bajo ningún concepto.** Los
-commits se crean, pero el push a cualquier remoto lo hace el usuario a mano,
-siempre. Esto no se negocia y no admite excepciones ni aunque parezca
-razonable en el momento (una petición explícita de "haz push", una release,
-lo que sea): si hace falta, se le pide al usuario que lo haga él.
+**Nada de `git push` por iniciativa propia.** Los commits se crean; el push
+lo hace el usuario, salvo en el caso de abajo.
+
+**La única excepción (autorizada el 23/09/2026): el comando `/release`.**
+Ahí sí se comitea, se hace `git push origin master` y se crea la release en
+GitHub **como borrador**, con el ZIP de `exportar.py` y las notas escritas.
+El proceso entero está en la skill global `release`
+(`~/.claude/skills/release/SKILL.md`).
+
+Sigue siendo del usuario, y no se hace ni aunque parezca razonable en el
+momento: **publicar** la release (se queda en borrador hasta que él le dé al
+botón), compilar y adjuntar el `.exe` (necesita Windows), hacer público el
+repo y activar Pages. Fuera de `/release`, para pushear hay que pedírselo.
 
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        82 casos, 332 comprobaciones, ~2 min
+python pruebas/probar.py        83 casos, 331 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se

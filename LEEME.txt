@@ -14,7 +14,7 @@ casilla "Add Python to PATH" durante la instalación.
 En Linux, si el doble clic no lo ejecuta, dale permisos desde una terminal
 en esta carpeta:  chmod +x instalar.sh && ./instalar.sh
 
-Si lo que tienes es un Movimientos.exe, sáltate este paso: no hace falta nada.
+Si lo que tienes es un eledger.exe, sáltate este paso: no hace falta nada.
 
 Cómo se usa
 -----------

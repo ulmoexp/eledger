@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.11.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.11.1.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -34,7 +34,7 @@ hay que actualizar.
 proyecto/
 ├── instalar.bat / ejecutar.bat / exportar.bat / compilar.bat   (+ .command/.sh)
 ├── LEEME.txt · GUIA.pdf · CHANGELOG.md · COMPILAR.md
-├── movimientos.spec · requisitos.txt
+├── eledger.spec · requisitos.txt
 ├── entrada/    lo que el usuario descarga del banco
 ├── salida/     se regenera cada vez. Borrable.
 ├── datos/      historico.xlsx + copias/.  INSUSTITUIBLE
@@ -209,32 +209,44 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### Hecho: 2.11.0 (sesión del 22/09/2026)
+### Hecho: 2.11.0 y 2.11.1 (sesiones del 22 y 23/09/2026)
 
-Las dos mejoras acordadas con el usuario: **fuera el gráfico de RESUMEN** y
-**colores en la salida del terminal** (ver las dos notas de §4). Batería
-completa en verde antes y después. Queda:
+**2.11.0**: fuera el gráfico de RESUMEN y colores en la salida del terminal
+(las dos notas de §4). Los colores, confirmados en Windows por el usuario.
 
-- **Probar los colores en Windows** (doble clic en `ejecutar.bat` y en el
-  `.exe`, y a poder ser también en Windows Terminal): que salgan colores y
-  no códigos `←[1;36m` a la vista.
-- **Release v2.11.0**: la hace el usuario. El ZIP sale con
-  `python app/exportar.py`; el `.exe` hay que recompilarlo (`compilar.bat`).
-- Web (`eledger-web`): no menciona ni el gráfico ni los colores; nada que
-  cambiar.
+**2.11.1**: lo que se descarga pasa a llamarse `eledger`. El `.exe` es
+`eledger.exe` (antes `Movimientos.exe`), la receta es `eledger.spec` y el ZIP
+de `exportar.py` sale ya como `eledger_v<ver>_<fecha>.zip`, que es como se
+llaman los ficheros de las releases: hasta la 2.11.0 salía
+`movimientos_...` y el usuario lo renombraba a mano cada vez.
 
-### Estado de la publicación (22/09/2026)
+**Lo que NO se renombró, a propósito:**
+- `salida/movimientos_limpios.xlsx` y `movimientos_excluidos.xlsx`: el nombre
+  describe lo que hay dentro, que es lo que sirve cuando los tienes abiertos
+  al lado de otros Excel. Decisión del usuario (23/09/2026).
+- `rutas.NOMBRE_CUENTA_LEGADO = "movimientos"`: no es un fichero nuestro, es
+  el `movimientos.xls` que el usuario deja suelto en la carpeta a la manera
+  antigua. Tocarlo rompería a quien siga trabajando así.
 
-- Release **v2.10.1** publicada en `ulmoexp/eledger` con dos ficheros:
-  `eledger_v2.10.1_20260922.zip` (el de `exportar.py`) y
-  `eledger_v2.10.1_20260922_windows.zip` (el `.exe`, compilado y subido por
-  el usuario). **Las notas de la release aún dicen que el `.exe` «llegará más
-  adelante»**: hay que ofrecerle un texto nuevo que diga qué descargar
-  según el caso.
-- El repo `eledger` sigue **privado**: la release y el botón «Descargar» de
-  la web solo funcionan para el usuario hasta que lo haga público (lo hace
-  él). `eledger-web` ya es público, pero **GitHub Pages no está activado**.
-- Nunca push, ni release, ni tocar la configuración de GitHub desde aquí.
+El nombre en pantalla no cambia: sigue siendo «Movimientos bancarios», con
+«eledger» como referencia secundaria.
+
+### Estado de la publicación (23/09/2026)
+
+- Release **v2.11.0** publicada, pero **sin ningún fichero adjunto**: el ZIP
+  que se dejó en el borrador no está y el `.exe` tampoco, así que sus notas
+  mandan descargar dos ficheros que no existen. Pendiente de decidir con el
+  usuario: adjuntarle el ZIP, o dejarla así y que la sustituya la 2.11.1.
+- Release **v2.10.1**, con sus dos ZIP. Sus notas siguen diciendo que el
+  `.exe` «llegará más adelante» cuando ya estaba subido.
+- **2.11.1 sin release todavía**: hay que sacarla con `/release` (ver la
+  skill global `release`), y el `.exe` lo compila y lo adjunta el usuario.
+- El repo `eledger` sigue **privado**: las releases y el botón «Descargar»
+  de la web solo funcionan para él hasta que lo haga público (lo hace él).
+  `eledger-web` ya es público, pero **GitHub Pages no está activado**.
+- Desde aquí: `/release` puede comitear, pushear y dejar la release en
+  borrador (autorizado el 23/09/2026). Publicar, el `.exe`, hacer público el
+  repo y Pages siguen siendo del usuario.
 
 1. **Confirmar con el usuario cómo fue el primer `.exe`.** Ya está compilado
    y en la release, pero no sabemos si comprobó lo que había que comprobar:

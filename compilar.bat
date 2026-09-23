@@ -1,5 +1,5 @@
 @echo off
-REM Genera dist\Movimientos.exe con PyInstaller.
+REM Genera dist\eledger.exe con PyInstaller.
 REM TIENE QUE EJECUTARSE EN WINDOWS: un .exe solo se puede compilar en Windows.
 chcp 65001 >nul
 cd /d "%~dp0"
@@ -62,17 +62,17 @@ if errorlevel 1 goto error
 
 echo.
 echo Compilando. Esto tarda varios minutos.
-"%PY%" -m PyInstaller movimientos.spec --clean --noconfirm
+"%PY%" -m PyInstaller eledger.spec --clean --noconfirm
 if errorlevel 1 goto error
 
-if not exist "dist\Movimientos.exe" goto error
+if not exist "dist\eledger.exe" goto error
 
 echo.
 echo ============================================================
-echo  Listo:  dist\Movimientos.exe
+echo  Listo:  dist\eledger.exe
 echo.
 echo  Para repartirlo, crea una carpeta con:
-echo     Movimientos.exe    (de dist\)
+echo     eledger.exe    (de dist\)
 echo     LEEME.txt
 echo     GUIA.pdf
 echo     CHANGELOG.md

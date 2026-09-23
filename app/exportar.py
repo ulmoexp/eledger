@@ -46,7 +46,7 @@ CARPETAS_OPCIONALES = {"--con-pruebas": "pruebas"}
 FICHEROS_PERMITIDOS = ["ejecutar.bat", "ejecutar.command", "ejecutar.sh",
                        "exportar.bat", "exportar.command", "exportar.sh",
                        "instalar.bat", "instalar.command", "instalar.sh",
-                       "compilar.bat", "movimientos.spec", "requisitos.txt",
+                       "compilar.bat", "eledger.spec", "requisitos.txt",
                        "LEEME.txt", "GUIA.pdf", "CHANGELOG.md", "COMPILAR.md",
                        "TRASPASO.md", "LICENSE"]
 
@@ -151,7 +151,7 @@ def _revisar(piezas) -> list[str]:
 def exportar(con_pruebas=False) -> Path:
     version = rutas.version()
     sello = dt.datetime.now().strftime("%Y%m%d")
-    destino = rutas.RAIZ / f"movimientos_v{version}_{sello}.zip"
+    destino = rutas.RAIZ / f"eledger_v{version}_{sello}.zip"
 
     piezas = _recoger(con_pruebas)
     if not piezas:

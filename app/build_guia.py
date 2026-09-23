@@ -315,7 +315,7 @@ story += [tabla(
     [ANCHO * 0.32, ANCHO * 0.68])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
-    "Si lo que te han dado es un <font face='Mono' size='8.6'>Movimientos.exe</font>, "
+    "Si lo que te han dado es un <font face='Mono' size='8.6'>eledger.exe</font>, "
     "no hay que instalar nada: doble clic y ya. Y si prefieres hacerlo a mano, "
     "<font face='Mono' size='8.6'>pip install -r requisitos.txt</font> hace lo mismo. "
     "De las tres librerías, <font face='Mono' size='8.6'>xlrd</font> solo hace falta "

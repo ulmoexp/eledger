@@ -6,6 +6,19 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.11.1
+
+- **Todo lo que se descarga se llama ahora `eledger`**: el programa compilado
+  para Windows es `eledger.exe` (antes `Movimientos.exe`) y el ZIP que genera
+  `exportar.bat` sale como `eledger_v2.11.1_<fecha>.zip`. El nombre en
+  pantalla sigue siendo Movimientos bancarios; lo que cambia es el nombre de
+  los ficheros, para que se vea de dónde salen.
+- Si ya tenías el `.exe`, reemplázalo por el nuevo y borra el viejo: son el
+  mismo programa con otro nombre, y tener los dos solo lleva a ejecutar el
+  que no toca.
+
+---
+
 ## 2.11.0
 
 - **Fuera el gráfico de la hoja RESUMEN.** En OnlyOffice seguía saliendo

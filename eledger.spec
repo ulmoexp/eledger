@@ -1,12 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-movimientos.spec — Receta para compilar el .exe con PyInstaller.
+eledger.spec — Receta para compilar el .exe con PyInstaller.
 
-    compilar.bat        (o: pyinstaller movimientos.spec --clean)
+    compilar.bat        (o: pyinstaller eledger.spec --clean)
 
 QUÉ GENERA
 ----------
-Un único `dist/Movimientos.exe`. Los datos NO van dentro: el .exe crea
+Un único `dist/eledger.exe`. Los datos NO van dentro: el .exe crea
 `entrada/`, `salida/`, `datos/` y `ajustes/` en la carpeta donde esté puesto, y
 esos JSON se pueden abrir y editar con el bloc de notas como siempre. Era la
 decisión pendiente en el traspaso, y va por aquí porque un .exe que se lo traga
@@ -62,7 +62,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name="Movimientos",
+    name="eledger",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

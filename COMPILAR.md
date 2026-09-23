@@ -12,7 +12,7 @@ desde Mac ni desde Linux; empaqueta el intérprete de la máquina donde se ejecu
 ## Cómo se hace
 
 1. `instalar.bat` — crea el entorno y las librerías (si ya lo hiciste, sáltalo).
-2. `compilar.bat` — pasa las pruebas, compila y deja `dist\Movimientos.exe`.
+2. `compilar.bat` — pasa las pruebas, compila y deja `dist\eledger.exe`.
 
 Tarda varios minutos y el resultado pesa **60–80 MB**. Es lo que hay: dentro va
 el intérprete de Python entero y pandas, que solo, ya son unos 40 MB.
@@ -27,7 +27,7 @@ Una carpeta con cuatro ficheros:
 
 ```
 Movimientos/
-├── Movimientos.exe     ← de dist\
+├── eledger.exe     ← de dist\
 ├── LEEME.txt
 ├── GUIA.pdf
 └── CHANGELOG.md
@@ -81,7 +81,7 @@ El `.exe` es solo para repartir a quien no va a tocar el código.
 
 | Qué sale | Qué hacer |
 |---|---|
-| `ModuleNotFoundError` al ejecutar el .exe | Falta una librería que PyInstaller no ha detectado. Añádela a `hiddenimports` en `movimientos.spec` y recompila. |
+| `ModuleNotFoundError` al ejecutar el .exe | Falta una librería que PyInstaller no ha detectado. Añádela a `hiddenimports` en `eledger.spec` y recompila. |
 | El .exe arranca y se cierra al instante | Ejecútalo desde la terminal (`cmd`, arrastra el .exe y pulsa Intro) para ver el error. La ventana se cierra porque se acabó el programa. |
 | Se crean las carpetas en un sitio raro | `rutas.py` calcula la raíz desde `sys.executable` cuando está compilado. Si mueves el .exe, se lleva sus carpetas: tiene que estar en la misma carpeta que ellas. |
 | Pesa mucho más de 80 MB | Mira `excludes` en el `.spec`. Si el entorno tiene matplotlib o scipy instalados, conviene que estén ahí listados. |

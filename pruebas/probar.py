@@ -2140,7 +2140,7 @@ def prueba_congelado(e):
         "print('BASE=' + str(rutas.REGLAS_BASE))\n"
         "print('PLANTILLAS=' + str(rutas.PLANTILLAS))\n"
     ).format(recursos=str(e.dir / "temporal_de_windows"),
-             exe=str(e.dir / "Movimientos.exe"),
+             exe=str(e.dir / "eledger.exe"),
              app=str(e.dir / DIR_APP))
 
     proc = subprocess.run([sys.executable, "-c", guion], capture_output=True,
@@ -2164,8 +2164,8 @@ def prueba_congelado(e):
 
 @caso("empaquetado", "La receta de compilación apunta a lo que existe")
 def prueba_empaquetado(e):
-    spec = RAIZ / "movimientos.spec"
-    comprobar(spec.exists(), "hay un movimientos.spec")
+    spec = RAIZ / "eledger.spec"
+    comprobar(spec.exists(), "hay un eledger.spec")
     if not spec.exists():
         return
     texto = spec.read_text(encoding="utf-8")

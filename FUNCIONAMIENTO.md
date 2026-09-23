@@ -284,6 +284,15 @@ La pantalla va por bloques, siempre en este orden:
    momento en que se detectan: antes aparecían mezclados con todo, a menudo
    lo primero de la pantalla, que es justo donde menos se leen.
 
+**Colores.** En una terminal de verdad, los títulos de cada bloque salen en
+negrita y color, lo que ha ido bien (✅) en verde, los avisos en amarillo,
+los errores (❌, ✗) en rojo y lo secundario (motivos, notas, ejemplos) en
+gris. El balance y el Acumulado del último mes, verdes si van a favor y
+rojos si van en contra. Si la salida va a un fichero u otro programa, o
+existe la variable `NO_COLOR`, sale sin ningún color. En la consola clásica
+de Windows hay que activar antes el modo que entiende los colores; si no se
+puede, también sale sin color, nunca con códigos raros a la vista.
+
 **Al terminar bien**, la ventana no se cierra sola. Ofrece:
 
 ```
@@ -483,12 +492,10 @@ pide revisarlo a mano.
 Las siete primeras columnas (de fecha a categoria) están siempre en ese orden,
 porque hay hojas de usuario con fórmulas que apuntan a ellas por posición.
 
-**RESUMEN** — la tabla del apartado 3.7, con un gráfico de línea del
-Acumulado **debajo**, a dos filas de la tabla. Sin anotaciones ni texto
-generado: solo el gráfico. El gráfico lleva dentro una copia de sus valores
-y de los meses, además de la referencia a las celdas: Excel lo recalcula al
-abrir, pero otros programas (OnlyOffice) lo dibujan con esa copia, y sin
-ella salía vacío.
+**RESUMEN** — la tabla del apartado 3.7, sin gráfico. Hubo uno del
+Acumulado entre la 2.5.0 y la 2.10.1; se quitó en la 2.11.0 porque
+OnlyOffice lo dibujaba mal incluso con sus valores copiados dentro, y mejor
+no enseñar nada que enseñarlo mal.
 
 Orden de las hojas: **RESUMEN primero** (y es la que se ve al abrir el
 fichero), luego MOVIMIENTOS y por último _meta.

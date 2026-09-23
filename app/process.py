@@ -66,21 +66,88 @@ _avisos = []
 CODIGO_ERROR_EXPLICADO = 2
 
 
+def _preparar_color() -> bool:
+    """
+    Colores solo si hay una persona mirando una terminal de verdad y no ha
+    pedido lo contrario con NO_COLOR (la convención de no-color.org). Con la
+    salida capturada (las pruebas, un fichero) no sale ni un código: esos
+    textos se comparan y se leen tal cual.
+
+    La consola clásica de Windows (conhost, la del doble clic en .bat y en el
+    .exe) no interpreta los códigos hasta que se le activa el modo VT. Si eso
+    falla por lo que sea, sin color: se vería basura como «←[1;36m».
+    """
+    if os.environ.get("NO_COLOR"):
+        return False
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
+    if os.name == "nt":
+        try:
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            salida = kernel32.GetStdHandle(-11)              # STD_OUTPUT_HANDLE
+            modo = ctypes.c_uint32()
+            if not kernel32.GetConsoleMode(salida, ctypes.byref(modo)):
+                return False
+            ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+            if not modo.value & ENABLE_VIRTUAL_TERMINAL_PROCESSING:
+                if not kernel32.SetConsoleMode(
+                        salida, modo.value | ENABLE_VIRTUAL_TERMINAL_PROCESSING):
+                    return False
+        except Exception:
+            return False
+    return True
+
+
+_COLOR = _preparar_color()
+
+
+def _pintar(codigo):
+    """
+    Los 16 colores básicos, no los de 24 bits: son los que respeta el tema de
+    cada terminal (fondo claro u oscuro) y los que entiende cualquier consola.
+    Gris (90) en vez de «atenuado» (2): conhost no sabe atenuar.
+
+    Se colorea línea a línea: un texto partido con textwrap sigue igual de
+    bien si luego se corta o se vuelve a partir, sin arrastrar el color a lo
+    que venga detrás.
+    """
+    def pintar(texto):
+        if not _COLOR:
+            return texto
+        return "\n".join(f"\x1b[{codigo}m{linea}\x1b[0m" if linea else linea
+                         for linea in str(texto).split("\n"))
+    return pintar
+
+
+titular = _pintar("1;36")      # secciones y teclas del menú: negrita, acento
+verde = _pintar("32")          # lo que ha salido bien
+amarillo = _pintar("33")       # avisos
+rojo = _pintar("31")           # errores
+gris = _pintar("90")           # lo secundario: motivos, rutas, notas
+negrita = _pintar("1")
+
+
 def avisar(titulo, lineas=()):
     """Guarda un aviso para enseñarlo al final, con los demás."""
     _avisos.append((titulo, list(lineas)))
 
 
-def seccion(titulo):
-    print(f"\n── {titulo} {'─' * max(3, 60 - len(titulo))}\n")
+def seccion(titulo, pintar=titular):
+    print("\n" + pintar(f"── {titulo} {'─' * max(3, 60 - len(titulo))}") + "\n")
 
 
 def mostrar_avisos():
     if not _avisos:
         return
-    seccion(f"Avisos ({len(_avisos)})")
+    seccion(f"Avisos ({len(_avisos)})", pintar=amarillo)
     for titulo, lineas in _avisos:
-        print(textwrap.fill(f"⚠️  {titulo}", 78, subsequent_indent="    "))
+        # el color DESPUÉS de partir las líneas: textwrap contaría los códigos
+        # como letras y cortaría antes de tiempo
+        print(amarillo(textwrap.fill(f"⚠️  {titulo}", 78, subsequent_indent="    ")))
         for linea in lineas:
             # las viñetas llevan una sangría más en las líneas partidas, para
             # que se vea dónde empieza cada punto
@@ -139,8 +206,8 @@ def menu_final():
 
     seccion("¿Y ahora?")
     for tecla, (texto, _) in opciones.items():
-        print(f"   {tecla}      {texto}")
-    print("   Intro  Cerrar")
+        print(f"   {titular(tecla)}      {texto}")
+    print(f"   {titular('Intro')}  Cerrar")
     while True:
         eleccion = _esperar("\n   > ")
         if not eleccion:
@@ -152,8 +219,8 @@ def menu_final():
             _abrir(opciones[eleccion][1])
             print("   Abierto. Puedes elegir otra opción, o Intro para cerrar.")
         except Exception as e:
-            print(f"   No he podido abrirlo ({e}). Está en "
-                  f"{opciones[eleccion][1]}")
+            print(rojo(f"   No he podido abrirlo ({e}). Está en "
+                       f"{opciones[eleccion][1]}"))
 
 
 # ========= CONFIG =========
@@ -280,7 +347,7 @@ def leer_entrada():
         try:
             df = leer_tabla_bancaria(ruta)
             if df.empty:
-                print("     → sin movimientos utilizables, lo salto")
+                print(gris("     → sin movimientos utilizables, lo salto"))
                 avisar(f"{nombre} no tiene ningún movimiento utilizable",
                        ["Lo he saltado. Si debería tenerlos, mira el diagnóstico "
                         "de la guía («Cuando algo no sale»)."])
@@ -294,11 +361,11 @@ def leer_entrada():
             # ajustes/cuentas.json configurado (el caso normal), no aporta
             # nada repetir "cuenta: " vacío en cada línea.
             extra = f" · cuenta: {cuenta}" if cuenta else ""
-            print(f"     → {tipo} ({motivo}){extra}")
+            print(f"     → {tipo} " + gris(f"({motivo}){extra}"))
             dfs.append(df)
         except Exception as e:
-            print(f"   · {nombre}: ✗ no se ha podido leer (el motivo, en los "
-                  f"avisos del final)")
+            print(f"   · {nombre}: " + rojo("✗ no se ha podido leer")
+                  + gris(" (el motivo, en los avisos del final)"))
             avisar(f"No he podido leer {nombre}", str(e).splitlines())
     return dfs
 
@@ -530,21 +597,21 @@ def informe_sin_clasificar(df):
     print(f"ℹ️  {len(sin_regla)} movimientos sin ninguna regla, en "
           f"{len(grupos)} grupos por palabra común:")
     if len(grupos) > _MAX_GRUPOS_SIN_CLASIFICAR:
-        print(f"   (se muestran los {_MAX_GRUPOS_SIN_CLASIFICAR} de más importe)")
+        print(gris(f"   (se muestran los {_MAX_GRUPOS_SIN_CLASIFICAR} de más importe)"))
     print()
 
     for palabra, filas in mostrados:
         total = -filas["importe"].sum()
         ejemplo = filas["descripcion"].mode().iloc[0]
         print(f"   {total:>10,.2f} €  ·  {len(filas):>3} mov.  ·  {palabra}")
-        print(f"      ej: {ejemplo}")
+        print(gris(f"      ej: {ejemplo}"))
         sugerida = _sugerir_regla(filas, palabra, normalizados)
         if sugerida:
             print(f'      añade a rules.json:  "{sugerida}": '
                   f'"{_PLACEHOLDER_CATEGORIA}"')
         else:
-            print("      (ninguna palabra de este grupo es segura de sugerir "
-                  "sin pisar otra regla; revísalo a mano)")
+            print(gris("      (ninguna palabra de este grupo es segura de sugerir "
+                       "sin pisar otra regla; revísalo a mano)"))
         print()
 
 
@@ -794,7 +861,7 @@ def informe_recurrentes(df, categorias_gasto):
     print(f"🔁 {cuantos}; al importe de hoy suma{'n' if len(encontrados) > 1 else ''} "
           f"{total:,.2f} € al año:")
     if len(encontrados) > _MAX_RECURRENTES:
-        print(f"   (se muestran los {_MAX_RECURRENTES} que más suman)")
+        print(gris(f"   (se muestran los {_MAX_RECURRENTES} que más suman)"))
     print()
     for al_año, cadencia, importe, desde, ultimo in encontrados[:_MAX_RECURRENTES]:
         print(f"   {al_año:>10,.2f} €/año  ·  {importe:,.2f} € {cadencia}  ·  "
@@ -850,8 +917,8 @@ def main():
     # la cabecera primero: la versión es lo primero que hace falta saber si
     # algo va mal, y lo que arrancar() tenga que contar va debajo
     titulo = f"Movimientos bancarios · versión {rutas.version()}"
-    print(titulo)
-    print("═" * len(titulo) + "\n")
+    print(negrita(titulo))
+    print(negrita("═" * len(titulo)) + "\n")
 
     arrancar()
 
@@ -873,7 +940,7 @@ def main():
     seccion(f"Leyendo {rutas.relativa(rutas.ENTRADA)}/")
     nuevos = leer_entrada()
     if not nuevos:
-        print("   (no hay ficheros nuevos)")
+        print(gris("   (no hay ficheros nuevos)"))
 
     hist.comprobar_version(rutas.HISTORICO, rutas.version())
     previo = hist.cargar(rutas.HISTORICO)
@@ -895,7 +962,7 @@ def main():
         print("➕ Ningún movimiento nuevo: ya estaba todo en el histórico.")
 
     if crudos.empty:
-        print("\n❌ No hay ningún movimiento que procesar.")
+        print("\n" + rojo("❌ No hay ningún movimiento que procesar."))
         return
 
     validas = set(catalogo.todas) | {hist.MARCA_EXCLUIDO}
@@ -930,20 +997,21 @@ def main():
         guardar_excel(excluidos[["fecha", "descripcion", "importe", "tipo",
                                  "origen", "regla"]], rutas.EXCLUIDOS)
 
-    print(f"✅ {rutas.relativa(rutas.HISTORICO)}  ·  hojas {hist.HOJA_RESUMEN} y "
-          f"{hist.HOJA_MOVIMIENTOS}")
-    print(f"   {rutas.relativa(rutas.LIMPIOS)}  ·  lo que pegas en A-G")
+    print(verde(f"✅ {rutas.relativa(rutas.HISTORICO)}  ·  hojas {hist.HOJA_RESUMEN} y "
+                f"{hist.HOJA_MOVIMIENTOS}"))
+    print(f"   {rutas.relativa(rutas.LIMPIOS)}  " + gris("·  lo que pegas en A-G"))
 
     # --- volcado directo en el fichero de contabilidad ---
     if cfg_sync.activa:
         try:
             a_volcar = todo if cfg_sync.incluir_excluidos else df
             copia, filas = sync.escribir(cfg_sync, a_volcar[COLUMNAS_BASE])
-            print(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: {filas} filas escritas")
-            print(f"   copia de seguridad en {copia}")
+            print(verde(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
+                        f"{filas} filas escritas"))
+            print(gris(f"   copia de seguridad en {copia}"))
         except Exception as e:
-            print(f"📗 {cfg_sync.archivo}: ✗ no sincronizado (el motivo, en los "
-                  f"avisos del final)")
+            print(f"📗 {cfg_sync.archivo}: " + rojo("✗ no sincronizado")
+                  + gris(" (el motivo, en los avisos del final)"))
             avisar(f"No he sincronizado con {cfg_sync.archivo}",
                    str(e).splitlines()
                    + ["Tu fichero de contabilidad NO se ha tocado. Usa "
@@ -963,8 +1031,8 @@ def main():
     detectados = {c: s for c, s in saldos_por_cuenta.items() if abs(s) >= 0.005}
     if len(detectados) == 1:
         print(f"\n💰 Saldo inicial detectado: {next(iter(detectados.values())):,.2f} €")
-        print("   Lo que tenía tu cuenta antes del primer movimiento que hay. "
-              "El Acumulado\n   del resumen parte de ahí, no de 0.")
+        print(gris("   Lo que tenía tu cuenta antes del primer movimiento que hay. "
+                   "El Acumulado\n   del resumen parte de ahí, no de 0."))
     elif detectados:
         print(f"\n💰 Saldo inicial detectado en {len(detectados)} cuentas "
               f"(ver ajustes/cuentas.json); el Acumulado del resumen parte "
@@ -981,7 +1049,16 @@ def main():
     # DESPUÉS de guardar, y se saltaba el informe de sin clasificar de abajo.
     if not resumen.empty:
         ult = resumen.iloc[-1]
-        partes = [f"{texto} {ult[col]:{formato}} €"
+
+        # las cifras con signo, verdes o rojas según el signo: un «total» en
+        # verde fijo pintaría de buena noticia un mes en negativo
+        def cifra(valor, formato):
+            texto = f"{valor:{formato}} €"
+            if "+" not in formato:
+                return negrita(texto)
+            return verde(texto) if valor >= 0 else rojo(texto)
+
+        partes = [f"{texto} {cifra(ult[col], formato)}"
                   for col, texto, formato in (("Total Gastos", "gastos", ",.2f"),
                                               ("Ingresos", "ingresos", ",.2f"),
                                               ("Balance", "balance", "+,.2f"))
@@ -990,10 +1067,12 @@ def main():
         if partes:
             print(f"\n   Último mes{mes}:  " + " · ".join(partes))
         if "Acumulado" in resumen.columns:
-            print(f"   Acumulado desde el principio: {ult['Acumulado']:+,.2f} €")
+            print(f"   Acumulado desde el principio: "
+                  f"{cifra(ult['Acumulado'], '+,.2f')}")
         if doble_tarjeta:
-            print("\n   ⚠️  Ojo: puede que los gastos de la tarjeta se estén "
-                  "contando dos veces. Mira los avisos del final.")
+            print("\n" + amarillo("   ⚠️  Ojo: puede que los gastos de la tarjeta "
+                                  "se estén contando dos veces. Mira los avisos "
+                                  "del final."))
 
     informe_recurrentes(df, catalogo.gastos)
     informe_sin_clasificar(df)
@@ -1010,7 +1089,7 @@ if __name__ == "__main__":
         # los avisos que ya hubiera pueden explicar el error: van antes, para
         # que el ❌ sea lo último que se ve
         mostrar_avisos()
-        print(f"\n❌ {e}")
+        print("\n" + rojo(f"❌ {e}"))
         if _interactiva():
             _esperar("\nPulsa Intro para cerrar...")
         sys.exit(CODIGO_ERROR_EXPLICADO)

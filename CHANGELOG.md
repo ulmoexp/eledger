@@ -6,6 +6,20 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.11.0
+
+- **Fuera el gráfico de la hoja RESUMEN.** En OnlyOffice seguía saliendo
+  mal incluso tras el arreglo de la 2.9.0, y mejor no enseñar nada que
+  enseñarlo mal. La tabla no cambia: el Acumulado sigue siendo su última
+  columna.
+- **Colores en la pantalla**, para que se lea mejor: títulos de cada bloque
+  destacados, lo que ha ido bien en verde, los avisos en amarillo, los
+  errores en rojo y lo secundario en gris. Solo en una ventana de terminal:
+  si la salida va a un fichero, o existe la variable `NO_COLOR`, sale sin
+  color, igual que antes. Sin nada que instalar.
+
+---
+
 ## 2.10.1
 
 - **El ZIP para repartir lleva siempre los saltos de línea correctos**:

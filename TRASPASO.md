@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.10.1.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.11.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          82 casos, 332 comprobaciones, ~2 min
+python pruebas/probar.py          83 casos, 331 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -153,11 +153,27 @@ stdout son una terminal: las pruebas capturan la salida y no se cuelgan.
 **Probado solo en Linux con una terminal simulada: falta probarlo en
 Windows** (doble clic en `ejecutar.bat` y en el `.exe`).
 
-**Gráfico con caché (2.9.0) — se va a quitar, ver §5.** El gráfico de
-RESUMEN lleva `numCache` y `strCache` escritos a mano: openpyxl solo escribe
-la referencia, Excel recalcula, pero OnlyOffice dibuja con la caché y salía
-vacío. **Ni con la caché funciona en OnlyOffice** (lo confirmó el usuario en
-Windows tras la 2.10.1), así que la decisión es quitarlo.
+**Colores en pantalla (2.11.0).** Códigos ANSI a mano, sin `colorama`: los
+pintores (`titular`, `verde`, `amarillo`, `rojo`, `gris`, `negrita`) están en
+la sección PANTALLA de `process.py` y devuelven el texto tal cual si
+`_COLOR` es falso, que es lo que pasa sin terminal (las pruebas) o con
+`NO_COLOR`. En Windows se activa el modo VT de la consola con `ctypes` al
+importar; si falla, sin color. Dos cosas que no romper: **colorear después
+de `textwrap.fill`**, nunca antes (contaría los códigos como letras), y
+**no meter colores dentro de un texto que se guarde o se compare** (los
+avisos se guardan sin color y se pintan al mostrarlos). El caso
+`sin-color` vigila que con la salida capturada no salga ni un `\x1b[`.
+Si añades un `print` nuevo, usa estos pintores; sin ellos sale sin color,
+que tampoco rompe nada. `exportar.py`, `bank_io.py` y `reglas.py` (su modo
+de prueba) se han dejado sin color a propósito: son secundarios.
+**Probado solo con una terminal simulada (`script`) en Linux: falta
+probarlo en Windows** (doble clic en `ejecutar.bat` y en el `.exe`).
+
+**Sin gráfico en RESUMEN (2.11.0).** Hubo uno del Acumulado (2.5.0–2.10.1)
+y se quitó: en OnlyOffice salía mal incluso con los valores copiados
+dentro. Decisión del usuario: *mejor no mostrar nada que mostrarlo mal*.
+No volver a ponerlo sin probarlo en OnlyOffice; el caso `resumen-primero`
+comprueba que no hay ningún `xl/charts/` en el fichero.
 
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y
@@ -193,53 +209,19 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### Lo siguiente: dos mejoras ya decididas con el usuario (sesión del 22/09/2026)
+### Hecho: 2.11.0 (sesión del 22/09/2026)
 
-Pedidas y acordadas, **sin empezar**. Van juntas como **2.11.0**. Antes de
-tocar nada, la batería completa como línea base (82 casos, 332 comprobaciones).
+Las dos mejoras acordadas con el usuario: **fuera el gráfico de RESUMEN** y
+**colores en la salida del terminal** (ver las dos notas de §4). Batería
+completa en verde antes y después. Queda:
 
-**A. Quitar el gráfico de RESUMEN.** El usuario lo ha probado en OnlyOffice
-(Windows) y sigue saliendo mal incluso con la caché de la 2.9.0. Su criterio:
-*mejor no mostrar nada que mostrarlo mal*. No volver a intentar arreglarlo.
-- `app/historico.py`: borrar `_grafico_acumulado()` y su llamada en
-  `guardar()` (el bloque `if "Acumulado" in resumen.columns`). Se queda todo
-  lo demás de esa versión: RESUMEN primera hoja y activa.
-- `pruebas/probar.py`, caso `resumen-primero`: quitar las comprobaciones del
-  gráfico (caché, meses como texto, posición) y poner una que diga que **no**
-  hay ningún `xl/charts/` en el fichero. Renombrar la descripción del caso.
-- Texto que habla del gráfico: `app/build_guia.py` (~línea 741, «Por eso la
-  hoja RESUMEN trae un gráfico de esa columna»), `FUNCIONAMIENTO.md` (§6
-  «RESUMEN — … gráfico … debajo»), esta nota de §4 (borrarla entera) y la
-  del 2.5.0 en `ROADMAP.md` si se quiere matizar. La web no lo menciona.
-
-**B. Colores en la salida del terminal**, para que se lea mejor.
-- Sin dependencias nuevas: códigos ANSI a mano (nada de `colorama`).
-- Solo si hay terminal de verdad (`sys.stdout.isatty()`) y no existe la
-  variable `NO_COLOR` (convención estándar). Con la salida capturada (las
-  pruebas) no sale ni un código de color, así que los textos que comprueban
-  las pruebas no cambian. Añadir un caso que lo compruebe (`\x1b[` no aparece
-  en `salida`).
-- **Windows**: la consola clásica (`conhost`) necesita que se active el modo
-  VT antes; hacerlo con `ctypes` (`kernel32.SetConsoleMode` con
-  `ENABLE_VIRTUAL_TERMINAL_PROCESSING`, 0x0004) al arrancar, dentro de un
-  `try` que si falla deja todo sin color. Windows Terminal ya lo soporta.
-  Vale igual para el `.exe` (consola de PyInstaller).
-- Qué colorear (propuesta, confirmar con el usuario si hay dudas): títulos
-  de sección (`seccion()`) en negrita + color del acento; ✅ y totales en
-  verde; bloque de avisos y `⚠️` en amarillo/naranja; `❌` en rojo; lo
-  secundario (motivo de cuenta/tarjeta, rutas, «(el motivo, en los avisos
-  del final)») atenuado; el menú final con la tecla resaltada.
-- Ojo con `mostrar_avisos()`: usa `textwrap.fill`, que cuenta los códigos
-  ANSI como caracteres. Colorear **después** de partir las líneas.
-- Todo está en `app/process.py` (sección `# ========= PANTALLA =========`:
-  `seccion()`, `mostrar_avisos()`, `menu_final()`). `app/exportar.py` y
-  `app/bank_io.py` también imprimen; decidir si se colorean o se dejan.
-- Probar de verdad en Windows (doble clic en `ejecutar.bat` y en el `.exe`):
-  aquí solo se puede simular con `script`.
-
-Al terminar: CHANGELOG, VERSION 2.11.0, esta sección, FUNCIONAMIENTO (§3.9 y
-§6), ROADMAP («fuera de este roadmap»), GUIA.pdf regenerada. Y el ZIP de la
-release nueva con `python app/exportar.py`.
+- **Probar los colores en Windows** (doble clic en `ejecutar.bat` y en el
+  `.exe`, y a poder ser también en Windows Terminal): que salgan colores y
+  no códigos `←[1;36m` a la vista.
+- **Release v2.11.0**: la hace el usuario. El ZIP sale con
+  `python app/exportar.py`; el `.exe` hay que recompilarlo (`compilar.bat`).
+- Web (`eledger-web`): no menciona ni el gráfico ni los colores; nada que
+  cambiar.
 
 ### Estado de la publicación (22/09/2026)
 

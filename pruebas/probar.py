@@ -1529,7 +1529,7 @@ def prueba_resumen_desglose_avisos(e):
               "y el total no pierde nada", str(e.resumen().iloc[0]["Ingresos"]))
 
 
-@caso("resumen-primero", "El histórico se abre por RESUMEN, con el gráfico debajo y con sus datos")
+@caso("resumen-primero", "El histórico se abre por RESUMEN, y sin gráfico")
 def prueba_resumen_primero(e):
     fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
     e.ejecutar()
@@ -1541,35 +1541,16 @@ def prueba_resumen_primero(e):
               str(wb.sheetnames))
     comprobar(wb.active.title == "RESUMEN", "y la que se ve al abrir",
               wb.active.title)
-    filas = wb["RESUMEN"].max_row
     wb.close()
 
-    import re
+    # Hubo un gráfico del Acumulado (2.9.0) y se quitó en la 2.11.0: en
+    # OnlyOffice salía mal incluso con los valores copiados dentro. Mejor
+    # nada que algo mal; si vuelve, que sea a propósito y probado allí.
     import zipfile
     with zipfile.ZipFile(e.ruta_historico) as z:
-        graficos = [n for n in z.namelist() if n.startswith("xl/charts/chart")]
-        dibujos = [n for n in z.namelist()
-                   if n.startswith("xl/drawings/drawing") and n.endswith(".xml")]
-        grafico = z.read(graficos[0]).decode() if graficos else ""
-        dibujo = z.read(dibujos[0]).decode() if dibujos else ""
-    comprobar(len(graficos) == 1, "hay un gráfico", str(graficos))
-
-    # sin los valores copiados dentro, OnlyOffice lo dibujaba vacío: Excel
-    # los recalcula desde las celdas, pero no todos los programas lo hacen
-    acumulado = float(e.resumen()["Acumulado"].iloc[-1])
-    cache = grafico[grafico.find("numCache"):]
-    guardados = [float(v) for v in re.findall(r"<(?:\w+:)?v>(-?[\d.eE+-]+)<", cache)]
-    comprobar(bool(guardados) and abs(guardados[-1] - acumulado) < 0.01,
-              "el gráfico lleva dentro los valores del Acumulado",
-              f"{guardados} / {acumulado}")
-    comprobar("strRef" in grafico and "strCache" in grafico and "2026-04" in grafico,
-              "y los meses, como texto", grafico[:400])
-
-    fila = re.search(r"<(?:\w+:)?from>.*?<(?:\w+:)?row>(\d+)<", dibujo, re.S)
-    columna = re.search(r"<(?:\w+:)?from>.*?<(?:\w+:)?col>(\d+)<", dibujo, re.S)
-    comprobar(bool(fila and columna) and int(fila.group(1)) >= filas
-              and int(columna.group(1)) == 0,
-              "colocado DEBAJO de la tabla, no a su derecha", dibujo[:300])
+        graficos = [n for n in z.namelist()
+                    if n.startswith(("xl/charts/", "xl/drawings/"))]
+    comprobar(not graficos, "no hay ningún gráfico en el fichero", str(graficos))
 
 
 @caso("pantalla-orden", "Por pantalla: versión arriba, avisos juntos al final")
@@ -1587,6 +1568,22 @@ def prueba_pantalla_orden(e):
     comprobar(e.ultimo_codigo == 0 and "¿Y ahora?" not in salida,
               "sin nadie delante no pregunta nada (no se queda esperando)",
               salida[-300:])
+
+
+@caso("sin-color", "Con la salida capturada no sale ningún código de color")
+def prueba_sin_color(e):
+    # Los colores (2.11.0) son solo para una terminal de verdad. Aquí la
+    # salida se captura, igual que cuando alguien la redirige a un fichero:
+    # un solo código colado ensuciaría el texto y rompería las comprobaciones
+    # de otros casos que buscan frases exactas. Se fuerza a que haya de todo
+    # por pantalla: resultado, sin clasificar y un aviso.
+    e.escribir_config("rules.json", {"mercadona": "Categoria Inventada"})
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
+    salida = e.ejecutar()
+    comprobar("✅" in salida and "Avisos (" in salida,
+              "la ejecución ha contado de todo", salida)
+    comprobar("\x1b[" not in salida, "y sin ningún código de color",
+              repr(salida[:500]))
 
 
 def _meses(dia, concepto, importes, año=2026, desde_mes=1):

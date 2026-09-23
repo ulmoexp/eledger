@@ -737,8 +737,7 @@ story += [Paragraph(
     "<b>Extras</b> y <b>Deuda</b> son acumulativos, no solo del mes justo anterior: "
     "reflejan cómo vas desde el principio. En un mes cualquiera solo uno de los dos "
     "tiene valor. <b>Balance</b> es el resultado del mes por sí solo, sin arrastre; "
-    "<b>Acumulado</b> es el que responde a «¿voy bien o voy mal?». Por eso la hoja "
-    "RESUMEN trae un gráfico de esa columna: para verlo de un vistazo.", S["pmini"])]
+    "<b>Acumulado</b> es el que responde a «¿voy bien o voy mal?».", S["pmini"])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
     "Los gastos se muestran en positivo cambiándoles el signo, no con valor absoluto. "

@@ -155,7 +155,7 @@ gráfico de Acumulado, en la 2.5.0): mirar ahí para lo que no aparezca en esta
 lista. Hasta ahora:
 
 - **2.5.0** — personalizar columnas de RESUMEN (`etiquetas`, `orden_resumen`)
-  y gráfico de Acumulado.
+  y gráfico de Acumulado (quitado en la 2.11.0).
 - **2.7.0** — desglosar los ingresos por categoría en RESUMEN
   (`desglosar_ingresos`).
 - **2.8.0** — informe de cargos que se repiten (suscripciones, cuotas,
@@ -170,6 +170,8 @@ lista. Hasta ahora:
   que eran de una contabilidad concreta.
 - **2.10.1** — el ZIP para repartir fuerza los saltos de línea de cada
   lanzador (salió al preparar la primera release).
+- **2.11.0** — fuera el gráfico de RESUMEN (en OnlyOffice seguía saliendo
+  mal: mejor nada que algo mal) y colores en la salida del terminal.
 
 ## Lo que queda fuera a propósito
 

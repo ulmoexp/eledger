@@ -233,14 +233,16 @@ El nombre en pantalla no cambia: sigue siendo «Movimientos bancarios», con
 
 ### Estado de la publicación (23/09/2026)
 
-- Release **v2.11.0** publicada, pero **sin ningún fichero adjunto**: el ZIP
-  que se dejó en el borrador no está y el `.exe` tampoco, así que sus notas
-  mandan descargar dos ficheros que no existen. Pendiente de decidir con el
-  usuario: adjuntarle el ZIP, o dejarla así y que la sustituya la 2.11.1.
+- Release **v2.11.0** publicada con sus dos ficheros:
+  `eledger_v2.11.0_20260923.zip` y `eledger_v2.11.0_20260923.windows.zip`
+  (el `.exe`, que en esa versión todavía se llamaba `Movimientos.exe`
+  dentro del ZIP). Ojo al nombre: lleva un punto antes de «windows» donde
+  la v2.10.1 llevaba un guion bajo.
 - Release **v2.10.1**, con sus dos ZIP. Sus notas siguen diciendo que el
   `.exe` «llegará más adelante» cuando ya estaba subido.
-- **2.11.1 sin release todavía**: hay que sacarla con `/release` (ver la
-  skill global `release`), y el `.exe` lo compila y lo adjunta el usuario.
+- **2.11.1 en borrador** (23/09/2026), con `eledger_v2.11.1_20260923.zip`
+  adjunto y las notas escritas. Falta que el usuario compile `eledger.exe`
+  con `compilar.bat`, lo adjunte y publique.
 - El repo `eledger` sigue **privado**: las releases y el botón «Descargar»
   de la web solo funcionan para él hasta que lo haga público (lo hace él).
   `eledger-web` ya es público, pero **GitHub Pages no está activado**.

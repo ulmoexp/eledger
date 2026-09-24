@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          86 casos, 341 comprobaciones, ~2 min
+python pruebas/probar.py          89 casos, 353 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -144,8 +144,11 @@ producto, no de estilo, y el caso `recurrentes-mensual` la vigila.
 **Pantalla, menú final y código de salida 2 (2.9.0).** Los avisos no se
 imprimen al detectarse: se guardan con `avisar()` y salen juntos al final
 (`mostrar_avisos()`). Si añades un aviso nuevo, usa `avisar()`, no `print`.
-Al terminar bien, `menu_final()` ofrece abrir el histórico o su carpeta; al
-fallar, se espera a Intro y se sale con `CODIGO_ERROR_EXPLICADO` (2). Los
+Al terminar bien, `menu_final()` ofrece abrir el histórico o su carpeta, o
+ejecutar de nuevo (2.12.0: bucle en el `__main__`, que limpia `_avisos`
+entre vueltas; si añades otro estado global que se acumule, límpialo en
+`_preparar_otra_vuelta()`); al fallar, se espera a Intro (o R para repetir)
+y se sale con `CODIGO_ERROR_EXPLICADO` (2). Los
 lanzadores **no** pausan con 0 ni con 2, solo con cualquier otro código (el
 programa ni ha arrancado); si cambias ese número, cámbialo en los tres
 sitios (el caso `lanzadores` lo vigila). Menú y esperas solo si stdin y

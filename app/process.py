@@ -9,6 +9,7 @@ Uso normal:
 Todo el procesamiento es local; no se conecta a internet.
 """
 
+import datetime as dt
 import difflib
 import json
 import os
@@ -186,41 +187,64 @@ def _abrir(ruta):
                          stderr=subprocess.DEVNULL)
 
 
-def menu_final():
+OTRA_VEZ = "otra vez"
+
+
+def menu_final(historico=None):
     """
     Al terminar bien, la ventana se queda abierta hasta que se decida qué
     hacer. Con el .exe no hay lanzador que haga una pausa, y la ventana se
     cerraba sola antes de poder leer nada.
+
+    historico es el fichero que se ha escrito de verdad: si el original
+    estaba abierto, la copia, que es lo que tiene sentido abrir ahora.
+    Devuelve OTRA_VEZ si se ha pedido ejecutar de nuevo.
     """
     if not _interactiva():
-        return
+        return None
+    historico = historico or rutas.HISTORICO
     opciones = {}
-    if rutas.HISTORICO.exists():
-        opciones["1"] = (f"Abrir el histórico  ({rutas.relativa(rutas.HISTORICO)})",
-                         rutas.HISTORICO)
+    if historico.exists():
+        opciones["1"] = (f"Abrir el histórico  ({rutas.relativa(historico)})",
+                         historico)
         opciones["2"] = (f"Abrir la carpeta  {rutas.relativa(rutas.DATOS)}/",
                          rutas.DATOS)
-    if not opciones:
-        _esperar("\nPulsa Intro para cerrar...")
-        return
+    # lo normal tras abrir el histórico es corregir algo (categoria_manual,
+    # una regla) y querer ver el efecto: sin esto había que cerrar la
+    # ventana y volver a hacer doble clic
+    tecla_otra = str(len(opciones) + 1)
+    opciones[tecla_otra] = ("Ejecutar de nuevo", None)
 
     seccion("¿Y ahora?")
     for tecla, (texto, _) in opciones.items():
         print(f"   {titular(tecla)}      {texto}")
     print(f"   {titular('Intro')}  Cerrar")
+    teclas = list(opciones)
     while True:
         eleccion = _esperar("\n   > ")
         if not eleccion:
-            return
+            return None
         if eleccion not in opciones:
-            print("   Escribe 1 o 2, o pulsa Intro para cerrar.")
+            validas = (teclas[0] if len(teclas) == 1
+                       else f"{', '.join(teclas[:-1])} o {teclas[-1]}")
+            print(f"   Escribe {validas}, o pulsa Intro para cerrar.")
             continue
+        if eleccion == tecla_otra:
+            return OTRA_VEZ
         try:
             _abrir(opciones[eleccion][1])
             print("   Abierto. Puedes elegir otra opción, o Intro para cerrar.")
         except Exception as e:
             print(rojo(f"   No he podido abrirlo ({e}). Está en "
                        f"{opciones[eleccion][1]}"))
+
+
+def _preparar_otra_vuelta():
+    """Lo que main() deja acumulado entre ejecuciones. La configuración no
+    hace falta: main() la vuelve a leer, y así entra lo que se haya
+    corregido en ajustes/ entre medias."""
+    _avisos.clear()
+    print("\n\n")
 
 
 # ========= CONFIG =========
@@ -266,6 +290,148 @@ def guardar_excel(df, ruta):
     hist._texto_seguro(wb.active)
     wb.save(ruta)
     wb.close()
+
+
+# ========= FICHEROS ABIERTOS =========
+# Lo normal es tener el histórico abierto en Excel u OnlyOffice mientras se
+# corrige categoria_manual, y volver a ejecutar sin cerrarlo. En Windows eso
+# fallaba al GUARDAR, con todo ya calculado. En Mac y Linux era peor: no
+# fallaba nada, y al guardar después desde la hoja de cálculo se pisaba el
+# resultado nuevo con la versión vieja, sin enterarse.
+#
+# No se cierra el programa que lo tiene abierto, a propósito: con OnlyOffice
+# o LibreOffice no hay forma fiable, y con Excel podría llevarse por delante
+# otros libros o cambios que no se querían guardar. Guardar y cerrar lo hace
+# la persona, que es quien sabe si lo que tiene escrito vale.
+
+def _ficheros_de_bloqueo(ruta):
+    """Los que deja al lado quien tiene el fichero abierto. Excel: «~$» más
+    el nombre (con los dos primeros caracteres recortados en nombres
+    largos, según versión). LibreOffice y OnlyOffice: «.~lock.nombre#»."""
+    nombre = ruta.name
+    return [ruta.with_name(n) for n in
+            (f"~${nombre}", f"~${nombre[2:]}", f".~lock.{nombre}#")]
+
+
+def esta_abierto(ruta):
+    """
+    None si se puede escribir sin miedo. Si no, cómo se ha sabido:
+    "sistema" (Windows lo tiene bloqueado: seguro que está abierto) o el
+    fichero de bloqueo encontrado (casi seguro, pero puede ser un resto de
+    un programa que se cerró en falso y no lo borró).
+    """
+    if not ruta.exists():
+        return None
+    if os.name == "nt":
+        try:
+            with open(ruta, "r+b"):
+                pass
+        except PermissionError:
+            return "sistema"
+        except OSError:
+            pass
+    for bloqueo in _ficheros_de_bloqueo(ruta):
+        if bloqueo.exists():
+            return bloqueo
+    return None
+
+
+def ruta_de_copia(ruta):
+    """«historico (copia 2026-09-24 10.32.05).xlsx», al lado del original.
+    Nunca pisa otra: dos ejecuciones en el mismo segundo no pierden nada."""
+    sello = dt.datetime.now().strftime("%Y-%m-%d %H.%M.%S")
+    destino = ruta.with_name(f"{ruta.stem} (copia {sello}){ruta.suffix}")
+    n = 2
+    while destino.exists():
+        destino = ruta.with_name(f"{ruta.stem} (copia {sello} {n}){ruta.suffix}")
+        n += 1
+    return destino
+
+
+def comprobar_abiertos(rutas_salida):
+    """
+    Antes de leer nada: si alguna salida está abierta, pide guardarla y
+    cerrarla. Tiene que ser ANTES de leer el histórico, no al guardar: así
+    lo que se acabe de escribir en categoria_manual y se guarde ahora entra
+    en esta misma ejecución.
+
+    Devuelve el conjunto de rutas que hay que escribir en una copia porque
+    siguen abiertas (vacío si todo está cerrado). Sin nadie delante para
+    contestar, lo abierto va directamente a copia.
+    """
+    abiertos = {r: m for r in rutas_salida if (m := esta_abierto(r))}
+    if not abiertos:
+        return set()
+    if not _interactiva():
+        return set(abiertos)
+
+    while abiertos:
+        seccion("Hay ficheros abiertos", pintar=amarillo)
+        for r in abiertos:
+            print(f"   · {rutas.relativa(r)}")
+        print("\n   Si has escrito algo en ellos (categoria_manual, por ejemplo), "
+              "GUÁRDALO\n   y cierra el archivo.\n")
+        print(f"   {titular('Intro')}  Ya está cerrado: seguir")
+        print(f"   {titular('C')}      Dejarlo abierto y guardar el resultado "
+              f"en una copia")
+        # un fichero de bloqueo sin bloqueo del sistema puede ser un resto de
+        # un cierre en falso: sin esta salida, se preguntaría para siempre
+        solo_restos = all(m != "sistema" for m in abiertos.values())
+        if solo_restos:
+            print(f"   {titular('S')}      Seguir igualmente " + gris(
+                "(si seguro que está cerrado: a veces queda el fichero de\n"
+                "          bloqueo de un programa que se cerró en falso)"))
+        eleccion = _esperar("\n   > ").lower()
+        if eleccion == "c":
+            return set(abiertos)
+        if eleccion == "s" and solo_restos:
+            return set()
+        abiertos = {r: m for r in abiertos if (m := esta_abierto(r))}
+        if abiertos:
+            print(amarillo("\n   Todavía está abierto."))
+    print(verde("   ✅ Cerrado. Sigo."))
+    return set()
+
+
+def guardar_o_copiar(ruta, escribir, en_copia, copiados):
+    """
+    Escribe con escribir(destino) en ruta o, si está en en_copia o resulta
+    estar bloqueado justo ahora (se ha abierto después de comprobarlo), en
+    una copia al lado. Devuelve dónde ha quedado y lo apunta en copiados.
+    """
+    if ruta not in en_copia:
+        try:
+            escribir(ruta)
+            return ruta
+        except PermissionError:
+            pass
+    destino = ruta_de_copia(ruta)
+    escribir(destino)
+    copiados[ruta] = destino
+    return destino
+
+
+def avisar_copias(copiados):
+    """Que quede claro que lo de verdad NO se ha actualizado: una copia que
+    pasa por el histórico es justo el descuadre silencioso que se evita."""
+    if not copiados:
+        return
+    for original, copia in copiados.items():
+        print(amarillo(f"   ⚠️  {rutas.relativa(original)} estaba abierto: el "
+                       f"resultado está en\n       {rutas.relativa(copia)}"))
+    lineas = [f"· {rutas.relativa(o)} → {rutas.relativa(c)}"
+              for o, c in copiados.items()]
+    if rutas.HISTORICO in copiados:
+        lineas.append(
+            "El histórico de verdad NO se ha actualizado: la copia es solo para "
+            "consultar. No se pierde nada, porque los extractos siguen en "
+            "entrada/. Ciérralo y vuelve a ejecutar (opción «Ejecutar de "
+            "nuevo») para ponerlo al día; luego puedes borrar la copia.")
+        lineas.append(
+            "Lo que escribas en categoria_manual de la COPIA no se lee: "
+            "escríbelo en el histórico de verdad.")
+    avisar("Resultado guardado en una copia porque el original estaba abierto",
+           lineas)
 
 
 # ========= AJUSTE DE MES CONTABLE =========
@@ -1021,6 +1187,8 @@ def main():
                [f"· {a}" for a in avisos]
                + ["Sigo adelante, pero revísalo o el resumen no cuadrará."])
 
+    en_copia = comprobar_abiertos([rutas.HISTORICO, rutas.LIMPIOS, rutas.EXCLUIDOS])
+
     seccion(f"Leyendo {rutas.relativa(rutas.ENTRADA)}/")
     nuevos = leer_entrada()
     if not nuevos:
@@ -1075,18 +1243,31 @@ def main():
     # Acumulado es lo que hay en la cuenta, no lo que suma el Balance
     resumen = hist.construir_resumen(df, catalogo, saldo_inicial,
                                      todo[todo["tipo"] == "cuenta"])
-    if os.path.exists(rutas.HISTORICO):
+    # la copia de seguridad solo si se va a tocar el de verdad: si el
+    # resultado va a una copia, el histórico queda como estaba
+    if os.path.exists(rutas.HISTORICO) and rutas.HISTORICO not in en_copia:
         sync.copia_de_seguridad(rutas.HISTORICO, cfg_sync.copias_de_seguridad)
-    hist.guardar(rutas.HISTORICO, todo[COLUMNAS_HISTORICO], resumen, catalogo,
-                 version=rutas.version())
-    guardar_excel(df[COLUMNAS_BASE + ["origen", "regla"]], rutas.LIMPIOS)
+    copiados = {}
+    historico_escrito = guardar_o_copiar(
+        rutas.HISTORICO,
+        lambda r: hist.guardar(r, todo[COLUMNAS_HISTORICO], resumen, catalogo,
+                               version=rutas.version()),
+        en_copia, copiados)
+    limpios_escrito = guardar_o_copiar(
+        rutas.LIMPIOS,
+        lambda r: guardar_excel(df[COLUMNAS_BASE + ["origen", "regla"]], r),
+        en_copia, copiados)
     if not excluidos.empty:
-        guardar_excel(excluidos[["fecha", "descripcion", "importe", "tipo",
-                                 "origen", "regla"]], rutas.EXCLUIDOS)
+        guardar_o_copiar(
+            rutas.EXCLUIDOS,
+            lambda r: guardar_excel(excluidos[["fecha", "descripcion", "importe",
+                                               "tipo", "origen", "regla"]], r),
+            en_copia, copiados)
 
-    print(verde(f"✅ {rutas.relativa(rutas.HISTORICO)}  ·  hojas {hist.HOJA_RESUMEN} y "
-                f"{hist.HOJA_MOVIMIENTOS}"))
-    print(f"   {rutas.relativa(rutas.LIMPIOS)}  " + gris("·  lo que pegas en A-G"))
+    print(verde(f"✅ {rutas.relativa(historico_escrito)}  ·  hojas "
+                f"{hist.HOJA_RESUMEN} y {hist.HOJA_MOVIMIENTOS}"))
+    print(f"   {rutas.relativa(limpios_escrito)}  " + gris("·  lo que pegas en A-G"))
+    avisar_copias(copiados)
 
     # --- volcado directo en el fichero de contabilidad ---
     if cfg_sync.activa:
@@ -1168,18 +1349,27 @@ def main():
     # los avisos, lo último antes de salir: juntos, contados y separados de
     # lo demás, que es lo que se lee cuando la ejecución termina
     mostrar_avisos()
+    return historico_escrito
 
 
 # ========= RUN =========
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        # los avisos que ya hubiera pueden explicar el error: van antes, para
-        # que el ❌ sea lo último que se ve
-        mostrar_avisos()
-        print("\n" + rojo(f"❌ {e}"))
-        if _interactiva():
-            _esperar("\nPulsa Intro para cerrar...")
-        sys.exit(CODIGO_ERROR_EXPLICADO)
-    menu_final()
+    while True:
+        try:
+            escrito = main()
+        except Exception as e:
+            # los avisos que ya hubiera pueden explicar el error: van antes,
+            # para que el ❌ sea lo último que se ve
+            mostrar_avisos()
+            print("\n" + rojo(f"❌ {e}"))
+            # tras un error también: lo habitual es arreglarlo (una coma en
+            # un JSON, un extracto que faltaba) y querer probar otra vez
+            if (_interactiva() and _esperar(
+                    "\nPulsa Intro para cerrar, o escribe R y pulsa Intro para "
+                    "ejecutar de nuevo... ").lower() == "r"):
+                _preparar_otra_vuelta()
+                continue
+            sys.exit(CODIGO_ERROR_EXPLICADO)
+        if menu_final(escrito) != OTRA_VEZ:
+            break
+        _preparar_otra_vuelta()

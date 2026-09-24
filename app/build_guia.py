@@ -244,7 +244,8 @@ story += [pasos([
     "<font face='Body' color='#5C6672'>(Linux)</font>",
     "Revisa el resumen en pantalla: qué ha leído de cada fichero, el resultado, "
     "lo que se repite y lo que falta por clasificar; los avisos, juntos al final",
-    "Pulsa <b>1</b> para abrir el histórico, o <b>2</b> para abrir su carpeta "
+    "Pulsa <b>1</b> para abrir el histórico, <b>2</b> para abrir su carpeta o "
+    "<b>3</b> para ejecutar de nuevo tras corregir algo "
     "<font face='Body' color='#5C6672'>(Intro cierra la ventana)</font>",
     "Abre tu fichero de contabilidad: los movimientos ya están dentro "
     "<font face='Body' color='#5C6672'>(si tienes la sincronización activada)</font>",
@@ -915,7 +916,12 @@ story += [EE]
 story += [h1("Cuando algo no sale"), E]
 story += [tabla(
     ["Síntoma", "Qué hacer"],
-    [["<i>«La carpeta entrada/ está vacía»</i>",
+    [["<i>«Hay ficheros abiertos»</i>",
+      "Tienes el histórico abierto en Excel u OnlyOffice. Si has escrito algo, "
+      "guárdalo, cierra el archivo y pulsa Intro: sigue solo. Con <b>C</b> lo dejas "
+      "abierto y el resultado va a una copia con fecha al lado, pero el histórico de "
+      "verdad no se actualiza hasta que lo ejecutes con él cerrado."],
+     ["<i>«La carpeta entrada/ está vacía»</i>",
       "Los ficheros que empiezan por <font face='Mono'>_</font>, "
       "<font face='Mono'>.</font> o <font face='Mono'>~$</font> se ignoran a propósito, "
       "y también los que no tengan una extensión conocida. Comprueba que lo que has "

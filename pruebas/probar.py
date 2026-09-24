@@ -684,6 +684,74 @@ def prueba_orden_resumen_retiradas(e):
               "y el resumen sale igual, sin ellas", str(list(e.resumen().columns)))
 
 
+@caso("historico-abierto", "Con el histórico abierto, el resultado va a una copia y no falla")
+def prueba_historico_abierto(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    antes = len(e.historico())
+    copias_antes = len(list((e.datos / "copias").glob("*.xlsx")))
+
+    # lo que deja OnlyOffice o LibreOffice al lado mientras lo tiene abierto.
+    # Aquí no hay nadie delante para contestar, así que va directo a copia.
+    (e.datos / ".~lock.historico.xlsx#").write_text("bloqueo")
+    fx.escribir_html(e.entrada / "cuenta2.xls",
+                     [("20/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+    salida = e.ejecutar()
+
+    comprobar(e.ultimo_codigo == 0, "no falla", salida)
+    copias = list(e.datos.glob("historico (copia *).xlsx"))
+    comprobar(len(copias) == 1, "deja el resultado en una copia al lado",
+              str(list(e.datos.iterdir())))
+    comprobar(len(e.historico()) == antes,
+              "el histórico de verdad no se toca (lo tiene otro programa)",
+              f"{len(e.historico())} filas en vez de {antes}")
+    if copias:
+        import pandas as pd
+        en_copia = pd.read_excel(copias[0], sheet_name="MOVIMIENTOS")
+        comprobar(len(en_copia) == antes + 1, "y la copia sí lleva lo nuevo",
+                  f"{len(en_copia)} filas")
+    comprobar(len(list((e.datos / "copias").glob("*.xlsx"))) == copias_antes,
+              "sin copia de seguridad: no se ha tocado nada que respaldar")
+    comprobar("NO se ha actualizado" in salida,
+              "avisa de que el histórico de verdad sigue sin actualizar", salida)
+
+    # cerrado ya, la siguiente ejecución lo pone al día: nada se ha perdido
+    (e.datos / ".~lock.historico.xlsx#").unlink()
+    e.ejecutar()
+    comprobar(len(e.historico()) == antes + 1,
+              "al cerrarlo y volver a ejecutar, el histórico se pone al día",
+              f"{len(e.historico())} filas")
+
+
+@caso("historico-abierto-excel", "También se detecta el fichero de bloqueo de Excel")
+def prueba_historico_abierto_excel(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    (e.datos / "~$historico.xlsx").write_text("bloqueo")
+    salida = e.ejecutar()
+    comprobar(e.ultimo_codigo == 0 and "estaba abierto" in salida,
+              "lo detecta y guarda en copia", salida)
+
+
+@caso("limpios-abierto", "Si solo está abierto movimientos_limpios, el histórico se guarda normal")
+def prueba_limpios_abierto(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    (e.salida / ".~lock.movimientos_limpios.xlsx#").write_text("bloqueo")
+    fx.escribir_html(e.entrada / "cuenta2.xls",
+                     [("20/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+    salida = e.ejecutar()
+
+    comprobar(len(e.historico()) == 4, "el histórico se actualiza como siempre",
+              f"{len(e.historico())} filas")
+    comprobar(len(list(e.salida.glob("movimientos_limpios (copia *).xlsx"))) == 1,
+              "lo que estaba abierto va a una copia", str(list(e.salida.iterdir())))
+    comprobar(not list(e.datos.glob("historico (copia *).xlsx")),
+              "y el histórico no se duplica", str(list(e.datos.iterdir())))
+    comprobar("NO se ha actualizado" not in salida,
+              "sin el aviso del histórico, que sí está al día", salida)
+
+
 @caso("gastos-signo", "Una devolución sale en negativo, no disfrazada de gasto")
 def prueba_signo(e):
     # Comida: -100 de compra y +150 de devolución -> la categoría acaba a favor.

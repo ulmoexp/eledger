@@ -26,6 +26,17 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
   compara día a día con el calculado. Si cuadra, lo dice; si no, avisa de en
   qué fechas deja de cuadrar y por cuánto (casi siempre, un extracto que
   falta entre medias).
+- **Ya no falla con el histórico abierto.** Antes de empezar mira si el
+  histórico (o `movimientos_limpios.xlsx`) está abierto en Excel u
+  OnlyOffice y te pide guardarlo y cerrarlo; en cuanto lo cierras y pulsas
+  Intro, sigue. Si prefieres dejarlo abierto (tecla C), el resultado se
+  guarda en una copia con fecha al lado, y se avisa de que el histórico de
+  verdad no se ha actualizado. No cierra nunca tu hoja de cálculo por su
+  cuenta: podrías perder cambios. En Mac y Linux, además, evita que al
+  guardar desde la hoja de cálculo pises sin saberlo el resultado nuevo.
+- **Ejecutar de nuevo**, opción 3 del menú final, para ver al momento el
+  efecto de una corrección sin cerrar la ventana. Tras un error, la R hace
+  lo mismo.
 
 ---
 

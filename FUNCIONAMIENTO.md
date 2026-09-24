@@ -141,6 +141,21 @@ misma "cuenta sin nombre", que es el comportamiento de siempre.
 
 ### 3.3 Cargar el histórico
 
+- **Antes que nada** (de hecho, antes incluso de leer los extractos), mira si
+  el histórico, `movimientos_limpios.xlsx` o `movimientos_excluidos.xlsx`
+  están **abiertos** en otro programa. Lo sabe por el fichero de bloqueo que
+  dejan al lado Excel (`~$historico.xlsx`) y OnlyOffice o LibreOffice
+  (`.~lock.historico.xlsx#`), y en Windows además porque el sistema no deja
+  abrirlo para escribir. Si lo están, pide guardarlos y cerrarlos: Intro
+  vuelve a comprobarlo y sigue en cuanto estén cerrados; **C** los deja
+  abiertos y guarda el resultado en una copia (3.8); **S** sigue igualmente,
+  y solo se ofrece cuando la única pista es el fichero de bloqueo (puede ser
+  un resto de un programa que se cerró en falso). Se hace antes de leer para
+  que lo que se acabe de guardar en `categoria_manual` entre en esta misma
+  ejecución. **No cierra nunca el programa que lo tiene abierto**: con
+  OnlyOffice no hay forma fiable, y con Excel podría llevarse por delante
+  otros libros o cambios que no se querían guardar. Sin nadie delante para
+  contestar, lo abierto va directamente a copia.
 - Si `historico.xlsx` lo escribió una **versión más nueva** del programa que
   la que se está ejecutando, **se planta** sin tocar nada: podría tener
   columnas que esta versión no conoce y se perderían al guardar.
@@ -273,6 +288,16 @@ Acumulado                = Acumulado del mes anterior + Balance
 
 ### 3.8 Guardar
 
+Lo que siga abierto (3.3), o lo que resulte bloqueado justo al guardar
+porque se ha abierto entre medias, **no falla**: se escribe en una copia al
+lado, con fecha y hora (`datos/historico (copia 2026-09-24 10.32.05).xlsx`),
+y se avisa bien claro de que el original **no se ha actualizado**. La copia
+es solo para consultar: la herramienta nunca la lee, así que lo escrito en
+su `categoria_manual` no cuenta. No se pierde nada, porque los extractos
+siguen en `entrada/` y la siguiente ejecución con el original cerrado lo
+pone al día. En ese caso no se hace copia de seguridad del histórico (no se
+ha tocado).
+
 1. **Copia de seguridad** del histórico anterior en `datos/copias/`, con fecha
    y hora en el nombre. Se conservan las últimas 10 (configurable en
    `sincronizar.json`); las más antiguas se borran.
@@ -325,16 +350,21 @@ puede, también sale sin color, nunca con códigos raros a la vista.
 ```
    1      Abrir el histórico  (datos/historico.xlsx)
    2      Abrir la carpeta  datos/
+   3      Ejecutar de nuevo
    Intro  Cerrar
 ```
 
 Se pueden elegir varias opciones seguidas; Intro cierra. Abre el fichero o la
 carpeta con el programa que tenga asignado el sistema (Excel, el
-explorador...).
+explorador...). Si el resultado ha ido a una copia (3.8), la opción 1 abre la
+copia. **Ejecutar de nuevo** vuelve a hacerlo todo desde el principio en la
+misma ventana, releyendo también `ajustes/`: sirve para ver al momento el
+efecto de una corrección en `categoria_manual` o en las reglas.
 
 **Si algo falla**, primero salen los avisos que ya hubiera (pueden explicar
-el error), luego un mensaje con ❌ en lenguaje llano, y la ventana espera a
-que se pulse Intro.
+el error), luego un mensaje con ❌ en lenguaje llano, y la ventana espera:
+Intro cierra, y **R** vuelve a ejecutar (para después de arreglar lo que
+fallaba sin tener que volver a abrirlo).
 
 El menú y las esperas solo ocurren **si hay una persona delante** (se ha
 abierto con doble clic o desde una consola). Si la salida va a otro programa

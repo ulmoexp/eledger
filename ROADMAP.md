@@ -175,7 +175,8 @@ lista. Hasta ahora:
 - **2.12.0** — el Acumulado pasa a ser el saldo real de la cuenta (no
   cuadraba con el banco en cuanto había traspasos o excluidos), columna
   Fuera del balance, fuera Extras y Deuda, y cuadre día a día contra el
-  saldo del extracto.
+  saldo del extracto. También: no falla con el histórico abierto (pide
+  cerrarlo o guarda en una copia) y opción «Ejecutar de nuevo».
 
 ## Lo que queda fuera a propósito
 

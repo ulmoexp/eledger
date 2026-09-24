@@ -28,7 +28,7 @@ repo y activar Pages. Fuera de `/release`, para pushear hay que pedírselo.
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        86 casos, 341 comprobaciones, ~2 min
+python pruebas/probar.py        89 casos, 353 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se

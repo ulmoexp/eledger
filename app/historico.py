@@ -360,6 +360,169 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0,
 
 
 # =====================================================================
+# GRÁFICOS DE RESUMEN
+# =====================================================================
+# Hubo uno del Acumulado (2.5.0-2.10.1) que en OnlyOffice salía con los
+# meses en el eje vertical y sin línea, y se quitó en la 2.11.0. La causa
+# (2.12.0, comprobada con el motor de OnlyOffice): openpyxl escribe los DOS
+# ejes con axPos="l". Excel y LibreOffice lo ignoran y colocan cada eje
+# donde le toca; OnlyOffice lo obedece. Cada gráfico fija la posición de
+# sus ejes a mano: no quitar esas líneas aunque en Excel no se note nada.
+#
+# Colores: huecos 1 y 2 de una paleta categórica validada para daltonismo
+# (azul y naranja). Una sola serie va siempre en el azul.
+_AZUL, _NARANJA = "2A78D6", "EB6834"
+_ALTO_GRAFICO = 8          # cm; unas 16 filas de las de por defecto
+_FILAS_POR_GRAFICO = 18
+
+
+def _graficos(ws, resumen: pd.DataFrame, catalogo) -> None:
+    """
+    Debajo de la tabla, uno encima de otro:
+      1. Acumulado: el saldo de la cuenta mes a mes.
+      2. Ingresos y gastos de cada mes.
+      3. Gasto medio al mes por categoría, de más a menos. Una sola serie y
+         no una barra apilada por categoría: con diez categorías serían
+         diez colores, y a partir de ocho ya no se distinguen.
+    Cada uno solo si sus columnas siguen en el resumen (orden_resumen puede
+    haberlas quitado).
+    """
+    columnas = list(resumen.columns)
+    fila = len(resumen) + 4             # dos filas de aire bajo la tabla
+
+    graficos = []
+    if "Acumulado" in columnas:
+        g = _grafico_linea(ws, resumen, "Acumulado", "Acumulado (saldo de la cuenta)")
+        graficos.append(g)
+    if "Ingresos" in columnas and "Total Gastos" in columnas:
+        graficos.append(_grafico_ingresos_gastos(ws, resumen))
+    medias = _gasto_medio_por_categoria(resumen, catalogo)
+    if medias:
+        graficos.append(_grafico_categorias(medias))
+
+    for g in graficos:
+        ws.add_chart(g, f"A{fila}")
+        fila += _FILAS_POR_GRAFICO
+
+
+def _serie_de_columna(ws, resumen, columna, titulo, color):
+    """
+    Una serie que apunta a las celdas de la tabla y lleva además una copia
+    de los valores DENTRO del gráfico. Excel lo recalcula desde las celdas
+    al abrir; OnlyOffice lo dibuja con la copia, y sin ella salía vacío
+    (2.9.0). Los meses van como texto: son etiquetas, no números.
+    """
+    from openpyxl.chart import Series
+    from openpyxl.chart.data_source import (AxDataSource, NumData, NumVal,
+                                            StrData, StrRef, StrVal)
+    from openpyxl.chart.series import SeriesLabel
+    from openpyxl.utils import get_column_letter
+
+    columnas = list(resumen.columns)
+    n = len(resumen)
+    hoja = f"'{ws.title}'"
+    letra = get_column_letter(columnas.index(columna) + 1)
+    serie = Series(f"{hoja}!${letra}$2:${letra}${n + 1}", title=None)
+    serie.val.numRef.numCache = NumData(formatCode="General", ptCount=n, pt=[
+        NumVal(idx=i, v=float(v)) for i, v in enumerate(resumen[columna])])
+    serie.tx = SeriesLabel(v=titulo)
+    if "Mes" in columnas:
+        letra = get_column_letter(columnas.index("Mes") + 1)
+        serie.cat = AxDataSource(strRef=StrRef(
+            f=f"{hoja}!${letra}$2:${letra}${n + 1}",
+            strCache=StrData(ptCount=n, pt=[
+                StrVal(idx=i, v=str(m)) for i, m in enumerate(resumen["Mes"])])))
+    _pintar(serie, color)
+    return serie
+
+
+def _pintar(serie, color):
+    from openpyxl.chart.shapes import GraphicalProperties
+    from openpyxl.drawing.line import LineProperties
+
+    serie.graphicalProperties = GraphicalProperties(
+        solidFill=color, ln=LineProperties(solidFill=color))
+
+
+def _preparar(g, titulo, eje_categorias="b", eje_valores="l"):
+    g.title = titulo
+    g.height, g.width = _ALTO_GRAFICO, 18
+    # sin delete=False, algunas versiones esconden los ejes y queda una
+    # línea suelta; axPos, ver la nota de arriba (OnlyOffice)
+    g.x_axis.delete = False
+    g.y_axis.delete = False
+    g.x_axis.axPos = eje_categorias
+    g.y_axis.axPos = eje_valores
+    g.y_axis.number_format = '#,##0 €'
+    return g
+
+
+def _grafico_linea(ws, resumen, columna, titulo):
+    from openpyxl.chart import LineChart
+
+    serie = _serie_de_columna(ws, resumen, columna, titulo, _AZUL)
+    serie.smooth = False
+    serie.graphicalProperties.line.width = 25400        # 2 pt
+    g = LineChart()
+    g.series.append(serie)
+    g.legend = None                     # una serie: el título ya la nombra
+    return _preparar(g, titulo)
+
+
+def _grafico_ingresos_gastos(ws, resumen):
+    from openpyxl.chart import BarChart
+
+    g = BarChart()
+    g.type, g.grouping = "col", "clustered"
+    g.series.append(_serie_de_columna(ws, resumen, "Ingresos", "Ingresos", _AZUL))
+    g.series.append(_serie_de_columna(ws, resumen, "Total Gastos", "Gastos", _NARANJA))
+    g.legend.position = "b"
+    return _preparar(g, "Ingresos y gastos")
+
+
+def _gasto_medio_por_categoria(resumen, catalogo) -> list[tuple[str, float]]:
+    """(columna, media mensual) de las categorías de gasto que salen en el
+    resumen, de menos a más (en un gráfico de barras horizontales la primera
+    va abajo: así la mayor queda arriba). Las que en conjunto acaban a favor
+    o a cero no tienen barra que dibujar."""
+    n = len(resumen)
+    columnas = [catalogo.etiqueta(c) for c in catalogo.gastos]
+    medias = [(c, float(resumen[c].sum()) / n) for c in columnas
+              if c in resumen.columns]
+    return sorted([(c, m) for c, m in medias if m >= 0.005], key=lambda x: x[1])
+
+
+def _grafico_categorias(medias):
+    """
+    Con los valores escritos dentro del gráfico, sin apuntar a celdas: la
+    media no está en ninguna celda del resumen, y añadir una fila de totales
+    a la tabla cambiaría lo que lee quien la use desde fuera (la
+    sincronización, sus fórmulas).
+    """
+    from openpyxl.chart import BarChart
+    from openpyxl.chart.data_source import (AxDataSource, NumData,
+                                            NumDataSource, NumVal, StrData,
+                                            StrVal)
+    from openpyxl.chart.series import Series as SerieXml
+
+    serie = SerieXml(
+        val=NumDataSource(numLit=NumData(
+            formatCode="General", ptCount=len(medias),
+            pt=[NumVal(idx=i, v=round(m, 2)) for i, (_, m) in enumerate(medias)])),
+        cat=AxDataSource(strLit=StrData(ptCount=len(medias), pt=[
+            StrVal(idx=i, v=str(c)) for i, (c, _) in enumerate(medias)])))
+    _pintar(serie, _AZUL)
+
+    g = BarChart()
+    g.type = "bar"                      # horizontal: los nombres se leen enteros
+    g.series.append(serie)
+    g.legend = None
+    # en horizontal, las categorías van a la izquierda y los importes abajo
+    return _preparar(g, "Gasto medio al mes por categoría",
+                     eje_categorias="l", eje_valores="b")
+
+
+# =====================================================================
 # ESCRITURA
 # =====================================================================
 
@@ -455,10 +618,7 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
                 if j % 2 == 0 and col not in destacadas:
                     c.fill = suave
 
-        # Sin gráfico, a propósito. Hubo uno del Acumulado (2.9.0), pero
-        # OnlyOffice lo dibujaba mal incluso con los valores copiados dentro:
-        # mejor no enseñar nada que enseñarlo mal. No volver a ponerlo sin
-        # probarlo antes en OnlyOffice además de en Excel.
+        _graficos(ws, resumen, catalogo)
 
     # RESUMEN es lo que se viene a mirar: primera hoja y la que se ve al
     # abrir. MOVIMIENTOS es el detalle, para cuando haga falta. _meta la

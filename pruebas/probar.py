@@ -1687,7 +1687,7 @@ def prueba_resumen_desglose_avisos(e):
               "y el total no pierde nada", str(e.resumen().iloc[0]["Ingresos"]))
 
 
-@caso("resumen-primero", "El histórico se abre por RESUMEN, y sin gráfico")
+@caso("resumen-primero", "El histórico se abre por RESUMEN")
 def prueba_resumen_primero(e):
     fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
     e.ejecutar()
@@ -1701,14 +1701,59 @@ def prueba_resumen_primero(e):
               wb.active.title)
     wb.close()
 
-    # Hubo un gráfico del Acumulado (2.9.0) y se quitó en la 2.11.0: en
-    # OnlyOffice salía mal incluso con los valores copiados dentro. Mejor
-    # nada que algo mal; si vuelve, que sea a propósito y probado allí.
+
+def _xml_graficos(ruta):
     import zipfile
-    with zipfile.ZipFile(e.ruta_historico) as z:
-        graficos = [n for n in z.namelist()
-                    if n.startswith(("xl/charts/", "xl/drawings/"))]
-    comprobar(not graficos, "no hay ningún gráfico en el fichero", str(graficos))
+    with zipfile.ZipFile(ruta) as z:
+        return [z.read(n).decode("utf-8") for n in sorted(z.namelist())
+                if n.startswith("xl/charts/chart")]
+
+
+@caso("graficos", "Los gráficos de RESUMEN se ven también en OnlyOffice")
+def prueba_graficos(e):
+    datos = ABRIL + [("05/05/2026", "COMPRA MERCADONA MADRID", -80.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", datos)
+    e.ejecutar()
+    xmls = _xml_graficos(e.ruta_historico)
+
+    comprobar(len(xmls) == 3, "tres: Acumulado, ingresos y gastos, y por categoría",
+              f"{len(xmls)} gráficos")
+    # la causa del gráfico roto de la 2.10 (quitado en la 2.11): openpyxl
+    # escribe los dos ejes a la izquierda; OnlyOffice lo obedece y pone los
+    # meses en vertical, sin línea. Cada eje tiene que ir en su sitio.
+    import re
+    posiciones = [(re.search(r'<catAx>.*?<axPos val="(.)"', x).group(1),
+                   re.search(r'<valAx>.*?<axPos val="(.)"', x).group(1))
+                  for x in xmls]
+    comprobar(posiciones and all(cat != val for cat, val in posiciones),
+              "cada eje en un lado distinto, no los dos a la izquierda",
+              f"(categorías, valores): {posiciones}")
+    # sin la copia de los valores dentro, OnlyOffice lo dibujaba vacío (2.9.0)
+    comprobar(all("<numCache>" in x or "<numLit>" in x for x in xmls),
+              "todos llevan los valores dentro, no solo la referencia a celdas")
+    comprobar("<numLit>" in xmls[2] and "Comida" in xmls[2],
+              "el de categorías lleva sus medias escritas dentro", xmls[2][:300])
+
+
+@caso("graficos-orden-resumen", "Sin Acumulado en orden_resumen, no hay gráfico de Acumulado")
+def prueba_graficos_orden_resumen(e):
+    e.escribir_config("categorias.json", {
+        "gastos": ["Comida", "Otros"],
+        "ingresos": ["Ingresos"],
+        "neutras": ["Transferencias internas"],
+        "columna_mes": "mes_ajustado",
+        "orden_resumen": ["Mes", "Comida", "Otros", "Total Gastos", "Ingresos"]})
+    e.escribir_config("rules.json", {"mercadona": "Comida", "nomina": "Ingresos"})
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                      ("09/04/2026", "NOMINA EMPRESA SL", 2000.00)])
+    salida = e.ejecutar()
+    xmls = _xml_graficos(e.ruta_historico)
+
+    comprobar(e.ultimo_codigo == 0, "no falla", salida)
+    comprobar(len(xmls) == 2 and not any("Acumulado" in x for x in xmls),
+              "solo los dos que tienen sus columnas en el resumen",
+              f"{len(xmls)} gráficos")
 
 
 @caso("pantalla-orden", "Por pantalla: versión arriba, avisos juntos al final")

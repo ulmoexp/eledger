@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          89 casos, 353 comprobaciones, ~2 min
+python pruebas/probar.py          91 casos, 358 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -172,11 +172,15 @@ de prueba) se han dejado sin color a propósito: son secundarios.
 **Probado solo con una terminal simulada (`script`) en Linux: falta
 probarlo en Windows** (doble clic en `ejecutar.bat` y en el `.exe`).
 
-**Sin gráfico en RESUMEN (2.11.0).** Hubo uno del Acumulado (2.5.0–2.10.1)
-y se quitó: en OnlyOffice salía mal incluso con los valores copiados
-dentro. Decisión del usuario: *mejor no mostrar nada que mostrarlo mal*.
-No volver a ponerlo sin probarlo en OnlyOffice; el caso `resumen-primero`
-comprueba que no hay ningún `xl/charts/` en el fichero.
+**Gráficos en RESUMEN (2.12.0).** Hubo uno del Acumulado (2.5.0–2.10.1)
+que se quitó en la 2.11.0 porque en OnlyOffice salía mal. Causa encontrada
+en la 2.12.0: openpyxl escribe los dos ejes con `axPos="l"` y OnlyOffice lo
+obedece. `_preparar()` en `historico.py` coloca cada eje a mano; el caso
+`graficos` lo vigila. **Cualquier cambio en los gráficos se prueba en
+OnlyOffice**, no solo en Excel: sin OnlyOffice de escritorio a mano,
+DocumentBuilder (tarball de GitHub, sin instalar nada) convierte el xlsx a
+PDF con su mismo motor: `builder.OpenFile(...)`, `builder.SaveFile("pdf",
+...)`. Sale una marca de agua de «Unregistered», que no afecta.
 
 **Escritura segura:** Excel toma por fórmula cualquier texto que empiece por
 `=`, y hay reglas que se llaman `=dia`. `_texto_seguro()` lo evita. Y

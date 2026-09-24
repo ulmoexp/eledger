@@ -21,7 +21,8 @@ Cómo se usa
 1. Descarga los extractos del banco y déjalos en la carpeta  entrada/
    Con el nombre y la extensión que traigan. No hay que renombrar nada.
 2. Doble clic en  ejecutar.bat   (en Mac: ejecutar.command; en Linux: ejecutar.sh)
-3. Al terminar, pulsa 1 para abrir  datos/historico.xlsx  (o ábrelo tú).
+3. Al terminar, pulsa 1 para abrir  datos/historico.xlsx  (o ábrelo tú con
+   Microsoft Excel, OnlyOffice o LibreOffice).
    Los avisos, si hay alguno, salen juntos justo antes de esa pregunta.
 
 Puedes volver a ejecutarlo tantas veces como quieras. Los movimientos que ya

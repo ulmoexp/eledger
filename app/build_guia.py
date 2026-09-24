@@ -266,7 +266,8 @@ story += [p(
     "tabla, descarta los movimientos que no quieres contar, los clasifica por "
     "categorías y genera un Excel listo para pegar en tu hoja de cálculo. Al terminar, "
     "te enseña qué cargos se repiten cada mes o cada año (suscripciones, cuotas, "
-    "seguros) y cuánto suman al año; sin opinar sobre ninguno.")]
+    "seguros) y cuánto suman al año; sin opinar sobre ninguno. "
+    "El Excel se abre con Microsoft Excel, OnlyOffice o LibreOffice.")]
 
 flujo = Table([[
     Paragraph("<b>Entrada</b><br/><font size='8' color='#5C6672'>cuenta + tarjetas<br/>"
@@ -620,7 +621,9 @@ story += [tabla(
       "columna <font face='Mono'>excluido</font>). La cabecera naranja señala la "
       "única columna que puedes escribir tú."],
      ["<font face='Mono'>RESUMEN</font>",
-      "La matriz mes × categoría con los totales, el balance y el arrastre."]],
+      "La matriz mes × categoría con los totales, el balance y el saldo de la "
+      "cuenta. Debajo, tres gráficos: el Acumulado, los ingresos y gastos de cada "
+      "mes, y el gasto medio al mes por categoría."]],
     [ANCHO * 0.26, ANCHO * 0.74])]
 story += [Spacer(1, 7)]
 story += [aviso(

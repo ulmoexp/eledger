@@ -176,7 +176,8 @@ lista. Hasta ahora:
   cuadraba con el banco en cuanto había traspasos o excluidos), columna
   Fuera del balance, fuera Extras y Deuda, y cuadre día a día contra el
   saldo del extracto. También: no falla con el histórico abierto (pide
-  cerrarlo o guarda en una copia) y opción «Ejecutar de nuevo».
+  cerrarlo o guarda en una copia), opción «Ejecutar de nuevo» y vuelven
+  los gráficos de RESUMEN (ya también en OnlyOffice).
 
 ## Lo que queda fuera a propósito
 

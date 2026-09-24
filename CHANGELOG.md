@@ -34,6 +34,11 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
   verdad no se ha actualizado. No cierra nunca tu hoja de cálculo por su
   cuenta: podrías perder cambios. En Mac y Linux, además, evita que al
   guardar desde la hoja de cálculo pises sin saberlo el resultado nuevo.
+- **Vuelven los gráficos a la hoja RESUMEN**, debajo de la tabla: el
+  Acumulado mes a mes, los ingresos y gastos de cada mes, y el gasto medio
+  al mes por categoría. Se ven en Microsoft Excel, OnlyOffice y
+  LibreOffice. El de la 2.10 salía mal en OnlyOffice por cómo se escribían
+  sus ejes; está resuelto.
 - **Ejecutar de nuevo**, opción 3 del menú final, para ver al momento el
   efecto de una corrección sin cerrar la ventana. Tras un error, la R hace
   lo mismo.

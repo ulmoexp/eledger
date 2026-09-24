@@ -3,7 +3,8 @@
 Herramienta local para clasificar tus movimientos bancarios. Lee los
 extractos que te descargas del banco (cuenta y tarjeta), los une sin
 duplicar, los clasifica por categorías y te deja un Excel con histórico y
-resumen mensual.
+resumen mensual, con gráficos. Se abre con Microsoft Excel, OnlyOffice o
+LibreOffice.
 
 **Todo se procesa en tu ordenador.** No hay servidor, no hay cuenta, no sale
 nada a internet. Es justo lo que hace falta para darle tus movimientos

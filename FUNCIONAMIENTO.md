@@ -549,10 +549,32 @@ pide revisarlo a mano.
 Las siete primeras columnas (de fecha a categoria) están siempre en ese orden,
 porque hay hojas de usuario con fórmulas que apuntan a ellas por posición.
 
-**RESUMEN** — la tabla del apartado 3.7, sin gráfico. Hubo uno del
-Acumulado entre la 2.5.0 y la 2.10.1; se quitó en la 2.11.0 porque
-OnlyOffice lo dibujaba mal incluso con sus valores copiados dentro, y mejor
-no enseñar nada que enseñarlo mal.
+**RESUMEN** — la tabla del apartado 3.7 y, debajo, tres gráficos, uno
+encima de otro:
+
+1. **Acumulado**: el saldo de la cuenta mes a mes (línea).
+2. **Ingresos y gastos** de cada mes (barras, una junto a otra).
+3. **Gasto medio al mes por categoría**, de más a menos (barras
+   horizontales, un solo color). No son barras apiladas por categoría a
+   propósito: con diez categorías serían diez colores, y pasadas ocho ya no
+   se distinguen. Las categorías que en conjunto quedan a cero o a favor no
+   salen.
+
+Cada uno sale solo si sus columnas siguen en el resumen (`orden_resumen`
+puede haberlas quitado). Los dos primeros apuntan a las celdas de la tabla
+y llevan además una copia de los valores dentro; el tercero lleva las
+medias solo dentro, porque no están en ninguna celda (añadir una fila de
+totales cambiaría la tabla que leen la sincronización y las fórmulas de
+cada cual).
+
+Funcionan en Microsoft Excel, OnlyOffice y LibreOffice. Hubo un gráfico del
+Acumulado entre la 2.5.0 y la 2.10.1 que en OnlyOffice salía con los meses
+en el eje vertical y sin línea, y se quitó en la 2.11.0. La causa se
+encontró en la 2.12.0 renderizando el fichero con el motor de OnlyOffice:
+la librería que escribe el Excel pone los dos ejes a la izquierda; Excel y
+LibreOffice lo pasan por alto y OnlyOffice lo obedece. Ahora cada eje se
+coloca en su sitio a mano. La copia de los valores dentro es de la 2.9.0:
+sin ella, OnlyOffice lo dibujaba vacío.
 
 Orden de las hojas: **RESUMEN primero** (y es la que se ve al abrir el
 fichero), luego MOVIMIENTOS y por último _meta.

@@ -415,7 +415,7 @@ def prueba_saldo_inicial(e):
     salida = e.ejecutar()
     res = e.resumen()
 
-    comprobar("Saldo inicial detectado" in salida and "5,000.00" in salida,
+    comprobar("Saldo inicial detectado" in salida and "5.000,00" in salida,
               "lo dice por pantalla", salida)
 
     f = res.iloc[0]
@@ -466,7 +466,7 @@ def prueba_saldo_inicial_ambiguo_resoluble(e):
     salida = e.ejecutar()
 
     # saldo real antes de TODO: 5000 (lo fija fixtures.escribir_html)
-    comprobar("Saldo inicial detectado: 5,000.00" in salida,
+    comprobar("Saldo inicial detectado: 5.000,00" in salida,
               "resuelve el ambiguo apoyándose en el día siguiente, sin ambigüedad",
               salida)
 
@@ -591,7 +591,7 @@ def prueba_saldo_por_cuenta(e):
 
     comprobar("Saldo inicial detectado en 2 cuentas" in salida, "avisa de las dos",
               salida)
-    comprobar("principal: 5,000.00" in salida and "ahorro: 5,000.00" in salida,
+    comprobar("principal: 5.000,00" in salida and "ahorro: 5.000,00" in salida,
               "cada una con SU PROPIO saldo (5000 €, fijado por fixtures.py)",
               salida)
     # 5000+5000 de saldo inicial, -100 de gasto y +200 que entran en ahorro.
@@ -658,7 +658,7 @@ def prueba_cuadre_hueco(e):
 
     comprobar("No cuadra con el banco" in salida,
               "avisa de que el cálculo y el banco no coinciden", salida)
-    comprobar("10/06/2026: +800.00" in salida,
+    comprobar("10/06/2026: +800,00" in salida,
               "dice en qué fecha aparece la diferencia y de cuánto es", salida)
     comprobar(e.ultimo_codigo == 0, "es un aviso, no un error: el resto sale igual",
               salida)
@@ -750,6 +750,41 @@ def prueba_limpios_abierto(e):
               "y el histórico no se duplica", str(list(e.datos.iterdir())))
     comprobar("NO se ha actualizado" not in salida,
               "sin el aviso del histórico, que sí está al día", salida)
+
+
+@caso("cuadre-intermedio", "Si al final cuadra pero no por el camino, no dice «no cuadra»")
+def prueba_cuadre_intermedio(e):
+    # fixtures.py calcula el saldo en el orden de la lista: con el día 15
+    # detrás del 20, el saldo del banco de esos dos días no casa con el
+    # calculado, pero el del último día sí
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("10/04/2026", "COMPRA MERCADONA MADRID", -10.00),
+                      ("20/04/2026", "REPSOL E.S. LAS ROZAS", -20.00),
+                      ("15/04/2026", "CINE YELMO", -5.00),
+                      ("25/04/2026", "COMPRA MERCADONA MADRID", -7.00)])
+    salida = e.ejecutar()
+
+    comprobar("Al final cuadra con el banco" in salida,
+              "dice que al final cuadra", salida)
+    comprobar("No cuadra con el banco" not in salida,
+              "y no que no cuadre: las dos cifras serían la misma", salida)
+    comprobar("se separa del saldo del banco" in salida,
+              "pero avisa de las fechas en que se separa", salida)
+
+
+@caso("importes-formato", "Los importes de la pantalla van en formato español")
+def prueba_importes_formato(e):
+    # 5000 € de saldo inicial (lo fija fixtures.py) y una nómina de 2000 €:
+    # con el formato de Python saldrían «5,000.00» y «2,000.00», al revés de
+    # como los escribe cualquier banco español
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:1])
+    salida = e.ejecutar()
+
+    comprobar("5.000,00 €" in salida and "2.000,00 €" in salida,
+              "miles con punto y decimales con coma", salida)
+    comprobar("5,000.00" not in salida and "2,000.00" not in salida,
+              "ni rastro del formato inglés", salida)
+    comprobar("(1 mes)" in salida, "y «1 mes», no «1 meses»", salida)
 
 
 @caso("gastos-signo", "Una devolución sale en negativo, no disfrazada de gasto")
@@ -957,7 +992,7 @@ def prueba_tarjeta_detecta(e):
 
     comprobar("ningún patrón en" in salida, "avisa de que no hay exclusiones",
               salida)
-    comprobar("2026-04" in salida and "95.30" in salida,
+    comprobar("2026-04" in salida and "95,30 €" in salida,
               "identifica el mes y el importe que cuadra", salida)
     comprobar('"liquidacion tarjeta visa"' in salida,
               "propone la parte fija del recibo, sin el número de referencia",
@@ -1028,7 +1063,7 @@ def prueba_tarjeta_tolerancia(e):
 
     salida = e.ejecutar()
 
-    comprobar("2026-04" in salida and "40.00" in salida,
+    comprobar("2026-04" in salida and "40,00 €" in salida,
               "el cuadre a 2 céntimos sí se acepta (redondeo)", salida)
     comprobar("2026-05:" not in salida,
               "el cuadre a 10 céntimos no, no es un simple redondeo", salida)
@@ -1699,6 +1734,13 @@ def prueba_resumen_primero(e):
               str(wb.sheetnames))
     comprobar(wb.active.title == "RESUMEN", "y la que se ve al abrir",
               wb.active.title)
+    # la guía dice «la cabecera naranja» para señalar la única columna que
+    # se escribe a mano: hasta la 2.12.0 era verde como todas
+    ws = wb["MOVIMIENTOS"]
+    colores = {c.value: c.fill.fgColor.rgb for c in ws[1]}
+    comprobar(str(colores.get("categoria_manual", "")).endswith("B4531A")
+              and not str(colores.get("categoria", "")).endswith("B4531A"),
+              "categoria_manual lleva la cabecera naranja, y solo ella", str(colores))
     wb.close()
 
 
@@ -1810,11 +1852,11 @@ def prueba_recurrentes_mensual(e):
 
     comprobar("🔁 2 cargos que se repiten" in salida,
               "encuentra los dos, y nada más", salida)
-    comprobar("167.88 €/año" in salida and "13.99 € mensual" in salida,
+    comprobar("167,88 €/año" in salida and "13,99 € mensual" in salida,
               "al importe de hoy (13,99 × 12), no al antiguo", salida)
-    comprobar("420.00 €/año" in salida,
+    comprobar("420,00 €/año" in salida,
               "y agrupa el recibo aunque la referencia cambie cada mes", salida)
-    comprobar(salida.index("420.00 €/año") < salida.index("167.88 €/año"),
+    comprobar(salida.index("420,00 €/año") < salida.index("167,88 €/año"),
               "de más a menos coste al año", salida)
     for palabra in ("deberías", "cancela", "ahorra"):
         comprobar(palabra not in salida.lower(),
@@ -1861,7 +1903,7 @@ def prueba_recurrentes_anual(e):
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     salida = e.ejecutar()
 
-    comprobar("295.00 €/año" in salida and "anual" in salida,
+    comprobar("295,00 €/año" in salida and "anual" in salida,
               "sale como anual, al importe del último", salida)
 
 

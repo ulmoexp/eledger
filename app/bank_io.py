@@ -208,7 +208,8 @@ def _leer_xls_biff(ruta: str) -> list[list]:
         raise RuntimeError(
             f"'{os.path.basename(ruta)}' es un .xls real (Excel 97-2003) y hace "
             "falta la librería 'xlrd' para leerlo.\n"
-            "   Instálala con:  pip install xlrd"
+            "   Vuelve a lanzar el instalador (instalar.bat, .command o .sh):\n"
+            "   la instala en el entorno de la herramienta."
         )
     import datetime as _dt
 

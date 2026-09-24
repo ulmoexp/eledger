@@ -157,7 +157,9 @@ def aviso(titulo, texto, color=AVISO, fondo=AVISO_CL):
         ("TOPPADDING", (0, 1), (0, 1), 0),
         ("BOTTOMPADDING", (0, 1), (0, 1), 8),
     ]))
-    return t
+    # entero o nada: una tabla se puede partir entre filas, y el título se
+    # quedaba solo al pie de una página con el texto en la siguiente
+    return KeepTogether([t])
 
 
 def pasos(items):
@@ -278,8 +280,8 @@ flujo = Table([[
               "clasificar · ajustar mes</font>", S["celda"]),
     Paragraph("→", ParagraphStyle("f2", parent=S["celda"], fontSize=13,
                                   textColor=ACENTO, alignment=1)),
-    Paragraph("<b>Salida</b><br/><font size='8' color='#5C6672'>movimientos_limpios<br/>"
-              "movimientos_excluidos</font>", S["celda"]),
+    Paragraph("<b>Salida</b><br/><font size='8' color='#5C6672'>historico.xlsx<br/>"
+              "movimientos_limpios · excluidos</font>", S["celda"]),
 ]], colWidths=[ANCHO * 0.28, ANCHO * 0.08, ANCHO * 0.28, ANCHO * 0.08, ANCHO * 0.28])
 flujo.setStyle(TableStyle([
     ("BACKGROUND", (0, 0), (0, 0), FONDO),
@@ -297,7 +299,8 @@ story += [flujo, EE]
 story += [h1("Instalación"), E]
 story += [p(
     "Una sola vez: doble clic en <font face='Mono' size='9'>instalar.bat</font> "
-    "(en Mac, <font face='Mono' size='9'>instalar.command</font>). Tarda un par de "
+    "(en Mac, <font face='Mono' size='9'>instalar.command</font>; en Linux, "
+    "<font face='Mono' size='9'>instalar.sh</font>). Tarda un par de "
     "minutos. Prepara las librerías en una carpeta propia dentro de "
     "<font face='Mono' size='8.6'>app/.venv</font>, sin tocar nada de lo que ya "
     "tengas instalado, y a partir de ahí "
@@ -313,7 +316,10 @@ story += [tabla(
       "No se ha llegado a instalar. Vuelve a lanzar "
       "<font face='Mono'>instalar.bat</font> y mira si termina sin errores."],
      ["Mac: no deja abrir el fichero",
-      "Clic derecho sobre él → <b>Abrir</b>. Solo la primera vez."]],
+      "Clic derecho sobre él → <b>Abrir</b>. Solo la primera vez."],
+     ["Linux: el doble clic no lo ejecuta",
+      "Dale permisos desde una terminal en esa carpeta: "
+      "<font face='Mono'>chmod +x instalar.sh &amp;&amp; ./instalar.sh</font>"]],
     [ANCHO * 0.32, ANCHO * 0.68])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
@@ -328,9 +334,9 @@ story += [h1("Estructura de carpetas"), E]
 story += [codigo([
     "proyecto/",
     "├── instalar.bat        ← solo la primera vez",
-    "├── ejecutar.bat        ← doble clic (Windows)",
-    "├── ejecutar.command    ← doble clic (Mac)",
+    "├── ejecutar.bat        ← doble clic para procesar",
     "├── exportar.bat        ← ZIP para dar a alguien, sin tus datos",
+    "│   (en Mac, los tres acaban en .command; en Linux, en .sh)",
     "├── LEEME.txt",
     "├── CHANGELOG.md        ← qué cambió en cada versión",
     "├── GUIA.pdf            ← esto que estás leyendo",
@@ -345,10 +351,11 @@ story += [codigo([
     "│   └── copias/             ← copias de seguridad",
     "│",
     "├── ajustes/            ← TU configuración",
-    "│   ├── rules.json          ← tus categorías",
+    "│   ├── rules.json          ← tus reglas",
     "│   ├── exclude_patterns.json",
     "│   ├── categorias.json",
     "│   ├── mes_contable.json",
+    "│   ├── cuentas.json        ← solo si tienes varias cuentas",
     "│   └── sincronizar.json",
     "│",
     "├── salida/             ← se regenera cada vez",
@@ -521,13 +528,17 @@ story += [aviso(
     "un concepto <b>distinto</b> del negativo (Bizum recibido / enviado, prestación / "
     "cuota), no cuando es la devolución del mismo gasto.")]
 story += [Spacer(1, 8)]
-story += [Paragraph("Añadir una categoría nueva", S["h2"])]
+story += [Paragraph("Añadir reglas", S["h2"])]
 story += [codigo([
     '"decathlon": "Ocio",',
     '"=gym":      "Ocio",',
 ])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
+    "Si la categoría es <b>nueva</b>, declárala también en "
+    "<font face='Mono' size='8.2'>categorias.json</font> (como gasto, ingreso o "
+    "neutra): si no, las reglas que la usan se descartan y se avisa al ejecutar, "
+    "porque no sumaría en ninguna columna del resumen. "
     "Usa <font face='Mono' size='8.2'>=</font> siempre que la palabra sea corta "
     "(3-4 letras) o pueda aparecer dentro de otra. Sin ese marcador, "
     "<font face='Mono' size='8.2'>bar</font> se comería BARCELONA y "
@@ -539,12 +550,12 @@ story += [p("Para ver en qué categoría caería un concepto concreto:")]
 story += [codigo([
     'python app/reglas.py "MEDIA MARKT ONLINE" "BAR LA ESQUINA"',
     '',
-    'MEDIA MARKT ONLINE  ->  Otros       [sin regla]',
-    'BAR LA ESQUINA      ->  Ocio        [=bar]',
+    'MEDIA MARKT ONLINE  ->  Otros                    [media markt · base]',
+    'BAR LA ESQUINA      ->  Ocio                     [=bar · base]',
     '',
     'python app/reglas.py "BIZUM DE MARTA" 25',
     '',
-    'BIZUM DE MARTA   25,00  ->  Ingresos    [bizum]',
+    'BIZUM DE MARTA      25,00 €  ->  Ingresos                 [bizum · base]',
 ])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
@@ -613,17 +624,19 @@ story += [p(
     "<font face='Mono' size='8.6'>historico.xlsx</font> acumula todo lo que has ido "
     "procesando, ejecución tras ejecución. Puedes borrar de "
     "<font face='Mono' size='8.6'>entrada/</font> los extractos viejos: lo que ya "
-    "entró, entrado se queda. Tiene dos hojas:")]
+    "entró, entrado se queda. Se abre por RESUMEN, y tiene además una hoja "
+    "<font face='Mono' size='8.6'>_meta</font> con la versión que lo escribió, que "
+    "no hace falta tocar:")]
 story += [tabla(
     ["Hoja", "Qué contiene"],
-    [["<font face='Mono'>MOVIMIENTOS</font>",
-      "Todos los movimientos, uno por fila, incluidos los excluidos (marcados en la "
-      "columna <font face='Mono'>excluido</font>). La cabecera naranja señala la "
-      "única columna que puedes escribir tú."],
-     ["<font face='Mono'>RESUMEN</font>",
+    [["<font face='Mono'>RESUMEN</font>",
       "La matriz mes × categoría con los totales, el balance y el saldo de la "
       "cuenta. Debajo, tres gráficos: el Acumulado, los ingresos y gastos de cada "
-      "mes, y el gasto medio al mes por categoría."]],
+      "mes, y el gasto medio al mes por categoría."],
+     ["<font face='Mono'>MOVIMIENTOS</font>",
+      "Todos los movimientos, uno por fila, incluidos los excluidos (marcados en la "
+      "columna <font face='Mono'>excluido</font>). La cabecera naranja señala la "
+      "única columna que puedes escribir tú."]],
     [ANCHO * 0.26, ANCHO * 0.74])]
 story += [Spacer(1, 7)]
 story += [aviso(
@@ -676,7 +689,7 @@ story += [aviso(
     "El resto de la hoja se regenera en cada ejecución y perderías el cambio. Si te "
     "equivocas con el nombre de una categoría, se avisa por pantalla. Y por si acaso, "
     "antes de cada escritura se guarda una copia del histórico en "
-    "<font face='Mono'>copias/</font>.")]
+    "<font face='Mono'>datos/copias/</font>.")]
 story += [EE]
 
 story += [h1("categorias.json · las columnas del resumen"), E]
@@ -783,24 +796,21 @@ story += [Paragraph(
     "mes anterior, pero el <b>recibo que pagas</b> no. Un gasto pertenece al mes en que "
     "se paga; solo se mueven los ingresos.", S["pmini"])]
 story += [Spacer(1, 7)]
-story += [Paragraph("Cómo se configura", S["h2"])]
-story += [codigo([
+# el bloque entero junto: si no, la frase final se quedaba sola arriba de
+# la página siguiente
+story += [KeepTogether([Paragraph("Cómo se configura", S["h2"]), codigo([
     '{',
     '  "dias": 3,                      ← 0 lo desactiva del todo',
     '  "palabras": ["nomina", "mutua"],',
     '  "solo_ingresos": true           ← déjalo en true',
     '}',
-])]
-story += [Spacer(1, 5)]
-story += [Paragraph(
+]), Spacer(1, 5), Paragraph(
     "Las palabras van en minúsculas y sin tildes. Si dejas "
     "<font face='Mono' size='8.2'>solo_ingresos</font> en "
     "<font face='Mono' size='8.2'>false</font>, la cuota que le pagas a la mutua se "
     "iría al mes anterior junto con la prestación que cobras de ella, y son dos cosas "
-    "distintas.", S["pmini"])]
-story += [Spacer(1, 5)]
-story += [Paragraph(
-    "Para cuadrar tus meses usa siempre <b>mes_ajustado</b>, no <b>mes</b>.", S["pmini"])]
+    "distintas.", S["pmini"]), Spacer(1, 5), Paragraph(
+    "Para cuadrar tus meses usa siempre <b>mes_ajustado</b>, no <b>mes</b>.", S["pmini"])])]
 story += [EE]
 
 story += [h1("Sincronizar con tu contabilidad"), E]
@@ -847,7 +857,7 @@ story += [tabla(
      ["El histórico encoge respecto a la vez anterior",
       "Las filas sobrantes se eliminan, no quedan restos debajo."],
      ["Cualquier otro fallo",
-      "Se hace una copia con fecha en <font face='Mono'>copias/</font> ANTES de cada "
+      "Se hace una copia con fecha en <font face='Mono'>datos/copias/</font> ANTES de cada "
       "escritura. Se guardan las 10 últimas."]],
     [ANCHO * 0.40, ANCHO * 0.60])]
 story += [EE]
@@ -891,7 +901,8 @@ story += [aviso(
 story += [Spacer(1, 6)]
 story += [p(
     "Usa <font face='Mono' size='9'>exportar.bat</font> (en Mac, "
-    "<font face='Mono' size='9'>exportar.command</font>). Genera un ZIP con el "
+    "<font face='Mono' size='9'>exportar.command</font>; en Linux, "
+    "<font face='Mono' size='9'>exportar.sh</font>). Genera un ZIP con el "
     "programa, los lanzadores, esta guía y unas reglas de partida genéricas. Nada "
     "más: no funciona quitando cosas de la carpeta, sino al revés, copiando solo lo "
     "que está autorizado, para que un fichero nuevo no se cuele por olvido.")]
@@ -940,7 +951,7 @@ story += [tabla(
       "<font face='Mono'>PISTAS_TARJETA_COL</font> en <font face='Mono'>bank_io.py</font>. "
       "Como apaño rápido, mete la palabra «tarjeta» en el nombre del fichero."],
      ["<i>«hace falta la librería xlrd»</i>",
-      "<font face='Mono'>pip install xlrd</font>"],
+      "Vuelve a lanzar el instalador: la instala en el entorno de la herramienta."],
      ["<i>«no encuentro una fila de cabecera»</i>",
       "Tu banco usa nombres de columna que no están mapeados. Ejecuta el diagnóstico "
       "(abajo) y añade el nombre a <font face='Mono'>ALIAS_COLUMNAS</font> en "
@@ -950,7 +961,7 @@ story += [tabla(
       "mayor a menor importe, con una línea lista para pegar en "
       "<font face='Mono'>rules.json</font>."],
      ["Un movimiento cae en la categoría equivocada",
-      "Mira la columna <b>I (regla)</b>: te dice exactamente qué clave lo clasificó. "
+      "Mira la columna <b>K (regla)</b>: te dice exactamente qué clave lo clasificó. "
       "O bien la afinas con <font face='Mono'>=</font>, o la mueves de sitio en el "
       "JSON, porque gana la primera que casa."],
      ["Una categoría suma 0 € en el resumen",
@@ -963,7 +974,10 @@ story += [EE]
 story += [h1("Diagnóstico de un fichero"), E]
 story += [p("Enseña qué formato es realmente, dónde está la cabecera y qué columnas ha "
             "reconocido. No modifica nada:")]
-story += [codigo("python bank_io.py movimientos.xls")]
+story += [codigo([
+    "app\\.venv\\Scripts\\python app\\bank_io.py entrada\\movimientos.xls   (Windows)",
+    "app/.venv/bin/python app/bank_io.py entrada/movimientos.xls   (Mac, Linux)",
+])]
 
 # --------------------------------------------- agrupar secciones
 UMBRAL = 340   # pt: por encima de esto, la sección puede partirse

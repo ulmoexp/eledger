@@ -88,6 +88,17 @@ def normalizar(texto) -> str:
     return re.sub(r"\s+", " ", t.lower()).strip()
 
 
+def euros(valor, signo=False, ancho=0) -> str:
+    """
+    5000 -> '5.000,00 €'; con signo, '+800,00 €'. El formato de Python es el
+    inglés (5,000.00) y quien usa esto lee sus importes como se los da el
+    banco. ancho alinea a la derecha la cifra, sin contar el símbolo.
+    """
+    cifra = f"{valor:{'+' if signo else ''},.2f}"
+    cifra = cifra.replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"{cifra:>{ancho}} €"
+
+
 _INICIO = r"(?<![0-9a-z])"
 _FIN = r"(?![0-9a-z])"
 
@@ -488,7 +499,7 @@ if __name__ == "__main__":
     for texto, imp in casos:
         etiqueta = f"{texto:<{ancho}}"
         if imp is not None:
-            etiqueta += f"  {imp:>9,.2f}"
+            etiqueta += f"  {euros(imp, ancho=9)}"
         fuera, cl_exc = exc.excluir(texto)
         if fuera:
             print(f"{etiqueta}  ->  EXCLUIDO           [{cl_exc}]")

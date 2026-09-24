@@ -599,6 +599,10 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
         if col == "fecha":
             for c in ws[get_column_letter(i)][1:]:
                 c.number_format = "DD/MM/YYYY"
+        # la única columna que se escribe a mano: la guía la señala por su
+        # cabecera naranja, así que tiene que serlo de verdad
+        if col == "categoria_manual":
+            ws.cell(row=1, column=i).fill = PatternFill("solid", fgColor="B4531A")
 
     # --- resumen: bandas, euros y realce de Balance
     if not resumen.empty:

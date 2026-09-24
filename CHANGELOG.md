@@ -39,6 +39,16 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
   al mes por categoría. Se ven en Microsoft Excel, OnlyOffice y
   LibreOffice. El de la 2.10 salía mal en OnlyOffice por cómo se escribían
   sus ejes; está resuelto.
+- **Los importes de la pantalla, en formato español**: `5.000,00 €` en vez
+  de `5,000.00 €`, como los escribe tu banco.
+- **La cabecera de `categoria_manual` es naranja** en la hoja MOVIMIENTOS,
+  como decía la guía: es la única columna que escribes tú. Hasta ahora era
+  verde como todas.
+- Arreglos menores de texto: «1 mes» en vez de «1 meses»; en Linux, el
+  aviso de que falta una librería manda a `instalar.sh` (antes decía
+  `instalar.command`, que es el de Mac); y si falta `xlrd`, se pide volver a
+  lanzar el instalador en vez de un `pip install` que la dejaba fuera del
+  entorno de la herramienta.
 - **Ejecutar de nuevo**, opción 3 del menú final, para ver al momento el
   efecto de una corrección sin cerrar la ventana. Tras un error, la R hace
   lo mismo.

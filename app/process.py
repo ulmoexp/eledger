@@ -29,7 +29,9 @@ except ImportError:
         print("   Cierra esta ventana y haz doble clic en  instalar.bat")
         print("   Es lo que hay que hacer una vez, la primera.\n")
     else:
-        print("   Cierra esta ventana y haz doble clic en  instalar.command")
+        # Mac y Linux comparten os.name, pero no el lanzador
+        lanzador = "instalar.command" if sys.platform == "darwin" else "instalar.sh"
+        print(f"   Cierra esta ventana y haz doble clic en  {lanzador}")
         print("   Es lo que hay que hacer una vez, la primera.\n")
     print("   (Si sabes lo que haces:  pip install -r requisitos.txt)\n")
     # la ventana no se cierra hasta que se ha leído (ver menu_final())
@@ -44,7 +46,8 @@ import historico as hist
 import sincronizar as sync
 from bank_io import detectar_tipo, leer_tabla_bancaria
 import rutas
-from reglas import Catalogo, Clasificador, Excluidor, IdentificadorCuentas, compilar, normalizar
+from reglas import (Catalogo, Clasificador, Excluidor, IdentificadorCuentas,
+                    compilar, euros, normalizar)
 
 # La consola de Windows usa cp1252 por defecto y revienta con acentos y símbolos.
 try:
@@ -379,8 +382,9 @@ def comprobar_abiertos(rutas_salida):
         solo_restos = all(m != "sistema" for m in abiertos.values())
         if solo_restos:
             print(f"   {titular('S')}      Seguir igualmente " + gris(
-                "(si seguro que está cerrado: a veces queda el fichero de\n"
-                "          bloqueo de un programa que se cerró en falso)"))
+                "(si estás seguro de que está cerrado:\n"
+                "          a veces queda el fichero de bloqueo de un programa\n"
+                "          que se cerró en falso)"))
         eleccion = _esperar("\n   > ").lower()
         if eleccion == "c":
             return set(abiertos)
@@ -707,26 +711,44 @@ def informar_cuadre(cuadre):
     for id_cuenta, (fecha, banco, calculado, saltos) in sorted(cuadre.items()):
         nombre = f" ({id_cuenta or 'sin identificar'})" if varias else ""
         if not saltos and abs(banco - calculado) < _TOLERANCIA_CUADRE:
-            print(verde(f"   🧮 Cuadra con el banco{nombre}: {calculado:,.2f} € "
+            print(verde(f"   🧮 Cuadra con el banco{nombre}: {euros(calculado)} "
                         f"a {fecha:%d/%m/%Y}, igual que el extracto."))
             continue
 
-        print(amarillo(f"   ⚠️  No cuadra con el banco{nombre}: el extracto dice "
-                       f"{banco:,.2f} € a {fecha:%d/%m/%Y}\n       y el "
-                       f"cálculo da {calculado:,.2f} €. Mira los avisos del final."))
-        lineas = [f"Diferencia final: {banco - calculado:+,.2f} € "
-                  f"(saldo del banco menos el calculado). Aparece en:"]
+        # si el final coincide, los saltos se han compensado entre sí: decir
+        # «no cuadra: 8.670,85 € contra 8.670,85 €» parecía una contradicción
+        acaba_bien = abs(banco - calculado) < _TOLERANCIA_CUADRE
+        if acaba_bien:
+            print(amarillo(f"   ⚠️  Al final cuadra con el banco{nombre} "
+                           f"({euros(banco)} a {fecha:%d/%m/%Y}), pero no en\n"
+                           f"       todas las fechas. Mira los avisos del final."))
+            lineas = ["Hay fechas en que el saldo calculado se separa del saldo del "
+                      "banco y luego vuelve a coincidir. Aparece en:"]
+        else:
+            print(amarillo(f"   ⚠️  No cuadra con el banco{nombre}: el extracto dice "
+                           f"{euros(banco)} a {fecha:%d/%m/%Y}\n       y el "
+                           f"cálculo da {euros(calculado)}. Mira los avisos del final."))
+            lineas = [f"Diferencia final: {euros(banco - calculado, signo=True)} "
+                      f"(saldo del banco menos el calculado). Aparece en:"]
         for f, dif in saltos[:_MAX_SALTOS_MOSTRADOS]:
-            lineas.append(f"· {f:%d/%m/%Y}: {dif:+,.2f} €")
+            lineas.append(f"· {f:%d/%m/%Y}: {euros(dif, signo=True)}")
         if len(saltos) > _MAX_SALTOS_MOSTRADOS:
             lineas.append(f"· ... y {len(saltos) - _MAX_SALTOS_MOSTRADOS} más")
-        lineas += [
-            "Entre la fecha anterior con saldo y esa, falta un movimiento de "
-            "ese importe (o sobra, si es negativo). Lo normal es un hueco "
-            "entre dos extractos: descarga el que cubra esas fechas y vuelve "
-            "a ejecutar.",
-            "Hasta entonces, el Acumulado del resumen arrastra esa diferencia."]
-        avisar(f"El saldo calculado no cuadra con el del banco{nombre}", lineas)
+        if acaba_bien:
+            lineas.append(
+                "Los totales del final están bien. Lo normal es un movimiento "
+                "con la fecha cambiada entre dos extractos, o dos del mismo "
+                "día que el banco aplicó en otro orden.")
+        else:
+            lineas += [
+                "Entre la fecha anterior con saldo y esa, falta un movimiento de "
+                "ese importe (o sobra, si es negativo). Lo normal es un hueco "
+                "entre dos extractos: descarga el que cubra esas fechas y vuelve "
+                "a ejecutar.",
+                "Hasta entonces, el Acumulado del resumen arrastra esa diferencia."]
+        titulo = ("El saldo calculado se separa del saldo del banco en algunas fechas"
+                  if acaba_bien else "El saldo calculado no cuadra con el del banco")
+        avisar(f"{titulo}{nombre}", lineas)
 
 
 # ========= INFORME DE LO SIN CLASIFICAR (hito A1 del roadmap) =========
@@ -853,7 +875,7 @@ def informe_sin_clasificar(df):
     for palabra, filas in mostrados:
         total = -filas["importe"].sum()
         ejemplo = filas["descripcion"].mode().iloc[0]
-        print(f"   {total:>10,.2f} €  ·  {len(filas):>3} mov.  ·  {palabra}")
+        print(f"   {euros(total, ancho=10)}  ·  {len(filas):>3} mov.  ·  {palabra}")
         print(gris(f"      ej: {ejemplo}"))
         sugerida = _sugerir_regla(filas, palabra, normalizados)
         if sugerida:
@@ -981,8 +1003,8 @@ def detectar_recibo_tarjeta(todo):
     lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
               "Esto parece el recibo:"]
     for mes, fila in sorted(candidatos.items()):
-        lineas.append(f"· {mes}: la tarjeta suma {-tarjeta_por_mes[mes]:,.2f} € y "
-                      f"tu cuenta tiene un cargo de {-fila['importe']:,.2f} € el "
+        lineas.append(f"· {mes}: la tarjeta suma {euros(-tarjeta_por_mes[mes])} y "
+                      f"tu cuenta tiene un cargo de {euros(-fila['importe'])} el "
                       f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
 
     ya_usadas = {f.name for f in candidatos.values()}
@@ -1109,12 +1131,12 @@ def informe_recurrentes(df, categorias_gasto):
                else f"{len(encontrados)} cargos que se repiten")
     seccion("Cargos que se repiten")
     print(f"🔁 {cuantos}; al importe de hoy suma{'n' if len(encontrados) > 1 else ''} "
-          f"{total:,.2f} € al año:")
+          f"{euros(total)} al año:")
     if len(encontrados) > _MAX_RECURRENTES:
         print(gris(f"   (se muestran los {_MAX_RECURRENTES} que más suman)"))
     print()
     for al_año, cadencia, importe, desde, ultimo in encontrados[:_MAX_RECURRENTES]:
-        print(f"   {al_año:>10,.2f} €/año  ·  {importe:,.2f} € {cadencia}  ·  "
+        print(f"   {euros(al_año, ancho=10)}/año  ·  {euros(importe)} {cadencia}  ·  "
               f"desde {desde:%m/%Y}  ·  {ultimo['categoria']}")
         print(f"      {ultimo['descripcion']}")
 
@@ -1288,7 +1310,7 @@ def main():
     print(f"\n   {len(df)} movimientos · {len(excluidos)} excluidos")
     if not df.empty:
         print(f"   del {df['fecha'].min():%d/%m/%Y} al {df['fecha'].max():%d/%m/%Y}"
-              f"  ({len(resumen)} meses)")
+              f"  ({len(resumen)} {'mes' if len(resumen) == 1 else 'meses'})")
 
     ajustadas = (df["mes"] != df["mes_ajustado"]).sum()
     if ajustadas:
@@ -1298,7 +1320,7 @@ def main():
     # ruido de coma flotante aparte: solo cuenta lo que de verdad se detectó
     detectados = {c: s for c, s in saldos_por_cuenta.items() if abs(s) >= 0.005}
     if len(detectados) == 1:
-        print(f"\n💰 Saldo inicial detectado: {next(iter(detectados.values())):,.2f} €")
+        print(f"\n💰 Saldo inicial detectado: {euros(next(iter(detectados.values())))}")
         print(gris("   Lo que tenía tu cuenta antes del primer movimiento que hay. "
                    "El Acumulado\n   del resumen parte de ahí, no de 0."))
     elif detectados:
@@ -1306,7 +1328,7 @@ def main():
               f"(ver ajustes/cuentas.json); el Acumulado del resumen parte "
               f"de la suma:")
         for id_cuenta, saldo in sorted(detectados.items()):
-            print(f"   {id_cuenta or '(sin identificar)'}: {saldo:,.2f} €")
+            print(f"   {id_cuenta or '(sin identificar)'}: {euros(saldo)}")
 
     # si se están contando dos veces los gastos de la tarjeta, que se sepa
     # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
@@ -1320,23 +1342,23 @@ def main():
 
         # las cifras con signo, verdes o rojas según el signo: un «total» en
         # verde fijo pintaría de buena noticia un mes en negativo
-        def cifra(valor, formato):
-            texto = f"{valor:{formato}} €"
-            if "+" not in formato:
+        def cifra(valor, signo=False):
+            texto = euros(valor, signo=signo)
+            if not signo:
                 return negrita(texto)
             return verde(texto) if valor >= 0 else rojo(texto)
 
-        partes = [f"{texto} {cifra(ult[col], formato)}"
-                  for col, texto, formato in (("Total Gastos", "gastos", ",.2f"),
-                                              ("Ingresos", "ingresos", ",.2f"),
-                                              ("Balance", "balance", "+,.2f"))
+        partes = [f"{texto} {cifra(ult[col], signo)}"
+                  for col, texto, signo in (("Total Gastos", "gastos", False),
+                                            ("Ingresos", "ingresos", False),
+                                            ("Balance", "balance", True))
                   if col in resumen.columns]
         mes = f" ({ult['Mes']})" if "Mes" in resumen.columns else ""
         if partes:
             print(f"\n   Último mes{mes}:  " + " · ".join(partes))
         if "Acumulado" in resumen.columns:
             print(f"   Acumulado (saldo al cierre del mes): "
-                  f"{cifra(ult['Acumulado'], '+,.2f')}")
+                  f"{cifra(ult['Acumulado'], signo=True)}")
         if doble_tarjeta:
             print("\n" + amarillo("   ⚠️  Ojo: puede que los gastos de la tarjeta "
                                   "se estén contando dos veces. Mira los avisos "

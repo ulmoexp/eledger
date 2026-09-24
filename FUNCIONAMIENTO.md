@@ -239,8 +239,11 @@ coincide con el del banco. Dentro de un día no se sabe el orden, pero el
 saldo al cerrarlo tiene que ser el de *alguna* de sus filas, y con eso basta.
 Si en algún punto deja de coincidir, apunta la fecha y la diferencia: es un
 movimiento que falta o sobra desde el día anterior con saldo, casi siempre
-un hueco entre dos extractos. Si el saldo de partida no se ha podido
-calcular, no compara nada (no hay con qué).
+un hueco entre dos extractos. Si al final vuelve a coincidir (los saltos
+se compensan: un movimiento con la fecha cambiada entre dos extractos, por
+ejemplo), no dice «no cuadra», sino que al final cuadra y en qué fechas se
+separó. Si el saldo de partida no se ha podido calcular, no compara nada
+(no hay con qué).
 
 ### 3.7 Construir el resumen mensual
 
@@ -335,6 +338,11 @@ La pantalla va por bloques, siempre en este orden:
    van guardando durante la ejecución y salen al final, en vez de en el
    momento en que se detectan: antes aparecían mezclados con todo, a menudo
    lo primero de la pantalla, que es justo donde menos se leen.
+
+**Importes.** Siempre en formato español, como los da el banco:
+`5.000,00 €`, y con signo cuando importa (`+800,00 €`). El formato de
+Python es el inglés (`5,000.00`); la conversión la hace `euros()` en
+`reglas.py`.
 
 **Colores.** En una terminal de verdad, los títulos de cada bloque salen en
 negrita y color, lo que ha ido bien (✅) en verde, los avisos en amarillo,
@@ -530,7 +538,9 @@ pide revisarlo a mano.
 
 `datos/historico.xlsx` tiene tres hojas.
 
-**MOVIMIENTOS** — el histórico completo, incluidos los excluidos:
+**MOVIMIENTOS** — el histórico completo, incluidos los excluidos. Todas
+las cabeceras van en verde salvo la de `categoria_manual`, en naranja: es
+la única columna que se escribe a mano, y la guía la señala así.
 
 | Columna | Qué es |
 |---|---|

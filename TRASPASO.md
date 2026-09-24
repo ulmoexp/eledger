@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          83 casos, 331 comprobaciones, ~2 min
+python pruebas/probar.py          86 casos, 341 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```

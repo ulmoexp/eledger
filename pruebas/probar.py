@@ -394,10 +394,17 @@ def prueba_totales(e):
               "Ingresos = 2000", str(f["Ingresos"]))
     comprobar(abs(f["Balance"] - 1190) < 0.005, "Balance = +1190",
               str(f["Balance"]))
-    comprobar(abs(f["Acumulado"] - 1190) < 0.005, "Acumulado = +1190",
+    # la liquidación de la tarjeta (-500) está excluida: no es gasto, pero
+    # el banco sí la cargó. El Acumulado es lo que hay en la cuenta.
+    comprobar(abs(f["Fuera del balance"] + 500) < 0.005,
+              "Fuera del balance = -500 (lo excluido que sí salió de la cuenta)",
+              str(f["Fuera del balance"]))
+    comprobar(abs(f["Acumulado"] - 690) < 0.005,
+              "Acumulado = +690 (1190 de balance - 500 excluidos)",
               str(f["Acumulado"]))
-    comprobar(abs(f["Deuda"]) < 0.005 and abs(f["Extras"]) < 0.005,
-              "el primer mes no arrastra nada")
+    comprobar("Deuda" not in res.columns and "Extras" not in res.columns,
+              "sin las columnas Deuda y Extras (quitadas en la 2.12.0)",
+              str(list(res.columns)))
 
 
 @caso("saldo-inicial", "El Acumulado parte del saldo real de la cuenta, no de 0")
@@ -416,9 +423,8 @@ def prueba_saldo_inicial(e):
     comprobar(abs(f["Acumulado"] - (5000 + balance)) < 0.005,
               "Acumulado = saldo inicial + balance del mes, no solo el balance",
               str(f["Acumulado"]))
-    comprobar(abs(f["Extras"] - 5000) < 0.005 and abs(f["Deuda"]) < 0.005,
-              "el primer mes ya arrastra el saldo con que empezaba la cuenta",
-              f"Extras={f['Extras']} Deuda={f['Deuda']}")
+    comprobar("Cuadra con el banco" in salida,
+              "y comprueba que acaba donde dice el extracto", salida)
 
 
 @caso("saldo-inicial-sin-cuenta", "Sin movimientos de cuenta, el Acumulado sigue en 0")
@@ -588,11 +594,94 @@ def prueba_saldo_por_cuenta(e):
     comprobar("principal: 5,000.00" in salida and "ahorro: 5,000.00" in salida,
               "cada una con SU PROPIO saldo (5000 €, fijado por fixtures.py)",
               salida)
-    # 5000+5000 de saldo inicial, -100 de gasto ese mes (el traspaso entre
-    # las dos propias cuentas es neutro: no suma como ingreso, ver rules_base)
-    comprobar(abs(res.iloc[0]["Acumulado"] - 9900) < 0.005,
-              "el Acumulado combinado suma las dos cuentas más el balance",
+    # 5000+5000 de saldo inicial, -100 de gasto y +200 que entran en ahorro.
+    # El traspaso es neutro (no es ingreso, ver rules_base), pero la salida
+    # de principal no está en estos datos: en los dos bancos hay 10100 €, y
+    # eso es lo que tiene que decir el Acumulado (hasta la 2.11 decía 9900).
+    comprobar(abs(res.iloc[0]["Acumulado"] - 10100) < 0.005,
+              "el Acumulado combinado es la suma de los saldos reales de las dos",
               str(res.iloc[0]["Acumulado"]))
+
+
+@caso("acumulado-saldo-real", "El Acumulado acaba en el saldo real del banco")
+def prueba_acumulado_saldo_real(e):
+    # regresión: hasta la 2.11 el Acumulado era saldo inicial + suma de
+    # Balances, y se despegaba del banco con cada traspaso a una cuenta que
+    # no está aquí (neutro), cada excluido y el desfase de la tarjeta (la
+    # compra cuenta el mes que se hace; el recibo, excluido, llega después).
+    # Con estos datos daba 6470 € con 1550 € en la cuenta.
+    cuenta = [("02/04/2026", "NOMINA EMPRESA SL", 2000.00),
+              ("10/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+              ("15/04/2026", "TRASPASO A CUENTA AHORRO", -5000.00),
+              ("05/05/2026", "LIQUIDACION TARJETA CREDITO", -300.00),
+              ("12/05/2026", "COMPRA MERCADONA MADRID", -50.00),
+              ("08/06/2026", "TRASPASO A CUENTA AHORRO", -100.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta)
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls",
+                       [("20/04/2026", "COMPRA A", -300.00),
+                        ("20/05/2026", "COMPRA B", -80.00)], tarjeta=True)
+    salida = e.ejecutar()
+    res = e.resumen()
+
+    saldo_real = 5000 + sum(i for _, _, i in cuenta)       # 5000 lo fija fixtures
+    comprobar(abs(res.iloc[-1]["Acumulado"] - saldo_real) < 0.005,
+              f"el último Acumulado es el saldo real ({saldo_real:.2f})",
+              str(res.iloc[-1]["Acumulado"]))
+    comprobar("2026-06" in set(res["Mes"]),
+              "un mes con solo un traspaso también sale: la cuenta se movió",
+              str(list(res["Mes"])))
+
+    anterior = 5000.0
+    cuadran = True
+    for _, f in res.iterrows():
+        if abs(anterior + f["Balance"] + f["Fuera del balance"] - f["Acumulado"]) >= 0.005:
+            cuadran = False
+        anterior = f["Acumulado"]
+    comprobar(cuadran, "cada fila cuadra: anterior + Balance + Fuera del balance",
+              res.to_string())
+    comprobar("Cuadra con el banco" in salida and "No cuadra" not in salida,
+              "y lo confirma por pantalla contra el saldo del extracto", salida)
+
+
+@caso("cuadre-hueco", "Si falta un extracto en medio, dice dónde y por cuánto")
+def prueba_cuadre_hueco(e):
+    fx.escribir_html(e.entrada / "cuenta_abril.xls",
+                     [("02/04/2026", "NOMINA EMPRESA SL", 2000.00),
+                      ("10/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+    # el extracto de junio trae el saldo REAL, que incluye 800 € de un mayo
+    # que no se ha descargado: 5000 + 2000 - 100 + 800 - 50
+    ruta = e.entrada / "cuenta_junio.xls"
+    fx.escribir_html(ruta, [("10/06/2026", "COMPRA MERCADONA MADRID", -50.00)])
+    html = ruta.read_bytes().decode("cp1252").replace("4.950,00", "7.650,00")
+    ruta.write_bytes(html.encode("cp1252"))
+    salida = e.ejecutar()
+
+    comprobar("No cuadra con el banco" in salida,
+              "avisa de que el cálculo y el banco no coinciden", salida)
+    comprobar("10/06/2026: +800.00" in salida,
+              "dice en qué fecha aparece la diferencia y de cuánto es", salida)
+    comprobar(e.ultimo_codigo == 0, "es un aviso, no un error: el resto sale igual",
+              salida)
+
+
+@caso("orden-resumen-retiradas", "Deuda o Extras en orden_resumen: avisa de que ya no existen")
+def prueba_orden_resumen_retiradas(e):
+    e.escribir_config("categorias.json", {
+        "gastos": ["Comida", "Otros"],
+        "ingresos": ["Ingresos"],
+        "neutras": ["Transferencias internas"],
+        "columna_mes": "mes_ajustado",
+        "orden_resumen": ["Mes", "Comida", "Deuda", "Extras", "Balance", "Acumulado"]})
+    e.escribir_config("rules.json", {"mercadona": "Comida", "nomina": "Ingresos"})
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+    salida = e.ejecutar()
+
+    comprobar("«Deuda» en orden_resumen ya no existe" in salida
+              and "«Extras» en orden_resumen ya no existe" in salida,
+              "explica que se han quitado, en vez de tomarlas por una errata", salida)
+    comprobar(list(e.resumen().columns) == ["Mes", "Comida", "Balance", "Acumulado"],
+              "y el resumen sale igual, sin ellas", str(list(e.resumen().columns)))
 
 
 @caso("gastos-signo", "Una devolución sale en negativo, no disfrazada de gasto")
@@ -1471,8 +1560,9 @@ def prueba_resumen_desglose_ingresos(e):
     salida = e.ejecutar()
 
     res = e.resumen()
-    comprobar(list(res.columns)[-6:] == ["Total Gastos", "Nomina", "Otros ingresos",
-                                         "Ingresos", "Balance", "Acumulado"],
+    comprobar(list(res.columns)[-7:] == ["Total Gastos", "Nomina", "Otros ingresos",
+                                         "Ingresos", "Balance", "Fuera del balance",
+                                         "Acumulado"],
               "una columna por categoría, justo antes del total que suman; la "
               "categoría «Ingresos» sale como «Otros ingresos» para no chocar "
               "con el total", str(list(res.columns)))

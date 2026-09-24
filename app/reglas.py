@@ -249,8 +249,14 @@ class Catalogo:
     siempre).
     """
 
-    COLUMNAS_SISTEMA = ["Mes", "Deuda", "Extras", "Total Gastos", "Ingresos",
-                        "Balance", "Acumulado"]
+    COLUMNAS_SISTEMA = ["Mes", "Total Gastos", "Ingresos", "Balance",
+                        "Fuera del balance", "Acumulado"]
+
+    # Quitadas en la 2.12.0: eran el Acumulado del mes anterior partido por
+    # su signo, lo mismo que ya se lee en la fila de arriba. Quien las tenga
+    # en orden_resumen merece saber que se han ido a propósito, no un «no
+    # es una columna» que le haga buscar una errata que no existe.
+    COLUMNAS_RETIRADAS = ["Deuda", "Extras"]
 
     # La categoría de ingreso de la plantilla y de rules_base.json se llama
     # «Ingresos», igual que la columna del total. Al desglosar, las dos no
@@ -354,7 +360,12 @@ class Catalogo:
             for nombre in self.orden_resumen:
                 if nombre in conocidas:
                     continue
-                if nombre in self.ingresos or nombre == self.COLUMNA_OTROS_INGRESOS:
+                if nombre in self.COLUMNAS_RETIRADAS:
+                    avisos.append(
+                        f"«{nombre}» en orden_resumen ya no existe desde la "
+                        f"2.12.0 (era el Acumulado del mes anterior, que ya se "
+                        f"ve en la fila de arriba). Quítala de ahí.")
+                elif nombre in self.ingresos or nombre == self.COLUMNA_OTROS_INGRESOS:
                     avisos.append(
                         f"«{nombre}» en orden_resumen es una categoría de "
                         f"ingreso, y solo tienen columna propia con "

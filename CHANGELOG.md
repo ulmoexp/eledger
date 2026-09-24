@@ -6,6 +6,29 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.12.0
+
+- **El Acumulado es ahora el saldo real de tu cuenta** al cerrar cada mes, el
+  mismo que te da el banco. Antes era el saldo inicial más la suma de los
+  Balances, y se despegaba del banco sin avisar: cada traspaso a otra cuenta
+  tuya (que no es gasto) y cada movimiento excluido (el recibo de la
+  tarjeta) salían de la cuenta sin restar del Acumulado, y el error se
+  arrastraba mes a mes. Con varios traspasos, la diferencia podía llegar a
+  miles de euros.
+- **Columna nueva, Fuera del balance**, entre Balance y Acumulado: lo que
+  movió la cuenta sin ser gasto ni ingreso (traspasos, lo excluido y las
+  compras con tarjeta que el banco aún no ha cargado). Cada fila cuadra a
+  ojo: Acumulado del mes anterior + Balance + Fuera del balance.
+- **Fuera las columnas Extras y Deuda.** Eran el Acumulado del mes anterior
+  partido por su signo, que ya se lee en la fila de arriba. Si las tenías en
+  `orden_resumen`, se avisa de que ya no existen; quítalas de ahí.
+- **Comprueba que cuadra con el banco.** Si el extracto trae saldo, se
+  compara día a día con el calculado. Si cuadra, lo dice; si no, avisa de en
+  qué fechas deja de cuadrar y por cuánto (casi siempre, un extracto que
+  falta entre medias).
+
+---
+
 ## 2.11.1
 
 - **Todo lo que se descarga se llama ahora `eledger`**: el programa compilado

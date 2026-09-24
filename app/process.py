@@ -449,11 +449,11 @@ def calcular_saldo_inicial(todo) -> dict:
     adivinar el orden dentro de un mismo día.
     """
     cuenta_mov = todo[todo["tipo"] == "cuenta"]
-    return {id_cuenta: _saldo_inicial_una_cuenta(grupo)
+    return {id_cuenta: _saldo_inicial_una_cuenta(grupo) or 0.0
             for id_cuenta, grupo in cuenta_mov.groupby("cuenta")}
 
 
-def _saldo_inicial_una_cuenta(movimientos) -> float:
+def _saldo_inicial_una_cuenta(movimientos):
     """
     El único sitio delicado es el primer DÍA con más de un movimiento: el
     saldo que trae cada fila es el que queda TRAS ella, y sin saber el orden
@@ -463,20 +463,104 @@ def _saldo_inicial_una_cuenta(movimientos) -> float:
     ahí lo de los días anteriores, que si son días completos enteros sí se
     pueden sumar sin importar el orden dentro de cada uno. Si ni un solo día
     es así de simple, mejor 0.0 que un cuadre inventado.
+
+    Devuelve None (no 0.0) cuando no se sabe: para el Acumulado da igual,
+    pero comprobar_cuadre() no puede comparar con el banco partiendo de un
+    saldo que no es el real.
     """
     con_saldo = movimientos[movimientos["saldo"].notna()]
     if con_saldo.empty:
-        return 0.0
+        return None
 
     un_solo_movimiento = con_saldo.groupby("fecha").size()
     fechas_sin_ambiguedad = sorted(un_solo_movimiento[un_solo_movimiento == 1].index)
     if not fechas_sin_ambiguedad:
-        return 0.0
+        return None
 
     ancla_fecha = fechas_sin_ambiguedad[0]
     ancla = con_saldo[con_saldo["fecha"] == ancla_fecha].iloc[0]
     anteriores = movimientos.loc[movimientos["fecha"] < ancla_fecha, "importe"].sum()
     return float(ancla["saldo"] - ancla["importe"] - anteriores)
+
+
+# ========= CUADRE CON EL SALDO DEL BANCO =========
+# El Acumulado del resumen es saldo inicial + movimientos de cuenta. Si falta
+# alguno (un hueco entre dos extractos, una fila que el lector ha descartado,
+# dos movimientos idénticos de verdad fusionados como duplicados), el
+# Acumulado se despega del banco para siempre, en silencio. Pero el propio
+# extracto trae el saldo tras cada movimiento: basta con compararlo.
+_TOLERANCIA_CUADRE = 0.005
+_MAX_SALTOS_MOSTRADOS = 5
+
+
+def comprobar_cuadre(todo) -> dict:
+    """
+    Para cada cuenta con saldo en el extracto: {cuenta: (ultima_fecha,
+    saldo_banco, saldo_calculado, saltos)}, donde saltos es la lista de
+    (fecha, diferencia) en que el cálculo deja de coincidir con el banco.
+    Sin saltos y con los dos saldos iguales, cuadra.
+
+    Se compara día a día, no fila a fila: dentro de un día el orden en que el
+    banco aplicó los movimientos no se conoce, pero el saldo al cerrar el día
+    tiene que ser el de ALGUNA de sus filas (la última que aplicó).
+    """
+    resultado = {}
+    cuenta_mov = todo[todo["tipo"] == "cuenta"]
+    for id_cuenta, grupo in cuenta_mov.groupby("cuenta"):
+        inicial = _saldo_inicial_una_cuenta(grupo)
+        if inicial is None:
+            continue
+
+        calculado = inicial
+        desfase = 0.0          # banco - calculado, tras el último salto visto
+        saltos = []
+        saldo_banco = ultima_fecha = None
+        for fecha, dia in grupo.groupby("fecha", sort=True):
+            calculado += dia["importe"].sum()
+            candidatos = dia["saldo"].dropna()
+            if candidatos.empty:
+                continue
+            desfases = candidatos - calculado
+            if not ((desfases - desfase).abs() < _TOLERANCIA_CUADRE).any():
+                # el más cercano al desfase anterior: con varias filas en el
+                # día, es la lectura que menos salto supone
+                nuevo = float(desfases.loc[(desfases - desfase).abs().idxmin()])
+                saltos.append((fecha, nuevo - desfase))
+                desfase = nuevo
+            saldo_banco = calculado + desfase
+            ultima_fecha = fecha
+        resultado[id_cuenta] = (ultima_fecha, saldo_banco, calculado, saltos)
+    return resultado
+
+
+def informar_cuadre(cuadre):
+    """Una línea si cuadra; si no, en qué fechas se rompe y por cuánto."""
+    if not cuadre:
+        return
+    varias = len(cuadre) > 1
+    for id_cuenta, (fecha, banco, calculado, saltos) in sorted(cuadre.items()):
+        nombre = f" ({id_cuenta or 'sin identificar'})" if varias else ""
+        if not saltos and abs(banco - calculado) < _TOLERANCIA_CUADRE:
+            print(verde(f"   🧮 Cuadra con el banco{nombre}: {calculado:,.2f} € "
+                        f"a {fecha:%d/%m/%Y}, igual que el extracto."))
+            continue
+
+        print(amarillo(f"   ⚠️  No cuadra con el banco{nombre}: el extracto dice "
+                       f"{banco:,.2f} € a {fecha:%d/%m/%Y}\n       y el "
+                       f"cálculo da {calculado:,.2f} €. Mira los avisos del final."))
+        lineas = [f"Diferencia final: {banco - calculado:+,.2f} € "
+                  f"(saldo del banco menos el calculado). Aparece en:"]
+        for f, dif in saltos[:_MAX_SALTOS_MOSTRADOS]:
+            lineas.append(f"· {f:%d/%m/%Y}: {dif:+,.2f} €")
+        if len(saltos) > _MAX_SALTOS_MOSTRADOS:
+            lineas.append(f"· ... y {len(saltos) - _MAX_SALTOS_MOSTRADOS} más")
+        lineas += [
+            "Entre la fecha anterior con saldo y esa, falta un movimiento de "
+            "ese importe (o sobra, si es negativo). Lo normal es un hueco "
+            "entre dos extractos: descarga el que cubra esas fechas y vuelve "
+            "a ejecutar.",
+            "Hasta entonces, el Acumulado del resumen arrastra esa diferencia."]
+        avisar(f"El saldo calculado no cuadra con el del banco{nombre}", lineas)
 
 
 # ========= INFORME DE LO SIN CLASIFICAR (hito A1 del roadmap) =========
@@ -987,7 +1071,10 @@ def main():
     seccion("Resultado")
     saldos_por_cuenta = calcular_saldo_inicial(todo)
     saldo_inicial = sum(saldos_por_cuenta.values())
-    resumen = hist.construir_resumen(df, catalogo, saldo_inicial)
+    # la cuenta entera, excluidos incluidos: el banco sí los aplicó, y el
+    # Acumulado es lo que hay en la cuenta, no lo que suma el Balance
+    resumen = hist.construir_resumen(df, catalogo, saldo_inicial,
+                                     todo[todo["tipo"] == "cuenta"])
     if os.path.exists(rutas.HISTORICO):
         sync.copia_de_seguridad(rutas.HISTORICO, cfg_sync.copias_de_seguridad)
     hist.guardar(rutas.HISTORICO, todo[COLUMNAS_HISTORICO], resumen, catalogo,
@@ -1067,12 +1154,14 @@ def main():
         if partes:
             print(f"\n   Último mes{mes}:  " + " · ".join(partes))
         if "Acumulado" in resumen.columns:
-            print(f"   Acumulado desde el principio: "
+            print(f"   Acumulado (saldo al cierre del mes): "
                   f"{cifra(ult['Acumulado'], '+,.2f')}")
         if doble_tarjeta:
             print("\n" + amarillo("   ⚠️  Ojo: puede que los gastos de la tarjeta "
                                   "se estén contando dos veces. Mira los avisos "
                                   "del final."))
+
+    informar_cuadre(comprobar_cuadre(todo))
 
     informe_recurrentes(df, catalogo.gastos)
     informe_sin_clasificar(df)

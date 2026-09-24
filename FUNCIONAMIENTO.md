@@ -196,8 +196,10 @@ Para cada movimiento, en este orden:
    declarada, **se ignora** y se avisa: aplicarla haría que ese movimiento
    desapareciera de los totales.
 
-Al final, lo excluido se separa de lo que cuenta. Todos los cálculos que
-siguen usan solo lo que cuenta; el histórico guarda las dos cosas.
+Al final, lo excluido se separa de lo que cuenta. Los totales que siguen
+usan solo lo que cuenta; el saldo de la cuenta (3.6 y el Acumulado de 3.7)
+usa también lo excluido, porque el banco sí lo aplicó. El histórico guarda
+las dos cosas.
 
 ### 3.6 Saldo inicial
 
@@ -215,6 +217,16 @@ orden). Si no hay ningún día así de limpio, usa 0 antes que inventar.
 Con varias cuentas declaradas, lo calcula para cada una por separado y suma.
 Las tarjetas no tienen saldo y no aportan nada aquí.
 
+**Cuadre con el banco.** Con ese saldo de partida, recorre los días en orden
+sumando los movimientos de cuenta (también los excluidos: el banco sí los
+aplicó) y, cada día que el extracto trae saldo, comprueba que el calculado
+coincide con el del banco. Dentro de un día no se sabe el orden, pero el
+saldo al cerrarlo tiene que ser el de *alguna* de sus filas, y con eso basta.
+Si en algún punto deja de coincidir, apunta la fecha y la diferencia: es un
+movimiento que falta o sobra desde el día anterior con saldo, casi siempre
+un hueco entre dos extractos. Si el saldo de partida no se ha podido
+calcular, no compara nada (no hay con qué).
+
 ### 3.7 Construir el resumen mensual
 
 Una fila por mes (agrupando por el mes ajustado, o por el real si así se
@@ -225,9 +237,9 @@ cada categoría de gasto  = lo gastado en ella ese mes, en positivo
 Total Gastos             = suma de las categorías de gasto
 Ingresos                 = suma de las categorías de ingreso
 Balance                  = Ingresos - Total Gastos
-Extras                   = lo que se arrastra a favor de los meses anteriores
-Deuda                    = lo que se arrastra en contra de los meses anteriores
-Acumulado                = Extras - Deuda + Balance
+Fuera del balance        = lo que movió la cuenta sin ser gasto ni ingreso
+Acumulado                = Acumulado del mes anterior + Balance
+                           + Fuera del balance
 ```
 
 - Los gastos salen en positivo **dándoles la vuelta al signo, no con valor
@@ -236,9 +248,23 @@ Acumulado                = Extras - Deuda + Balance
   absoluto, una devolución se disfrazaría de gasto.
 - Las categorías **neutras** (traspasos entre cuentas propias) no entran en
   ningún total: no es dinero que entre ni salga.
-- Extras y Deuda son el Acumulado del mes anterior partido por su signo; en
-  un mes solo uno de los dos tiene valor. El primer mes parte del saldo
-  inicial.
+- El **Acumulado es el saldo real de la cuenta** al cerrar el mes: saldo
+  inicial más todos los movimientos de cuenta hasta ese mes, cuenten o no en
+  el Balance. Con varias cuentas, la suma de todas.
+- **Fuera del balance** es la diferencia entre lo que se movió la cuenta y el
+  Balance: traspasos a cuentas que no están en la herramienta (neutros), lo
+  excluido (el recibo de la tarjeta, por ejemplo) y el desfase de la tarjeta
+  (la compra cuenta en el Balance el mes que se hace, pero el banco la carga
+  en la cuenta después). No se suma a partir de esas piezas, sino que se
+  saca por diferencia, así que la fila cuadra siempre. Un mes con solo
+  traspasos o excluidos también tiene fila: la cuenta se movió.
+- Sin ningún movimiento de cuenta (solo tarjeta) no hay saldo que seguir: el
+  Acumulado es la suma de los Balances y Fuera del balance es 0.
+- Hasta la 2.11 el Acumulado era la suma de los Balances más el saldo
+  inicial, y había dos columnas más, Extras y Deuda (el Acumulado del mes
+  anterior partido por su signo). Se despegaba del banco con cada traspaso
+  y cada excluido, sin avisar. Si `orden_resumen` sigue pidiendo Extras o
+  Deuda, se avisa de que ya no existen.
 - Personalizable sin tocar el cálculo, en `categorias.json`: textos de columna
   distintos del nombre interno (`etiquetas`), qué columnas salen y en qué
   orden (`orden_resumen`), y una columna por categoría de ingreso además del
@@ -271,14 +297,15 @@ La pantalla va por bloques, siempre en este orden:
    cuántos había en el histórico, cuántos son nuevos y cuántos repetidos.
 3. **Resultado**: dónde se ha guardado cada cosa, la sincronización,
    cuántos movimientos y excluidos, de qué fecha a qué fecha, el mes contable
-   ajustado, el saldo inicial detectado, y los totales del último mes y el
-   Acumulado. Si puede que el recibo de la tarjeta esté contando gastos dos
+   ajustado, el saldo inicial detectado, los totales del último mes, el
+   Acumulado y si cuadra con el saldo del extracto (3.6). Si puede que el recibo de la tarjeta esté contando gastos dos
    veces, se señala aquí mismo, junto a los totales, para no fiarse de ellos
    sin saberlo.
 4. **Cargos que se repiten** (apartado 5.2), si hay.
 5. **Sin clasificar** (apartado 5.3), si hay.
 6. **Avisos**, todos juntos y contados: categorías que no cuadran,
-   correcciones manuales inválidas, ficheros que no se han podido leer, la
+   correcciones manuales inválidas, ficheros que no se han podido leer, el
+   saldo que no cuadra con el banco (con las fechas en que se rompe), la
    sincronización que no se ha hecho, el recibo de la tarjeta (5.1)... Se
    van guardando durante la ejecución y salen al final, en vez de en el
    momento en que se detectan: antes aparecían mezclados con todo, a menudo

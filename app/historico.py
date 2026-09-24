@@ -239,48 +239,70 @@ def fusionar(historico: pd.DataFrame, nuevos: list[pd.DataFrame]):
 # RESUMEN MENSUAL
 # =====================================================================
 
-def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) -> pd.DataFrame:
+def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0,
+                      movimientos_cuenta: pd.DataFrame | None = None) -> pd.DataFrame:
     """
-    Matriz mes × categoría, con los totales y el arrastre entre meses.
+    Matriz mes × categoría, con los totales y el saldo de la cuenta.
 
     Los gastos se muestran en positivo (se les da la vuelta al signo, no se usa
     valor absoluto: si una categoría acaba en positivo por una devolución, se ve
     como negativa en vez de disfrazarse de gasto).
 
-        Total Gastos = suma de las categorías de gasto
-        Ingresos     = suma de las categorías de ingreso
-        Balance      = Ingresos - Total Gastos
-        Extras       = lo que se arrastra a favor del mes anterior
-        Deuda        = lo que se arrastra en contra del mes anterior
-        Acumulado    = Extras - Deuda + Balance
+        Total Gastos      = suma de las categorías de gasto
+        Ingresos          = suma de las categorías de ingreso
+        Balance           = Ingresos - Total Gastos
+        Fuera del balance = lo que movió la cuenta sin ser gasto ni ingreso
+        Acumulado         = Acumulado del mes anterior + Balance
+                            + Fuera del balance
 
-    saldo_inicial es de dónde parte el Acumulado antes del primer mes: 0 si no
-    se conoce el saldo real de la cuenta en ese punto (lo decide
-    calcular_saldo_inicial() en process.py), o ese saldo si se conoce. No hace
-    falta ningún caso especial para el primer mes: Deuda y Extras salen solos
-    del signo de saldo_inicial, igual que saldrían del arrastre de cualquier
-    otro mes.
+    El Acumulado es el SALDO REAL de la cuenta al cerrar el mes: saldo_inicial
+    más todos los movimientos de cuenta hasta ese mes, cuenten o no en el
+    Balance. Hasta la 2.11 era saldo_inicial + la suma de los Balances, y eso
+    se despegaba del banco con cada traspaso a una cuenta que no está aquí
+    (neutro: sale dinero y el Balance no lo ve), con cada movimiento excluido
+    y con el desfase de la tarjeta (la compra cuenta en el Balance el mes que
+    se hace; la cuenta la paga, con un recibo excluido, al mes siguiente). El
+    error se acumulaba mes a mes sin avisar. «Fuera del balance» es justo esa
+    diferencia, para que la fila cuadre a ojo y no haya que creérsela.
+
+    movimientos_cuenta son TODOS los de cuenta, excluidos incluidos (el banco
+    sí los aplicó), con la misma columna de mes que df. Si no hay ninguno
+    (solo tarjeta) no hay saldo que seguir, y el Acumulado es, como siempre,
+    la suma de los Balances desde saldo_inicial.
 
     Qué columnas salen, en qué orden y con qué nombre se puede personalizar
     en categorias.json ('orden_resumen', 'etiquetas' y 'desglosar_ingresos');
     sin ellos, sale exactamente lo de siempre.
     """
     col_mes = catalogo.columna_mes
-    if df.empty:
+    hay_cuenta = movimientos_cuenta is not None and not movimientos_cuenta.empty
+    if df.empty and not hay_cuenta:
         return pd.DataFrame()
 
-    piv = df.pivot_table(index=col_mes, columns="categoria",
-                         values="importe", aggfunc="sum")
+    piv = (df.pivot_table(index=col_mes, columns="categoria",
+                          values="importe", aggfunc="sum")
+           if not df.empty else pd.DataFrame())
+    por_mes_cuenta = (movimientos_cuenta.groupby(col_mes)["importe"].sum()
+                      if hay_cuenta else pd.Series(dtype=float))
+
+    # un mes con solo traspasos o excluidos no sale en piv, pero la cuenta
+    # sí se movió: sin su fila, ese movimiento no se vería en ninguna parte
+    meses = sorted(set(piv.index) | set(por_mes_cuenta.index))
+
+    def valor(mes, cat):
+        if cat in piv.columns and mes in piv.index and pd.notna(piv.at[mes, cat]):
+            return float(piv.at[mes, cat])
+        return 0.0
 
     columnas_ingreso = catalogo.columnas_ingreso
     filas = []
     acumulado = float(saldo_inicial)
-    for mes in sorted(piv.index):
+    for mes in meses:
         fila = {"Mes": mes}
 
         total_gastos = 0.0
         for cat in catalogo.gastos:
-            v = -float(piv.at[mes, cat]) if cat in piv.columns and pd.notna(piv.at[mes, cat]) else 0.0
+            v = -valor(mes, cat)
             fila[cat] = round(v, 2)
             total_gastos += v
 
@@ -289,20 +311,24 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
         # a los gastos): una devolución de nómina resta y se ve negativa.
         ingresos = 0.0
         for cat in catalogo.ingresos:
-            v = float(piv.at[mes, cat]) if cat in piv.columns and pd.notna(piv.at[mes, cat]) else 0.0
+            v = valor(mes, cat)
             if cat in columnas_ingreso:
                 fila[columnas_ingreso[cat]] = round(v, 2)
             ingresos += v
 
         balance = ingresos - total_gastos
+        # «fuera» se saca por diferencia con lo que de verdad movió la cuenta,
+        # no sumando neutras + excluidos + desfase de tarjeta: así cuadra por
+        # construcción, también con cualquier vía nueva que se abra mañana.
+        movido = float(por_mes_cuenta.get(mes, 0.0)) if hay_cuenta else balance
+        fuera = movido - balance
 
-        fila["Deuda"] = round(max(-acumulado, 0.0), 2)
-        fila["Extras"] = round(max(acumulado, 0.0), 2)
         fila["Total Gastos"] = round(total_gastos, 2)
         fila["Ingresos"] = round(ingresos, 2)
         fila["Balance"] = round(balance, 2)
+        fila["Fuera del balance"] = round(fuera, 2)
 
-        acumulado += balance
+        acumulado += movido
         fila["Acumulado"] = round(acumulado, 2)
 
         filas.append(fila)
@@ -312,8 +338,9 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0) ->
     # dos categorías acaban con el mismo nombre de columna (ya se avisa en
     # Catalogo.validar()), pandas no admite pedir dos veces la misma.
     orden = list(dict.fromkeys(
-        ["Mes"] + catalogo.gastos + ["Deuda", "Extras", "Total Gastos"]
-        + list(columnas_ingreso.values()) + ["Ingresos", "Balance", "Acumulado"]))
+        ["Mes"] + catalogo.gastos + ["Total Gastos"]
+        + list(columnas_ingreso.values())
+        + ["Ingresos", "Balance", "Fuera del balance", "Acumulado"]))
 
     # orden_resumen (opcional, en categorias.json) deja elegir qué columnas
     # salen y en qué orden, incluidas las de sistema (Balance, Acumulado...),

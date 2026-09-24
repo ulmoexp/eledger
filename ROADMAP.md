@@ -172,6 +172,10 @@ lista. Hasta ahora:
   lanzador (salió al preparar la primera release).
 - **2.11.0** — fuera el gráfico de RESUMEN (en OnlyOffice seguía saliendo
   mal: mejor nada que algo mal) y colores en la salida del terminal.
+- **2.12.0** — el Acumulado pasa a ser el saldo real de la cuenta (no
+  cuadraba con el banco en cuanto había traspasos o excluidos), columna
+  Fuera del balance, fuera Extras y Deuda, y cuadre día a día contra el
+  saldo del extracto.
 
 ## Lo que queda fuera a propósito
 

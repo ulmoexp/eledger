@@ -724,20 +724,22 @@ story += [EE]
 
 story += [h1("Cómo se calcula el resumen"), E]
 story += [codigo([
-    "Total Gastos = suma de las categorías de gasto",
-    "Ingresos     = suma de las categorías de ingreso",
-    "Balance      = Ingresos - Total Gastos",
+    "Total Gastos      = suma de las categorías de gasto",
+    "Ingresos          = suma de las categorías de ingreso",
+    "Balance           = Ingresos - Total Gastos",
     "",
-    "Extras       = lo que se arrastra A FAVOR del mes anterior",
-    "Deuda        = lo que se arrastra EN CONTRA del mes anterior",
-    "Acumulado    = Extras - Deuda + Balance",
+    "Fuera del balance = lo que movió la cuenta sin ser gasto ni ingreso",
+    "Acumulado         = Acumulado del mes anterior + Balance",
+    "                    + Fuera del balance",
 ])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
-    "<b>Extras</b> y <b>Deuda</b> son acumulativos, no solo del mes justo anterior: "
-    "reflejan cómo vas desde el principio. En un mes cualquiera solo uno de los dos "
-    "tiene valor. <b>Balance</b> es el resultado del mes por sí solo, sin arrastre; "
-    "<b>Acumulado</b> es el que responde a «¿voy bien o voy mal?».", S["pmini"])]
+    "<b>Balance</b> es el resultado del mes por sí solo: lo que ha entrado menos lo "
+    "que has gastado. <b>Acumulado</b> es el <b>saldo real de tu cuenta</b> al cerrar "
+    "el mes, el mismo que te da el banco. <b>Fuera del balance</b> explica la "
+    "diferencia entre los dos: traspasos a otras cuentas tuyas, lo que has excluido "
+    "(el recibo de la tarjeta, por ejemplo) y las compras con tarjeta que el banco "
+    "todavía no ha cargado en la cuenta.", S["pmini"])]
 story += [Spacer(1, 5)]
 story += [Paragraph(
     "Los gastos se muestran en positivo cambiándoles el signo, no con valor absoluto. "
@@ -748,10 +750,12 @@ story += [aviso(
     "De dónde parte el Acumulado",
     "Si tu extracto de cuenta trae columna de saldo, el Acumulado del primer mes no "
     "empieza en 0: empieza en el saldo real que tenía la cuenta antes de tu primer "
-    "movimiento. Se detecta solo y se avisa por pantalla de qué saldo ha usado. Sin "
-    "esa columna, o si solo subes extractos de tarjeta, sigue empezando en 0 como "
-    "siempre. Con más de una cuenta declarada en cuentas.json, cada una arrastra el "
-    "suyo y el Acumulado parte de la suma de todas.",
+    "movimiento. Se detecta solo y se avisa por pantalla de qué saldo ha usado. "
+    "Después comprueba día a día que el saldo calculado coincide con el del "
+    "extracto: si no, te dice en qué fecha deja de cuadrar y por cuánto (casi "
+    "siempre falta un extracto entre medias). Sin esa columna empieza en 0, y si "
+    "solo subes extractos de tarjeta es la suma de los Balances. Con más de una "
+    "cuenta declarada en cuentas.json, es la suma de todas.",
     ACENTO, ACENTO_CL)]
 story += [EE]
 

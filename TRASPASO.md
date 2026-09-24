@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.11.1.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.12.0.** Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -216,6 +216,24 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
+### Hecho: 2.12.0 (sesión del 24/09/2026)
+
+- **El Acumulado es el saldo real de la cuenta** (saldo inicial + todos los
+  movimientos de cuenta, excluidos incluidos), con la columna **Fuera del
+  balance** que explica la diferencia con el Balance. Fuera Extras y Deuda.
+  Lo pidió el usuario: con sus datos, el Acumulado se había despegado miles de euros del saldo del banco (traspasos neutros y excluidos que no restaban).
+- **Cuadre día a día contra el saldo del extracto** (`comprobar_cuadre()`),
+  que dice en qué fecha deja de coincidir y por cuánto.
+- **Histórico abierto**: se pide cerrarlo antes de leer; con C, o sin nadie
+  delante, el resultado va a una copia con fecha. Nunca se cierra la hoja
+  de cálculo por su cuenta (decisión del usuario).
+- **Ejecutar de nuevo** en el menú final, y R tras un error.
+- **Vuelven los gráficos** (ver §4, «Gráficos en RESUMEN»). Confirmados por
+  el usuario en OnlyOffice.
+- Importes de pantalla en formato español (`euros()` en `reglas.py`),
+  cabecera naranja de `categoria_manual`, y una revisión completa de
+  coherencia de la guía, la web y los textos de pantalla.
+
 ### Hecho: 2.11.0 y 2.11.1 (sesiones del 22 y 23/09/2026)
 
 **2.11.0**: fuera el gráfico de RESUMEN y colores en la salida del terminal
@@ -238,7 +256,13 @@ llaman los ficheros de las releases: hasta la 2.11.0 salía
 El nombre en pantalla no cambia: sigue siendo «Movimientos bancarios», con
 «eledger» como referencia secundaria.
 
-### Estado de la publicación (23/09/2026)
+### Estado de la publicación (24/09/2026)
+
+- **2.12.0 en borrador** (24/09/2026), con el ZIP de `exportar.py` y las
+  notas. Falta que el usuario compile `eledger.exe`, lo adjunte y publique.
+  La web ya describe la 2.12.0: conviene publicar la release **antes** de
+  subir la web, para que «Descargar» dé esa versión.
+- **2.11.1 publicada** (es la «Latest» en GitHub).
 
 - Release **v2.11.0** publicada con sus dos ficheros:
   `eledger_v2.11.0_20260923.zip` y `eledger_v2.11.0_20260923.windows.zip`
@@ -247,9 +271,6 @@ El nombre en pantalla no cambia: sigue siendo «Movimientos bancarios», con
   la v2.10.1 llevaba un guion bajo.
 - Release **v2.10.1**, con sus dos ZIP. Sus notas siguen diciendo que el
   `.exe` «llegará más adelante» cuando ya estaba subido.
-- **2.11.1 en borrador** (23/09/2026), con `eledger_v2.11.1_20260923.zip`
-  adjunto y las notas escritas. Falta que el usuario compile `eledger.exe`
-  con `compilar.bat`, lo adjunte y publique.
 - El repo `eledger` sigue **privado**: las releases y el botón «Descargar»
   de la web solo funcionan para él hasta que lo haga público (lo hace él).
   `eledger-web` ya es público, pero **GitHub Pages no está activado**.

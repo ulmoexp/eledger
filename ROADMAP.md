@@ -177,7 +177,9 @@ lista. Hasta ahora:
   Fuera del balance, fuera Extras y Deuda, y cuadre día a día contra el
   saldo del extracto. También: no falla con el histórico abierto (pide
   cerrarlo o guarda en una copia), opción «Ejecutar de nuevo» y vuelven
-  los gráficos de RESUMEN (ya también en OnlyOffice).
+  los gráficos de RESUMEN (ya también en OnlyOffice). Cerrada con una
+  revisión de coherencia de la guía, la web y la pantalla (importes en
+  formato español, cabecera naranja de categoria_manual).
 
 ## Lo que queda fuera a propósito
 

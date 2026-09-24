@@ -851,19 +851,21 @@ story += [EE]
 
 story += [h1("Uso en Excel"), E]
 story += [p(
-    "Tus fórmulas no cambian: el orden de columnas se mantiene, así que "
-    "<font face='Mono' size='8.6'>C</font>, <font face='Mono' size='8.6'>E</font>, "
-    "<font face='Mono' size='8.6'>F</font> y <font face='Mono' size='8.6'>G</font> "
-    "siguen donde estaban.")]
+    "La hoja RESUMEN ya trae las sumas por mes y categoría. Si prefieres montar "
+    "las tuyas en tu propio Excel (pegando <font face='Mono' size='8.6'>"
+    "movimientos_limpios.xlsx</font> en las columnas A-G, o con la "
+    "sincronización), las columnas están siempre en el mismo sitio, así que tus "
+    "fórmulas no se rompen de una versión a otra.")]
 story += [codigo(
     '=SUMAR.SI.CONJUNTO(MOVIMIENTOS!C:C;\n'
     '                   MOVIMIENTOS!G:G; "Comida";\n'
     '                   MOVIMIENTOS!F:F; "2026-04")')]
 story += [Spacer(1, 4)]
 story += [Paragraph(
-    "C = importe · G = categoria · F = mes_ajustado. El <font face='Mono' "
-    "size='8.2'>ABS()</font> es para que los gastos, que vienen en negativo, salgan "
-    "en positivo en el resumen. Si Excel te da error en los separadores, cambia "
+    "C = importe · G = categoria · F = mes_ajustado. Los gastos salen en "
+    "negativo: ponle un <font face='Mono' size='8.2'>-</font> delante si los "
+    "quieres en positivo (no uses <font face='Mono' size='8.2'>ABS()</font>, que "
+    "hace pasar las devoluciones por gasto). Si Excel te da error en los separadores, cambia "
     "<font face='Mono' size='8.2'>;</font> por <font face='Mono' size='8.2'>,</font> "
     "según tu configuración regional.", S["pmini"])]
 story += [Spacer(1, 7)]

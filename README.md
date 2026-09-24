@@ -46,8 +46,8 @@ pasos de arriba.
 - Al terminar, te dice qué se ha quedado sin clasificar, agrupado y con una
   línea lista para pegar en tus reglas. Y qué cargos se repiten cada mes o
   cada año (suscripciones, cuotas, seguros), con lo que suman al año.
-- Si tu extracto trae el saldo de la cuenta, el resumen parte de ese saldo
-  real en vez de partir de 0.
+- El Acumulado del resumen es el saldo real de tu cuenta: si el extracto
+  trae el saldo, parte de él y comprueba que acaba donde dice el banco.
 - Todo el histórico se recalcula en cada ejecución: si afinas una regla, se
   reclasifica hacia atrás sin tener que volver a descargar nada.
 

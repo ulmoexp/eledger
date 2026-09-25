@@ -469,8 +469,14 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
     'fecha' (datetime), 'descripcion' (str) e 'importe' (float), más 'saldo'
     (float, NaN si el extracto no trae esa columna).
     """
-    fmt, tablas = leer_tablas_crudas(ruta)
     nombre = os.path.basename(ruta)
+    # una descarga que no terminó deja un fichero de 0 bytes, que se leía
+    # «bien» como texto y acababa mandando a editar el código
+    if os.path.getsize(ruta) == 0:
+        raise RuntimeError(
+            f"'{nombre}' está vacío (0 bytes): la descarga no terminó bien.\n"
+            "   Vuelve a descargarlo del banco.")
+    fmt, tablas = leer_tablas_crudas(ruta)
 
     candidatas = []
     for tabla in tablas:
@@ -479,9 +485,10 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
             candidatas.append((len(tabla) - i, i, tabla))
     if not candidatas:
         raise RuntimeError(
-            f"'{nombre}' se ha leído bien (formato: {fmt}) pero no encuentro una "
-            f"fila de cabecera con {list(requeridas)}.\n"
-            "   Añade el nombre que use tu banco a ALIAS_COLUMNAS en bank_io.py."
+            f"'{nombre}' se ha podido abrir (formato: {fmt}), pero no encuentro "
+            f"las columnas de fecha, concepto e importe.\n"
+            "   Puede que no sea un extracto de movimientos. Si lo es, tu banco usa "
+            "otros nombres\n   de columna: mira «Cuando algo no sale» en la guía."
         )
 
     _, idx_cab, tabla = max(candidatas)          # la tabla con más datos útiles

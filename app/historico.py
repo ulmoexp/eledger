@@ -393,7 +393,7 @@ _ALTO_GRAFICO = 8          # cm; unas 16 filas de las de por defecto
 _FILAS_POR_GRAFICO = 18
 
 
-def _graficos(ws, resumen: pd.DataFrame, catalogo) -> None:
+def _graficos(ws, resumen: pd.DataFrame, catalogo, saldo_real=True) -> None:
     """
     Debajo de la tabla, uno encima de otro:
       1. Acumulado: el saldo de la cuenta mes a mes.
@@ -409,7 +409,11 @@ def _graficos(ws, resumen: pd.DataFrame, catalogo) -> None:
 
     graficos = []
     if "Acumulado" in columnas:
-        g = _grafico_linea(ws, resumen, "Acumulado", "Acumulado (saldo de la cuenta)")
+        # sin el saldo del extracto, el Acumulado parte de 0: es lo que ha
+        # variado la cuenta, no su saldo, y el título no puede decir otra cosa
+        titulo = ("Acumulado (saldo de la cuenta)" if saldo_real
+                  else "Acumulado (desde el primer movimiento)")
+        g = _grafico_linea(ws, resumen, "Acumulado", titulo)
         graficos.append(g)
     if "Ingresos" in columnas and "Total Gastos" in columnas:
         graficos.append(_grafico_ingresos_gastos(ws, resumen))
@@ -573,7 +577,7 @@ def _texto_seguro(ws):
 
 
 def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
-            catalogo, version: str = VERSION_SIN_SELLO) -> None:
+            catalogo, version: str = VERSION_SIN_SELLO, saldo_real=True) -> None:
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
@@ -639,7 +643,7 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
                 if j % 2 == 0 and col not in destacadas:
                     c.fill = suave
 
-        _graficos(ws, resumen, catalogo)
+        _graficos(ws, resumen, catalogo, saldo_real)
 
     # RESUMEN es lo que se viene a mirar: primera hoja y la que se ve al
     # abrir. MOVIMIENTOS es el detalle, para cuando haga falta. _meta la

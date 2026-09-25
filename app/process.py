@@ -47,7 +47,7 @@ import sincronizar as sync
 from bank_io import detectar_tipo, leer_tabla_bancaria
 import rutas
 from reglas import (Catalogo, Clasificador, Excluidor, IdentificadorCuentas,
-                    compilar, euros, normalizar)
+                    compilar, euros, leer_json, normalizar)
 
 # La consola de Windows usa cp1252 por defecto y revienta con acentos y símbolos.
 try:
@@ -457,9 +457,8 @@ class MesContable:
     def desde_json(cls, ruta):
         if not os.path.exists(ruta):
             return cls({})
-        with open(ruta, "r", encoding="utf-8") as f:
-            return cls({k: v for k, v in json.load(f).items()
-                        if not k.startswith("_")})
+        return cls({k: v for k, v in leer_json(ruta).items()
+                    if not k.startswith("_")})
 
     def aplica(self, descripcion, fecha, importe) -> bool:
         if self.dias <= 0 or fecha.day > self.dias:
@@ -513,6 +512,14 @@ def leer_entrada():
     """Lee todo lo que haya en entrada/. Puede devolver lista vacía sin error:
     si el histórico ya tiene datos, una ejecución sin ficheros nuevos es válida."""
     dfs = []
+    # lo que no es un extracto (un PDF, un ZIP) se ignoraba sin decir nada,
+    # y quien lo había dejado ahí no sabía si se había leído
+    if rutas.ENTRADA.is_dir():
+        for f in sorted(os.listdir(rutas.ENTRADA)):
+            if not _es_temporal(f) and not _admisible(f) \
+                    and (rutas.ENTRADA / f).is_file():
+                print(f"   · {f}: " + gris("no es un extracto del banco, lo dejo "
+                                           "sin leer"))
     for ruta in localizar_ficheros():
         nombre = os.path.basename(ruta)
         try:
@@ -624,6 +631,15 @@ def calcular_saldo_inicial(todo) -> dict:
             for id_cuenta, grupo in cuenta_mov.groupby("cuenta")}
 
 
+def cuentas_sin_saldo(todo) -> list:
+    """Las cuentas (su identificador, "" si no hay cuentas.json) cuyo saldo
+    de partida no se conoce: su extracto no trae saldo, o ningún día es
+    inequívoco. Para ellas el Acumulado parte de 0 y no es su saldo."""
+    cuenta_mov = todo[todo["tipo"] == "cuenta"]
+    return sorted(id_cuenta for id_cuenta, grupo in cuenta_mov.groupby("cuenta")
+                  if _saldo_inicial_una_cuenta(grupo) is None)
+
+
 def _saldo_inicial_una_cuenta(movimientos):
     """
     El único sitio delicado es el primer DÍA con más de un movimiento: el
@@ -695,8 +711,9 @@ _MAX_SALTOS_MOSTRADOS = 5
 def comprobar_cuadre(todo) -> dict:
     """
     Para cada cuenta con saldo en el extracto: {cuenta: (ultima_fecha,
-    saldo_banco, saldo_calculado, saltos)}, donde saltos es la lista de
-    (fecha, diferencia) en que el cálculo deja de coincidir con el banco.
+    saldo_banco, saldo_calculado, saltos, n_ficheros)}, donde saltos es la
+    lista de (fecha, diferencia) en que el cálculo deja de coincidir con el
+    banco, y n_ficheros de cuántos extractos salen sus movimientos.
     Sin saltos y con los dos saldos iguales, cuadra.
 
     Se compara día a día, no fila a fila: dentro de un día el orden en que el
@@ -728,7 +745,8 @@ def comprobar_cuadre(todo) -> dict:
                 desfase = nuevo
             saldo_banco = calculado + desfase
             ultima_fecha = fecha
-        resultado[id_cuenta] = (ultima_fecha, saldo_banco, calculado, saltos)
+        resultado[id_cuenta] = (ultima_fecha, saldo_banco, calculado, saltos,
+                                grupo["origen"].nunique())
     return resultado
 
 
@@ -737,7 +755,7 @@ def informar_cuadre(cuadre):
     if not cuadre:
         return
     varias = len(cuadre) > 1
-    for id_cuenta, (fecha, banco, calculado, saltos) in sorted(cuadre.items()):
+    for id_cuenta, (fecha, banco, calculado, saltos, n_ficheros) in sorted(cuadre.items()):
         nombre = f" ({id_cuenta or 'sin identificar'})" if varias else ""
         if not saltos and abs(banco - calculado) < _TOLERANCIA_CUADRE:
             print(verde(f"   🧮 Cuadra con el banco{nombre}: {euros(calculado)} "
@@ -775,6 +793,14 @@ def informar_cuadre(cuadre):
                 "entre dos extractos: descarga el que cubra esas fechas y vuelve "
                 "a ejecutar.",
                 "Hasta entonces, el Acumulado del resumen arrastra esa diferencia."]
+            # dos cuentas sin declarar se mezclan como si fueran una, y cada
+            # saldo del banco contradice al otro: la causa no es un hueco
+            if id_cuenta == "" and n_ficheros > 1:
+                lineas.append(
+                    f"Son {n_ficheros} ficheros de cuenta. Si son de cuentas "
+                    f"DISTINTAS (no descargas de la misma), decláralas en "
+                    f"ajustes/cuentas.json: sin eso se mezclan como una sola "
+                    f"y los saldos no pueden cuadrar.")
         titulo = ("El saldo calculado se separa del saldo del banco en algunas fechas"
                   if acaba_bien else "El saldo calculado no cuadra con el del banco")
         avisar(f"{titulo}{nombre}", lineas)
@@ -867,7 +893,7 @@ def _sugerir_regla(grupo, palabra_principal, descripciones_clasificadas):
     return None
 
 
-def informe_sin_clasificar(df):
+def informe_sin_clasificar(df, ignorar=frozenset()):
     """
     Hito A1 del roadmap: qué se ha quedado en Otros SIN que ninguna regla
     casara. `regla == ""` es justo eso (ver clasificar()): por construcción
@@ -875,8 +901,11 @@ def informe_sin_clasificar(df):
     ingreso por defecto del catálogo). Una regla que apunte a Otros a propósito
     deja «regla» rellena con su clave, así que no entra aquí: eso ya está
     clasificado, no es "esto no sé qué es".
+
+    ignorar: descripciones que otro aviso ya resuelve (el recibo de la
+    tarjeta, que hay que excluir, no clasificar).
     """
-    sin_regla = df[df["regla"] == ""]
+    sin_regla = df[(df["regla"] == "") & ~df["descripcion"].isin(ignorar)]
     if sin_regla.empty:
         return
 
@@ -905,10 +934,20 @@ def informe_sin_clasificar(df):
     for palabra, filas in mostrados:
         total = -filas["importe"].sum()
         ejemplo = filas["descripcion"].mode().iloc[0]
-        print(f"   {euros(total, ancho=10)}  ·  {len(filas):>3} mov.  ·  {palabra}")
+        # un grupo de dinero que ENTRA (cobros, recargas) salía como un gasto
+        # en negativo, sin más: se dice qué es, y la regla que se propone es
+        # solo para el lado positivo, para no arrastrar cargos con el mismo
+        # nombre
+        entra = total < 0
+        cifra = euros(-total if entra else total, ancho=10)
+        tipo = "  ·  entra" if entra else ""
+        print(f"   {cifra}  ·  {len(filas):>3} mov.  ·  {palabra}{tipo}")
         print(gris(f"      ej: {ejemplo}"))
         sugerida = _sugerir_regla(filas, palabra, normalizados)
-        if sugerida:
+        if sugerida and entra:
+            print(f'      añade a rules.json:  "{sugerida}": '
+                  f'{{"+": "{_PLACEHOLDER_CATEGORIA}"}}')
+        elif sugerida:
             print(f'      añade a rules.json:  "{sugerida}": '
                   f'"{_PLACEHOLDER_CATEGORIA}"')
         else:
@@ -1006,13 +1045,16 @@ def detectar_recibo_tarjeta(todo):
     tarjeta (así lo pide el roadmap, y evitar el aviso es tan fácil como
     excluir el recibo, que es justo lo que se está pidiendo).
 
-    No imprime nada: deja el aviso para el final, con los demás, y devuelve
-    si lo ha dejado, para poder señalarlo junto a los totales."""
+    No imprime nada: deja el aviso para el final, con los demás. Devuelve
+    (si lo ha dejado, descripciones de los recibos encontrados): lo primero
+    para señalarlo junto a los totales; lo segundo para que el informe de
+    sin clasificar no proponga ponerle categoría a un cargo al que este
+    aviso ya dice que hay que excluir (salían los dos consejos a la vez)."""
     if excluidor.patrones:
-        return False
+        return False, set()
     tarjeta_por_mes = _meses_tarjeta(todo)
     if tarjeta_por_mes.empty:
-        return False
+        return False, set()
 
     cuenta = todo[todo["tipo"] == "cuenta"]
     candidatos = {}
@@ -1028,7 +1070,7 @@ def detectar_recibo_tarjeta(todo):
             "Si tu cuenta paga la tarjeta con un recibo, cada gasto se está "
             "contando DOS VECES y no lo he sabido encontrar solo.",
             "Revísalo a mano: LEEME.txt explica cómo excluirlo."])
-        return True
+        return True, set()
 
     lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
               "Esto parece el recibo:"]
@@ -1054,7 +1096,7 @@ def detectar_recibo_tarjeta(todo):
                       "excluir algún otro movimiento tuyo); añádelo tú a mano "
                       "con lo que ves arriba.")
     avisar(titulo, lineas)
-    return True
+    return True, {f["descripcion"] for f in candidatos.values()}
 
 
 # ========= CARGOS QUE SE REPITEN (suscripciones, cuotas, seguros) =========
@@ -1229,9 +1271,14 @@ def main():
     if clasificador.desactivadas:
         print(f"   Apagadas con null: {', '.join(clasificador.desactivadas)}")
     if clasificador.descartadas_de_base:
-        print(f"   {len(clasificador.descartadas_de_base)} reglas de la base "
-              f"descartadas: apuntan a categorías que no tienes en "
-              f"categorias.json.")
+        descartadas = clasificador.descartadas_de_base
+        print(f"   {len(descartadas)} reglas de la base descartadas: apuntan a "
+              f"categorías que no tienes en categorias.json.")
+        # sin los nombres no había forma de saber qué comercios se quedaban
+        # sin regla (p. ej. las tiendas de animales al renombrar «Perros»)
+        muestra = ", ".join(descartadas[:8])
+        resto = f" y {len(descartadas) - 8} más" if len(descartadas) > 8 else ""
+        print(gris(f"   ({muestra}{resto})"))
 
     avisos = catalogo.validar(clasificador)
     if avisos:
@@ -1268,8 +1315,11 @@ def main():
 
     crudos, anadidos, repetidos = hist.fusionar(previo, nuevos)
     if repetidos:
-        print(f"🔁 {repetidos} movimientos ya estaban (extractos que se solapan); "
-              f"no se cuentan dos veces.")
+        # «ya estaban» cubre los dos casos: en el histórico (volver a
+        # ejecutar con los mismos ficheros) o en otro extracto que se solapa.
+        # Decir solo «se solapan» confundía al repetir una ejecución.
+        print(f"🔁 {repetidos} movimientos ya estaban (en el histórico o en otro "
+              f"extracto); no se cuentan dos veces.")
     if anadidos:
         print(f"➕ {anadidos} movimientos nuevos.")
     elif nuevos:
@@ -1301,6 +1351,11 @@ def main():
     seccion("Resultado")
     saldos_por_cuenta = calcular_saldo_inicial(todo)
     saldo_inicial = sum(saldos_por_cuenta.values())
+    sin_saldo = cuentas_sin_saldo(todo)
+    # el Acumulado solo es «tu saldo» si se conoce el de partida de TODAS
+    # las cuentas; si falta alguno (o solo hay tarjetas), es la variación
+    # desde el primer movimiento, y así se tiene que llamar
+    saldo_real = not sin_saldo and (todo["tipo"] == "cuenta").any()
     # la cuenta entera, excluidos incluidos: el banco sí los aplicó, y el
     # Acumulado es lo que hay en la cuenta, no lo que suma el Balance
     resumen = hist.construir_resumen(df, catalogo, saldo_inicial,
@@ -1313,7 +1368,7 @@ def main():
     historico_escrito = guardar_o_copiar(
         rutas.HISTORICO,
         lambda r: hist.guardar(r, todo[COLUMNAS_HISTORICO], resumen, catalogo,
-                               version=rutas.version()),
+                               version=rutas.version(), saldo_real=saldo_real),
         en_copia, copiados)
     limpios_escrito = guardar_o_copiar(
         rutas.LIMPIOS,
@@ -1326,8 +1381,12 @@ def main():
                                                "tipo", "origen", "regla"]], r),
             en_copia, copiados)
 
-    print(verde(f"✅ {rutas.relativa(historico_escrito)}  ·  hojas "
-                f"{hist.HOJA_RESUMEN} y {hist.HOJA_MOVIMIENTOS}"))
+    # en una copia no es un éxito del todo: el histórico de verdad no se ha
+    # actualizado, y un ✅ verde lo hacía pasar por bueno
+    pintar, marca = ((verde, "✅") if historico_escrito == rutas.HISTORICO
+                     else (amarillo, "⚠️ "))
+    print(pintar(f"{marca} {rutas.relativa(historico_escrito)}  ·  hojas "
+                 f"{hist.HOJA_RESUMEN} y {hist.HOJA_MOVIMIENTOS}"))
     print(f"   {rutas.relativa(limpios_escrito)}  " + gris("·  lo que pegas en A-G"))
     avisar_copias(copiados)
 
@@ -1369,10 +1428,20 @@ def main():
               f"de la suma:")
         for id_cuenta, saldo in sorted(detectados.items()):
             print(f"   {id_cuenta or '(sin identificar)'}: {euros(saldo)}")
+    if sin_saldo:
+        cuales = ("de tu cuenta" if sin_saldo == [""] else
+                  "de " + ", ".join(c or "(sin identificar)" for c in sin_saldo))
+        avisar(f"No sé el saldo {cuales}: el Acumulado no es tu saldo", [
+            "El extracto no trae columna de saldo (o todos sus días tienen "
+            "varios movimientos y no se puede deducir). Así que el Acumulado "
+            "empieza en 0: es lo que ha variado la cuenta desde el primer "
+            "movimiento, no el dinero que tienes.",
+            "Si tu banco deja descargar el extracto con la columna Saldo, "
+            "úsalo y se arregla solo."])
 
     # si se están contando dos veces los gastos de la tarjeta, que se sepa
     # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
-    doble_tarjeta = detectar_recibo_tarjeta(todo)
+    doble_tarjeta, recibos_tarjeta = detectar_recibo_tarjeta(todo)
 
     # orden_resumen puede haber quitado cualquiera de estas columnas del
     # resumen: se enseña solo lo que haya. Pedirlas a pelo rompía aquí,
@@ -1397,7 +1466,9 @@ def main():
         if partes:
             print(f"\n   Último mes{mes}:  " + " · ".join(partes))
         if "Acumulado" in resumen.columns:
-            print(f"   Acumulado (saldo al cierre del mes): "
+            etiqueta = ("saldo al cierre del mes" if saldo_real
+                        else "desde el primer movimiento")
+            print(f"   Acumulado ({etiqueta}): "
                   f"{cifra(ult['Acumulado'], signo=True)}")
         if doble_tarjeta:
             print("\n" + amarillo("   ⚠️  Ojo: puede que los gastos de la tarjeta "
@@ -1407,7 +1478,7 @@ def main():
     informar_cuadre(comprobar_cuadre(todo))
 
     informe_recurrentes(df, catalogo.gastos)
-    informe_sin_clasificar(df)
+    informe_sin_clasificar(df, ignorar=recibos_tarjeta)
     # los avisos, lo último antes de salir: juntos, contados y separados de
     # lo demás, que es lo que se lee cuando la ejecución termina
     mostrar_avisos()

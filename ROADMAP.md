@@ -182,7 +182,9 @@ lista. Hasta ahora:
   formato español, cabecera naranja de categoria_manual).
 - **2.12.1** — arreglos del piloto con usuarios simulados: declarar
   cuentas.json tarde ya no duplica el histórico, lo que entra sin regla va a
-  Ingresos, y los ingresos van primero en la base de reglas.
+  Ingresos, los ingresos van primero en la base de reglas, las notas de la
+  sincronización siguen a su movimiento, el Acumulado sin saldo ya no se
+  llama «saldo», y una tanda de mensajes más claros.
 
 ## Lo que queda fuera a propósito
 

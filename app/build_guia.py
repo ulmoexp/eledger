@@ -562,7 +562,9 @@ story += [Paragraph(
     "Si pones un número al final, se usa como importe: es la forma de comprobar las "
     "reglas que dependen del signo. Las reglas que salen de la base aparecen marcadas "
     "con <font face='Mono' size='8.2'>· base</font>. Sin argumentos ejecuta una "
-    "batería de casos trampa ya preparada.", S["pmini"])]
+    "batería de casos trampa ya preparada. En Mac y Linux, escribe "
+    "<font face='Mono' size='8.2'>python3</font> en vez de "
+    "<font face='Mono' size='8.2'>python</font>.", S["pmini"])]
 story += [EE]
 
 story += [h1("exclude_patterns.json · qué se descarta"), E]
@@ -770,9 +772,11 @@ story += [aviso(
     "movimiento. Se detecta solo y se avisa por pantalla de qué saldo ha usado. "
     "Después comprueba día a día que el saldo calculado coincide con el del "
     "extracto: si no, te dice en qué fecha deja de cuadrar y por cuánto (casi "
-    "siempre falta un extracto entre medias). Sin esa columna empieza en 0, y si "
-    "solo subes extractos de tarjeta es la suma de los Balances. Con más de una "
-    "cuenta declarada en cuentas.json, es la suma de todas.",
+    "siempre falta un extracto entre medias). Sin esa columna empieza en 0 y "
+    "<b>no es tu saldo</b>, sino lo que ha variado la cuenta: se avisa, y la pantalla "
+    "y el gráfico lo llaman «desde el primer movimiento». Si solo subes extractos de "
+    "tarjeta es la suma de los Balances. Con más de una cuenta declarada en "
+    "cuentas.json, es la suma de todas.",
     ACENTO, ACENTO_CL)]
 story += [EE]
 
@@ -854,6 +858,9 @@ story += [tabla(
       "Se cancela y se listan las hojas que sí existen."],
      ["El libro está abierto en OnlyOffice o Excel",
       "Se avisa de que lo cierres. No se escribe a medias."],
+     ["Tienes notas tuyas al lado de los movimientos",
+      "Se recolocan junto a su movimiento aunque entren otros por medio. Si una ya no "
+      "tiene movimiento al que acompañar, se queda donde estaba y se avisa."],
      ["El histórico encoge respecto a la vez anterior",
       "Las filas sobrantes se eliminan, no quedan restos debajo."],
      ["Cualquier otro fallo",
@@ -952,10 +959,14 @@ story += [tabla(
       "Como apaño rápido, mete la palabra «tarjeta» en el nombre del fichero."],
      ["<i>«hace falta la librería xlrd»</i>",
       "Vuelve a lanzar el instalador: la instala en el entorno de la herramienta."],
-     ["<i>«no encuentro una fila de cabecera»</i>",
-      "Tu banco usa nombres de columna que no están mapeados. Ejecuta el diagnóstico "
-      "(abajo) y añade el nombre a <font face='Mono'>ALIAS_COLUMNAS</font> en "
+     ["<i>«no encuentro las columnas de fecha, concepto e importe»</i>",
+      "Puede que no sea un extracto. Si lo es, tu banco usa nombres de columna que "
+      "no están mapeados: ejecuta el diagnóstico (abajo) y añade el nombre a "
+      "<font face='Mono'>ALIAS_COLUMNAS</font> en "
       "<font face='Mono'>bank_io.py</font>."],
+     ["<i>«tiene un error de formato en la línea…»</i>",
+      "Al editar un JSON de <font face='Mono'>ajustes/</font> falta o sobra una coma, "
+      "o hay unas comillas sin cerrar. El mensaje dice qué fichero y qué línea."],
      ["Demasiadas filas en «Otros»",
       "El script agrupa al final los conceptos sin regla por palabra común, de "
       "mayor a menor importe, con una línea lista para pegar en "

@@ -67,8 +67,8 @@ class Config:
     def desde_json(cls, ruta, raiz=None):
         if not os.path.exists(ruta):
             return cls({}, raiz)
-        with open(ruta, "r", encoding="utf-8") as f:
-            datos = {k: v for k, v in json.load(f).items() if not k.startswith("_")}
+        from reglas import leer_json
+        datos = {k: v for k, v in leer_json(ruta).items() if not k.startswith("_")}
         return cls(datos, raiz)
 
 
@@ -192,6 +192,87 @@ def _hay_datos_fuera_del_bloque(ws, columna_inicial, ancho, desde_fila) -> bool:
     return False
 
 
+# --- notas del usuario al lado de los movimientos ---
+# El bloque se vacía y se reescribe en orden de fecha, pero lo que el usuario
+# escribe a los lados («regalo mamá» junto a un cargo) se quedaba en su número
+# de fila. Bastaba con que entrara un movimiento más antiguo para que todo lo
+# de debajo bajara una fila y cada nota acabara junto al movimiento de al
+# lado, sin ningún aviso. Ahora cada nota se recuerda por el movimiento al que
+# acompaña y se vuelve a poner a su lado.
+
+def _clave_fila(fecha, descripcion, importe):
+    """(fecha, concepto, importe) de una fila volcada, o None si la fila no
+    parece un movimiento (sin fecha o sin importe): lo que el usuario tenga
+    junto a otras cosas no se toca."""
+    if not hasattr(fecha, "strftime"):
+        return None
+    try:
+        imp = round(float(importe), 2)
+    except (TypeError, ValueError):
+        return None
+    return fecha.strftime("%Y-%m-%d"), str(descripcion or "").strip(), imp
+
+
+def _con_repeticion(claves):
+    """Dos movimientos idénticos el mismo día son dos: se numeran, igual que
+    en el histórico, para que cada nota vuelva a SU movimiento."""
+    vistos, salida = {}, []
+    for k in claves:
+        if k is None:
+            salida.append(None)
+            continue
+        n = vistos.get(k, 0)
+        vistos[k] = n + 1
+        salida.append((k, n))
+    return salida
+
+
+def _leer_notas(ws, f0, c0, ancho, cols):
+    """{movimiento: (fila, {columna: valor})} de lo escrito a los lados."""
+    if not all(c in cols for c in ("fecha", "descripcion", "importe")):
+        return {}
+    cf, cd, ci = (c0 + cols.index(c) for c in ("fecha", "descripcion", "importe"))
+    filas = list(range(f0 + 1, ws.max_row + 1))
+    claves = _con_repeticion([_clave_fila(ws.cell(r, cf).value, ws.cell(r, cd).value,
+                                          ws.cell(r, ci).value) for r in filas])
+    notas = {}
+    for r, k in zip(filas, claves):
+        if k is None:
+            continue
+        lados = {c.column: c.value for c in ws[r]
+                 if c.value is not None and not c0 <= c.column < c0 + ancho}
+        if lados:
+            notas[k] = (r, lados)
+    return notas
+
+
+def _recolocar_notas(ws, notas, df, f0):
+    """Pone cada nota junto a su movimiento. Nunca pisa otra: si el sitio
+    está ocupado, la deja donde estaba. Devuelve (movidas, sin_su_movimiento,
+    sin_sitio)."""
+    claves = _con_repeticion([_clave_fila(r["fecha"], r["descripcion"], r["importe"])
+                              for _, r in df.iterrows()])
+    destino = {k: f0 + 1 + i for i, k in enumerate(claves) if k is not None}
+    mover = {k: v for k, v in notas.items() if k in destino and destino[k] != v[0]}
+    huerfanas = sum(1 for k in notas if k not in destino)
+
+    for r, lados in mover.values():
+        for c in lados:
+            ws.cell(r, c).value = None
+    sin_sitio = 0
+    for k, (r, lados) in mover.items():
+        fila = destino[k]
+        if any(ws.cell(fila, c).value is not None for c in lados):
+            sin_sitio += 1
+            if all(ws.cell(r, c).value is None for c in lados):
+                for c, v in lados.items():
+                    ws.cell(r, c).value = v
+            continue
+        for c, v in lados.items():
+            ws.cell(fila, c).value = v
+    return len(mover) - sin_sitio, huerfanas, sin_sitio
+
+
 def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
     """Vuelca df en la hoja indicada. Devuelve (ruta_de_la_copia, filas escritas)."""
     from openpyxl import load_workbook
@@ -222,6 +303,8 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
 
     copia = copia_de_seguridad(cfg.ruta, cfg.copias_de_seguridad)
 
+    notas = _leer_notas(ws, cfg.fila_inicial, cfg.columna_inicial,
+                        len(df.columns), list(df.columns))
     _limpiar_bloque(ws, cfg.fila_inicial, cfg.columna_inicial, len(df.columns))
 
     f0, c0 = cfg.fila_inicial, cfg.columna_inicial
@@ -246,6 +329,17 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
                 celda.value = texto
                 if texto.startswith("="):        # que no lo tome por fórmula
                     celda.data_type = "s"
+
+    if notas:
+        movidas, huerfanas, sin_sitio = _recolocar_notas(ws, notas, df, f0)
+        if movidas:
+            print(f"   ℹ️  {movidas} notas tuyas recolocadas junto a su movimiento "
+                  f"(han entrado movimientos por medio).")
+        if huerfanas or sin_sitio:
+            print(f"   ⚠️  {huerfanas + sin_sitio} notas tuyas no he podido "
+                  f"ponerlas junto a su movimiento (ya no se vuelca, o el sitio\n"
+                  f"      estaba ocupado): se han quedado donde estaban. Están "
+                  f"como antes en la copia {copia}.")
 
     # Si esta vez hay menos filas que la anterior, no basta con vaciarlas: se
     # eliminan, o la hoja arrastra para siempre el rango usado más grande.

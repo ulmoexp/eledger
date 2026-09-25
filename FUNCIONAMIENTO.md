@@ -87,7 +87,11 @@ Esto es lo que ocurre, en este orden, cada vez que se hace doble clic en
 Se ignoran los que empiezan por `.`, `_` o `~$` (ocultos, desactivados a
 propósito o temporales de Excel abiertos). Por compatibilidad, también se leen
 un `movimientos.*` suelto en la raíz y lo que haya en una carpeta `tarjetas/`,
-que era la forma antigua de trabajar.
+que era la forma antigua de trabajar. Lo que haya en `entrada/` con otra
+extensión (un PDF, un ZIP) no se lee, pero se nombra por pantalla («no es un
+extracto del banco»), para que se sepa que se ha visto. Un fichero vacío (0
+bytes, una descarga que no terminó) se salta con un aviso que pide volver a
+descargarlo.
 
 **Formato real, no extensión.** Los bancos españoles llaman `.xls` a cinco
 cosas distintas. La herramienta mira los primeros bytes del fichero y decide:
@@ -205,7 +209,8 @@ Para cada movimiento, en este orden:
 2. **Mes y mes contable.** Cada movimiento tiene su mes real y un "mes
    ajustado". El ajustado solo cambia para los movimientos que caen en los
    primeros días del mes (3 por defecto), contienen una de las palabras de
-   `mes_contable.json` (típicamente "nómina") y, por defecto, son ingresos:
+   `mes_contable.json` (de fábrica, "nomina" y "pension") y, por defecto,
+   son ingresos:
    esos se mueven al mes anterior, porque la nómina que entra el día 1 es
    con la que se ha vivido el mes que acaba. Lo del signo importa: la
    prestación que se cobra de una mutua sí es del mes anterior, pero la cuota
@@ -250,7 +255,15 @@ un hueco entre dos extractos. Si al final vuelve a coincidir (los saltos
 se compensan: un movimiento con la fecha cambiada entre dos extractos, por
 ejemplo), no dice «no cuadra», sino que al final cuadra y en qué fechas se
 separó. Si el saldo de partida no se ha podido calcular, no compara nada
-(no hay con qué).
+(no hay con qué). Si no cuadra y los movimientos de una cuenta sin declarar
+vienen de varios ficheros, añade que, si son de cuentas distintas, se
+declaren en `cuentas.json`: mezcladas como una sola, sus saldos no pueden
+cuadrar.
+
+**Sin saldo conocido** (el extracto no trae la columna, o ningún día es
+inequívoco) el Acumulado parte de 0 y **no es el saldo**, sino lo que ha
+variado la cuenta. Se avisa al final, y la pantalla y el título del gráfico
+lo llaman «desde el primer movimiento» en vez de «saldo».
 
 ### 3.7 Construir el resumen mensual
 
@@ -541,7 +554,11 @@ banco ("compra", "pago", "recibo", "tarjeta", "transferencia"...), los números
 sueltos y las palabras de menos de 3 letras.
 
 Se enseñan los 10 grupos que más suman, con un ejemplo y una línea lista para
-pegar en `rules.json`. La palabra sugerida se comprueba con el propio motor de
+pegar en `rules.json`. Un grupo de dinero que **entra** (cobros, recargas) se
+marca como tal, con su importe en positivo, y la regla que se le propone es
+solo para el lado positivo (`{"+": ...}`). El recibo de la tarjeta que ya ha
+señalado 5.1 no aparece aquí: la solución es excluirlo, no darle categoría.
+La palabra sugerida se comprueba con el propio motor de
 reglas: **solo se propone si no casaría con ningún movimiento que ya tiene
 categoría por otra regla**. Si ninguna palabra del grupo es segura, lo dice y
 pide revisarlo a mano.
@@ -636,6 +653,15 @@ Antes de escribir hace una copia de seguridad del libro en `datos/copias/`.
 Si esta vez hay menos filas que la anterior, borra las sobrantes, **salvo**
 que haya datos del usuario a los lados del bloque volcado (notas, por
 ejemplo): entonces solo las vacía, para no llevarse esos datos.
+
+**Las notas siguen a su movimiento.** Lo que el usuario tenga a los lados
+de una fila que es un movimiento volcado (con fecha e importe) se recuerda
+por fecha + concepto + importe + número de repetición, y tras reescribir el
+bloque se vuelve a poner junto a ese movimiento: si entra uno más antiguo,
+las notas no se quedan una fila por encima de lo que anotaban. Nunca pisa
+otra nota; si el sitio está ocupado o el movimiento ya no se vuelca, la
+deja donde estaba y avisa (y la copia de seguridad la conserva tal cual).
+Lo que esté junto a filas que no son movimientos no se mueve.
 
 ---
 

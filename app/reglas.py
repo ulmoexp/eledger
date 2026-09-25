@@ -88,6 +88,32 @@ def normalizar(texto) -> str:
     return re.sub(r"\s+", " ", t.lower()).strip()
 
 
+def leer_json(ruta):
+    """
+    Lee un fichero de ajustes/. Un error de formato (una coma que falta, una
+    que sobra tras la última regla) salía como «Expecting ',' delimiter: line
+    7 column 1», en inglés y sin decir de qué fichero: justo lo que se
+    encuentra quien edita su primer JSON. Aquí se dice en cuál, en qué línea
+    y qué suele ser. utf-8-sig acepta además el BOM que pone el Bloc de notas
+    de Windows al guardar, que por sí solo ya hacía fallar la lectura.
+    """
+    with open(ruta, "r", encoding="utf-8-sig") as f:
+        texto = f.read()
+    try:
+        return json.loads(texto)
+    except json.JSONDecodeError as e:
+        lineas = texto.splitlines()
+        linea = lineas[e.lineno - 1].strip() if 0 < e.lineno <= len(lineas) else ""
+        nombre = os.path.join(os.path.basename(os.path.dirname(str(ruta))),
+                              os.path.basename(str(ruta)))
+        raise RuntimeError(
+            f"{nombre} tiene un error de formato en la línea {e.lineno}"
+            + (f":  {linea}" if linea else "") + "\n"
+            "   Suele ser una coma que falta al final de la línea de antes, una "
+            "que sobra\n   después de la última línea, o unas comillas sin "
+            "cerrar.\n   Corrígelo y vuelve a ejecutar.") from None
+
+
 def euros(valor, signo=False, ancho=0) -> str:
     """
     5000 -> '5.000,00 €'; con signo, '+800,00 €'. El formato de Python es el
@@ -236,12 +262,10 @@ class Clasificador:
     @classmethod
     def desde_json(cls, ruta, por_defecto="Otros", ruta_base=None,
                    categorias_validas=None, por_defecto_positivo=None):
-        with open(ruta, "r", encoding="utf-8") as f:
-            propias = json.load(f)
+        propias = leer_json(ruta)
         base = {}
         if ruta_base and os.path.exists(ruta_base):
-            with open(ruta_base, "r", encoding="utf-8") as f:
-                base = json.load(f)
+            base = leer_json(ruta_base)
         return cls(propias, por_defecto, base, categorias_validas,
                    por_defecto_positivo)
 
@@ -326,8 +350,7 @@ class Catalogo:
 
     @classmethod
     def desde_json(cls, ruta):
-        with open(ruta, "r", encoding="utf-8") as f:
-            return cls({k: v for k, v in json.load(f).items() if not k.startswith("_")})
+        return cls({k: v for k, v in leer_json(ruta).items() if not k.startswith("_")})
 
     def validar(self, clasificador) -> list[str]:
         """Devuelve la lista de avisos (vacía si todo cuadra)."""
@@ -404,6 +427,22 @@ class Catalogo:
                     avisos.append(
                         f"«{nombre}» en orden_resumen no es ni una columna de "
                         f"sistema ni una categoría declarada: se ignora.")
+            # sin «Mes» el resumen sale sin la columna que dice de qué mes es
+            # cada fila; es legal, pero casi nunca a propósito
+            if "Mes" not in self.orden_resumen:
+                avisos.append(
+                    "orden_resumen no incluye «Mes»: el resumen saldrá sin la "
+                    "columna de los meses. Si no es a propósito, ponla la primera.")
+
+        # una etiqueta para una columna que no existe se ignoraba en silencio,
+        # cuando una errata en orden_resumen sí avisaba
+        propias = set(self.gastos) | set(self.columnas_ingreso.values())
+        for nombre in self.etiquetas:
+            if nombre not in propias:
+                avisos.append(
+                    f"«{nombre}» en etiquetas no es una categoría de gasto ni una "
+                    f"columna de ingreso desglosada: esa etiqueta no se usa. "
+                    f"(Las columnas de sistema, como Balance, no se renombran.)")
 
         return avisos
 
@@ -421,8 +460,7 @@ class Excluidor:
 
     @classmethod
     def desde_json(cls, ruta):
-        with open(ruta, "r", encoding="utf-8") as f:
-            return cls(json.load(f))
+        return cls(leer_json(ruta))
 
 
 class IdentificadorCuentas:
@@ -458,8 +496,7 @@ class IdentificadorCuentas:
     def desde_json(cls, ruta):
         if not os.path.exists(ruta):
             return cls({})
-        with open(ruta, "r", encoding="utf-8") as f:
-            return cls(json.load(f))
+        return cls(leer_json(ruta))
 
 
 # ========= COMPROBACIÓN =========

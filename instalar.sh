@@ -40,7 +40,7 @@ echo "Instalando librerias. Esto tarda un par de minutos la primera vez."
 
 echo
 echo "============================================================"
-echo " Listo. Ya puedes usar  ejecutar.command"
+echo " Listo. Ya puedes usar  ejecutar.sh"
 echo "============================================================"
 echo
 read -r -p "Pulsa Intro para cerrar..."

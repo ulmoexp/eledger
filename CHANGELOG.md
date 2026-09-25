@@ -21,6 +21,30 @@ Arreglos que salieron de un piloto con usuarios simulados.
 - **Una nómina se reconoce aunque el pagador sea un colegio o un
   supermercado.** «NOMINA COLEGIO…» caía en Hijos y «NOMINA MERCADONA» en
   Comida, porque esas reglas iban delante en la base.
+- **Sincronización: tus notas siguen a su movimiento.** Si tenías notas al
+  lado de los movimientos en tu fichero de contabilidad y entraba uno más
+  antiguo, cada nota se quedaba en su fila y pasaba a acompañar al
+  movimiento de al lado, sin avisar. Ahora se recolocan junto al suyo.
+- **Sin columna de saldo, el Acumulado ya no se llama «saldo».** Empieza en
+  0 y es lo que ha variado la cuenta; se avisa, y la pantalla y el gráfico
+  lo llaman «desde el primer movimiento».
+- Mensajes más claros:
+  - un error de formato en un JSON de `ajustes/` dice qué fichero, qué
+    línea y qué suele ser (antes salía en inglés y sin fichero), y se
+    acepta el UTF-8 del Bloc de notas;
+  - un fichero vacío pide volver a descargarlo, y lo que no es un extracto
+    (un PDF) se nombra por pantalla en vez de ignorarse en silencio;
+  - al repetir una ejecución ya no dice «extractos que se solapan»;
+  - si no cuadra con el banco y hay varios ficheros de cuenta sin declarar,
+    sugiere `cuentas.json`;
+  - el recibo de la tarjeta ya no sale también en «Sin clasificar» con un
+    consejo contrario, y los grupos de dinero que entra se marcan como tal;
+  - se avisa de `orden_resumen` sin «Mes» y de etiquetas para columnas que
+    no existen, y se nombran las reglas de la base descartadas;
+  - el resultado guardado en una copia ya no sale con un ✅ verde;
+  - en Linux, el instalador ya dice `ejecutar.sh`.
+- De fábrica, la pensión también cuenta en el mes anterior (como la
+  nómina), y Telefónica va a Fibra/móvil.
 
 ---
 

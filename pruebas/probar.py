@@ -451,6 +451,11 @@ def prueba_saldo_inicial_sin_columna(e):
               "sin columna de saldo no hay nada que detectar", salida)
     comprobar(abs(res.iloc[0]["Acumulado"] - res.iloc[0]["Balance"]) < 0.005,
               "Acumulado = Balance a secas", str(res.iloc[0]["Acumulado"]))
+    # regresión del piloto: aun así se llamaba «saldo al cierre del mes»
+    comprobar("el Acumulado no es tu saldo" in salida
+              and "Acumulado (desde el primer movimiento)" in salida
+              and "saldo al cierre" not in salida,
+              "avisa de que el Acumulado no es su saldo, y no lo llama así", salida)
 
 
 @caso("saldo-inicial-ambiguo-resoluble", "Dos movimientos el primer día no impiden calcularlo")
@@ -1383,6 +1388,42 @@ def prueba_sync_columnas(e):
     wb.close()
 
 
+@caso("sync-notas-realineadas", "Una nota junto a un movimiento lo sigue si entra otro por medio")
+def prueba_sync_notas_realineadas(e):
+    # regresión del piloto: la nota se quedaba en su número de fila, y al
+    # entrar un movimiento más antiguo pasaba a estar junto al de al lado
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    fx.escribir_destino(e.dir / "contabilidad.xlsx", filas_previas=0)
+    cfg = e.leer_config("sincronizar.json")
+    cfg["archivo"] = "contabilidad.xlsx"
+    e.escribir_config("sincronizar.json", cfg)
+    e.ejecutar()
+
+    from openpyxl import load_workbook
+    ruta = e.dir / "contabilidad.xlsx"
+    wb = load_workbook(ruta)
+    ws = wb["MOVIMIENTOS"]
+    fila = next(r for r in range(2, ws.max_row + 1)
+                if ws.cell(r, 2).value == "COMPRA MERCADONA MADRID")
+    ws.cell(fila, 10).value = "la del cumple"
+    wb.save(ruta)
+    wb.close()
+
+    fx.escribir_html(e.entrada / "anterior.xls",
+                     [("01/04/2026", "RECIBO GIMNASIO", -30.00)])
+    salida = e.ejecutar()
+
+    wb = load_workbook(ruta)
+    ws = wb["MOVIMIENTOS"]
+    junto = {ws.cell(r, 2).value: ws.cell(r, 10).value for r in range(2, ws.max_row + 1)}
+    wb.close()
+    comprobar(junto.get("COMPRA MERCADONA MADRID") == "la del cumple",
+              "la nota sigue junto a su movimiento", str(junto))
+    comprobar(sum(1 for v in junto.values() if v) == 1,
+              "y no se ha quedado otra copia en su fila vieja", str(junto))
+    comprobar("recolocadas" in salida, "lo dice por pantalla", salida)
+
+
 @caso("sync-formulas", "No se escribe en una hoja con fórmulas")
 def prueba_sync_formulas(e):
     fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
@@ -2129,7 +2170,9 @@ def prueba_mes_nuevo(e):
     salida = e.ejecutar()
 
     cfg = e.leer_config("mes_contable.json")
-    comprobar(cfg["palabras"] == ["nomina"],
+    # «pension» entra en la plantilla en la 2.12.1: la cobra el día 1 o 2 y
+    # es la del mes anterior, igual que la nómina (salió en el piloto)
+    comprobar(cfg["palabras"] == ["nomina", "pension"],
               "sin histórico previo no hay nada heredado que conservar",
               str(cfg["palabras"]))
     comprobar("no cambien" not in salida,

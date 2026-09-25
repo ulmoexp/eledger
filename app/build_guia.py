@@ -571,7 +571,8 @@ story += [codigo([
 ])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
-    "Si pones un número al final, se usa como importe: es la forma de comprobar las "
+    "Si pones un número detrás de un concepto, se usa como su importe (puedes poner "
+    "varios pares seguidos): es la forma de comprobar las "
     "reglas que dependen del signo. Las reglas que salen de la base aparecen marcadas "
     "con <font face='Mono' size='8.2'>· base</font>. Sin argumentos ejecuta una "
     "batería de casos trampa ya preparada. En Mac y Linux, escribe "
@@ -727,7 +728,7 @@ story += [aviso(
     "Escribe solo en esa columna",
     "El resto de la hoja se regenera en cada ejecución y perderías el cambio. Si te "
     "equivocas con el nombre de una categoría, se avisa por pantalla. Y por si acaso, "
-    "antes de cada escritura se guarda una copia del histórico en "
+    "cada vez que el histórico cambia se guarda antes una copia en "
     "<font face='Mono'>datos/copias/</font>.")]
 story += [EE]
 

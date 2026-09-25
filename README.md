@@ -51,6 +51,14 @@ pasos de arriba.
   trae el saldo, parte de él y comprueba que acaba donde dice el banco.
 - Todo el histórico se recalcula en cada ejecución: si afinas una regla, se
   reclasifica hacia atrás sin tener que volver a descargar nada.
+- Lee también los CSV de los neobancos (columnas en inglés) y los extractos
+  que parten el importe en Cargo y Abono.
+- Varias cuentas o tarjetas (`cuentas.json`): nada se fusiona entre ellas, y
+  una hoja aparte enseña lo que gasta cada una y su saldo.
+- Si ya llevas tus cuentas en tu propio Excel, puede añadir ahí los
+  movimientos nuevos, con tus columnas, sin tocar lo que ya tienes.
+- Si vienes de otra app de finanzas, su export entra como un extracto más y
+  puede conservar las categorías que ya tenías.
 
 ## Estructura del repositorio
 

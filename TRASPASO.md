@@ -247,11 +247,8 @@ en la ronda 3 (solo los tres perfiles que encontraron fallos graves), 8,3.
      `ejecutar.bat` e `instalar.bat` (solo un `echo`, pero la regla es
      probarlo).
 2. `/release` de la 2.14.0.
-3. La guía web (`eledger-web/guia/index.html`) está al día con la 2.14.0,
-   pero **sin comitear**: en ese repo solo se comitea si el usuario lo pide.
-
-Pendiente sin decidir: la portada no menciona a quien viene de otra app (ver
-`HALLAZGOS_3.md`).
+3. La web (`eledger-web`: guía y portada, con la tarjeta «¿Vienes de otra
+   app?») está al día con la 2.14.0 y comiteada, sin push.
 
 Decisiones del usuario: nada de cerrar la hoja de cálculo por su cuenta
 (2.12.0); la ronda 2 va después de las mejoras, no antes.

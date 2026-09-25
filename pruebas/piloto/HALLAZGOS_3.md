@@ -39,10 +39,13 @@ Ningún perfil encontró cifras mal sin avisar ni datos perdidos.
 | La guía: «la primera vez, sobre una copia», y cómo quedan las notas en modo añadir | Carmen |
 | LEEME: `cuentas.json` también para una tarjeta cada miembro de la pareja | pareja |
 
+## Hecho en la web
+
+- La portada tiene una tarjeta «¿Vienes de otra app?» (Raúl), y la guía web
+  explica `importar_categorias` y `equivalencias`.
+
 ## Sin tocar, a propósito
 
 - **`entrada/` no viene en el ZIP**: ya descartado en la ronda 1.
 - **«Fuera del balance» cuesta entenderlo a primera vista** (pareja): la guía
   lo explica en «Cómo se calcula el resumen». Preferencia, no fallo.
-- **Portada que mencione a quien viene de otra app** (Raúl): es de
-  `eledger-web`, y la portada ya es larga. Anotado.

@@ -216,6 +216,29 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
+### En curso: 2.12.1 (sesión del 25/09/2026), sin release todavía
+
+Salió de un **piloto con cinco usuarios simulados** (subagentes que prueban la
+release como alguien que la descarga, sin ver el código). Todo el material
+está en `pruebas/piloto/`: `INSTRUCCIONES.md` (cómo lanzarlo y el texto para
+los perfiles), `generar.py` (carpetas y extractos inventados),
+`HALLAZGOS_1.md` (qué se arregló y qué se descartó a propósito) y los cinco
+informes en `ronda1/`. Lo arreglado está en `CHANGELOG.md` (2.12.1).
+
+**Lo siguiente, por este orden:**
+1. **Ronda 2 del piloto**, en sesión nueva, sobre la 2.12.1: perfiles nuevos,
+   Marta y Ana repetidas y datos más realistas (ver el final de
+   `INSTRUCCIONES.md`). Antes, `app/exportar.py` para que haya ZIP de la
+   2.12.1, que es el que coge `generar.py`.
+2. Arreglar lo que salga.
+3. **Probar en Windows** los lanzadores: en la 2.12.1 cambió el texto del
+   aviso de carpeta incompleta en `ejecutar.bat` e `instalar.bat` (solo un
+   `echo`, pero la regla es probarlo).
+4. `/release` de la 2.12.1.
+
+Decisiones del usuario en esta sesión: nada de cerrar la hoja de cálculo por
+su cuenta (2.12.0); la ronda 2 va después de las mejoras, no antes.
+
 ### Hecho: 2.12.0 (sesión del 24/09/2026)
 
 - **El Acumulado es el saldo real de la cuenta** (saldo inicial + todos los

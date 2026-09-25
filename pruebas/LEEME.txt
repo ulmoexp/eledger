@@ -21,6 +21,13 @@ marcada con una x y el valor que ha salido en vez del esperado.
   python probar.py dedup        pasa solo los casos que se llamen así
   python probar.py -v           conserva las carpetas temporales para mirarlas
 
+Piloto de usuarios simulados
+----------------------------
+La carpeta piloto/ no son pruebas automáticas: es el material para que
+varios «usuarios» simulados (con IA) prueben la herramienta como alguien que
+la acaba de descargar y den su opinión. Instrucciones en
+piloto/INSTRUCCIONES.md; los datos son inventados.
+
 ¿Toca mis datos?
 ----------------
 No. Cada caso se monta en una carpeta temporal del sistema con una copia del

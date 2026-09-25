@@ -117,6 +117,11 @@ con una lista de sinónimos (p. ej. "fecha operación", "fecha valor",
 coincidencia exacta puntúa más que una parcial. Si hay varias tablas u hojas,
 se queda con la que tiene más filas de datos debajo de su cabecera. Si
 encuentra una columna de **saldo**, también se la guarda (es opcional).
+Los sinónimos incluyen los de los neobancos en inglés ("date", "description",
+"payee", "amount"). Si no hay columna de importe pero sí **dos columnas, una
+de lo que sale y otra de lo que entra** ("cargo"/"abono", "debe"/"haber"),
+reconocidas solo por coincidencia exacta, el importe es lo que entra menos
+lo que sale, venga el cargo en positivo o en negativo.
 
 **Convertir los valores.**
 - Importes en formato español y sus variantes: `1.234,56 €`, `-45,00`,
@@ -150,6 +155,22 @@ nunca se cambia una cuenta ya puesta. Si el histórico ya se había duplicado
 por esto (versión 2.12.0), las parejas repetidas se quitan, quedándose con la
 que tenga una corrección manual, y se dice por pantalla.
 
+**Un fichero que no casa con ninguna cuenta declarada.** Con `cuentas.json`
+declarado, un fichero cuyo nombre no casa con ningún patrón sería una cuenta
+más, sin identificar. Si la mitad o más de sus movimientos (misma fecha,
+concepto, importe y tipo, contando las repeticiones) ya están en una cuenta
+declarada, del histórico o de otro fichero de esta misma ejecución, es otra
+descarga de esa cuenta con otro nombre (el «movimientos (1).xls» de volver a
+bajarla): **no se lee**, y se avisa de que se renombre. Si no se parece a
+ninguna, entra como una cuenta sin identificar.
+
+**Dos cuentas o tarjetas sin declarar.** Sin `cuentas.json`, si dos ficheros
+del mismo tipo cubren al menos 7 días en común y, en esas fechas (con al
+menos 3 movimientos cada uno), comparten menos de la mitad de sus
+movimientos, no son dos descargas de lo mismo: se avisa de que hay que
+declararlas y, si ya se ha fundido algún cargo idéntico de las dos, de
+cuánto falta en los totales.
+
 ### 3.3 Cargar el histórico
 
 - **Antes que nada** (de hecho, antes incluso de leer los extractos), mira si
@@ -174,7 +195,8 @@ que tenga una corrección manual, y se dice por pantalla.
   pendientes (columnas que se han ido añadiendo con las versiones) y se dice
   por pantalla qué se ha actualizado.
 - Si no hay histórico ni ficheros en `entrada/`, se para con un mensaje
-  explicando qué hacer.
+  explicando qué hacer. Si hay ficheros pero no se ha podido leer ninguno,
+  lo dice así (no que la carpeta esté vacía) y remite a los avisos.
 
 ### 3.4 Juntar sin duplicar
 
@@ -324,7 +346,11 @@ ha tocado).
 1. **Copia de seguridad** del histórico anterior en `datos/copias/`, con fecha
    y hora en el nombre. Se conservan las últimas 10 (configurable en
    `sincronizar.json`); las más antiguas se borran.
-2. **`datos/historico.xlsx`**, reescrito entero (apartado 6).
+2. **`datos/historico.xlsx`**, reescrito entero (apartado 6). Se escribe en
+   un fichero temporal al lado (`.historico.xlsx.escribiendo.xlsx`) y solo
+   al terminar sustituye al de verdad, así que un fallo a mitad no deja el
+   histórico a medias. Las hojas que el usuario le haya añadido a mano no
+   pasan al nuevo: se avisa, diciendo en qué copia de seguridad están.
 3. **`salida/movimientos_limpios.xlsx`**: solo lo que cuenta.
 4. **`salida/movimientos_excluidos.xlsx`**: solo lo excluido, con qué patrón
    lo excluyó (solo si hay algo excluido).
@@ -427,7 +453,10 @@ cualquier regla de la base basta con repetirla en la propia. Para
 
 Una regla de la base que apunte a una categoría que el usuario **no tiene**
 en su `categorias.json` se descarta (se dice cuántas por pantalla). Si no, esos
-movimientos acabarían en una categoría que no es columna de nada.
+movimientos acabarían en una categoría que no es columna de nada. Desde la
+2.13.0, **una regla propia** así (una errata: «Sofware») también se descarta,
+con un aviso que nombra la regla; y si su clave era la misma que una de la
+base, la de la base vuelve a aplicarse.
 
 **Qué hay en la base.** Solo nombres y conceptos que significan lo mismo para
 cualquiera en España: cadenas de supermercados, gasolineras, operadores,
@@ -436,7 +465,9 @@ salud, tiendas online, y conceptos bancarios como nómina, préstamo, alquiler
 o IBI. Desde la 2.12.1, también los pagos a Hacienda y la cuota de autónomos,
 en la categoría **Impuestos** que trae la plantilla de `categorias.json`
 (quien actualiza y no la tiene no pierde nada: esas reglas se descartan y
-los cargos siguen en Otros). Nada que dependa de la vida de alguien (su casero, su colegio, sus
+los cargos siguen en Otros). Lo que también puede ser un cobro (la comunidad
+de propietarios, a la que factura un autónomo) solo clasifica el lado del
+cargo. Nada que dependa de la vida de alguien (su casero, su colegio, sus
 transferencias). Tampoco lo ambiguo: `renta` (la de Hacienda o la del piso),
 `credito` (el recibo de la tarjeta), `paypal` (lo que importa es el comercio
 que va detrás), los seguros genéricos (coche, casa o vida) o las marcas que
@@ -485,7 +516,8 @@ signo siguen buscando en las reglas siguientes.
 ### Probar una regla sin procesar nada
 
 `python app/reglas.py "CONCEPTO DE PRUEBA" -25` dice qué categoría saldría,
-qué regla casa y de qué capa viene, o si se excluiría. Sin argumentos, pasa
+qué regla casa y de qué capa viene, o si se excluiría. Admite varios
+conceptos, y cada importe va con el concepto que tiene delante. Sin argumentos, pasa
 los ejemplos de las trampas conocidas (MEDIA MARKT, NAVIDAD, BARCELONA...).
 
 ---
@@ -504,6 +536,10 @@ Para cada mes de tarjeta suma lo que debe la tarjeta ese mes (ya descontadas
 las devoluciones), y busca en la cuenta **un único cargo** por ese mismo
 importe, con 2 céntimos de margen, entre el día 1 de ese mes y 45 días después
 de que acabe. Si hay más de un candidato ese mes, no elige: descarta el mes.
+Si el total de todas las tarjetas no cuadra con ningún cargo y hay más de
+una tarjeta (por su cuenta de `cuentas.json` o, sin ella, por el fichero del
+que sale cada movimiento), repite la búsqueda con lo de cada tarjeta por
+separado, sin usar dos veces el mismo cargo.
 
 Con los cargos encontrados, extrae la parte del concepto que **no cambia** de
 un mes a otro (quitando las referencias numéricas) y la propone como patrón de
@@ -551,17 +587,23 @@ pendientes de afinar con extractos reales.
 ### 5.3 Lo que se ha quedado sin clasificar
 
 Los movimientos que ninguna regla ha sabido clasificar se reparten en grupos
-por **palabra común**: en cada vuelta se elige la palabra que más importe
-arrastra entre los que quedan, se forma su grupo y se sacan del reparto (un
+por **palabra común**, lo que sale y lo que entra **por separado**: en cada
+vuelta se elige la palabra que más importe (en valor absoluto) arrastra
+entre los que quedan, se forma su grupo y se sacan del reparto (un
 movimiento nunca está en dos grupos). Se descartan las palabras de relleno del
 banco ("compra", "pago", "recibo", "tarjeta", "transferencia"...), los números
-sueltos y las palabras de menos de 3 letras.
+sueltos y las palabras de menos de 3 letras. Un abono que lleva la palabra de
+un grupo de cargos es su devolución y se une a ese grupo, porque la regla que
+se proponga para el comercio debe cogerla también.
 
 Se enseñan los 10 grupos que más suman, con un ejemplo y una línea lista para
 pegar en `rules.json`. Un grupo de dinero que **entra** (cobros, recargas) se
 marca como tal, con su importe en positivo, y la regla que se le propone es
 solo para el lado positivo (`{"+": ...}`). El recibo de la tarjeta que ya ha
 señalado 5.1 no aparece aquí: la solución es excluirlo, no darle categoría.
+Si 5.1 no lo ha encontrado, un grupo de cargos cuyos conceptos llevan todos
+"tarjeta", "visa", "liquidacion"... tampoco recibe sugerencia de categoría:
+se dice que parece el recibo y que hay que excluirlo.
 La palabra sugerida se comprueba con el propio motor de
 reglas: **solo se propone si no casaría con ningún movimiento que ya tiene
 categoría por otra regla**. Si ninguna palabra del grupo es segura, lo dice y
@@ -651,9 +693,22 @@ Se niega a escribir, y lo explica, si:
 - el libro tiene tablas dinámicas o macros (no sobreviven a la reescritura);
 - la hoja de destino tiene **alguna fórmula** en cualquier parte (señal de que
   se ha apuntado a la hoja equivocada);
-- el fichero está abierto en otro programa.
+- en la esquina configurada hay una **tabla del usuario**: alguna celda de
+  la fila de cabecera tiene un texto que no es el nombre de la columna que
+  va ahí, o la cabecera está vacía y hay datos debajo. El bloque se vacía y
+  se reescribe entero en cada ejecución (no se añade debajo), así que
+  escribir borraría esa tabla;
+- el fichero está abierto en otro programa: por su fichero de bloqueo
+  (`~$…` de Excel, `.~lock.…#` de LibreOffice y OnlyOffice) o, en Windows,
+  porque el sistema no deja abrirlo para escribir.
 
-Antes de escribir hace una copia de seguridad del libro en `datos/copias/`.
+Un fichero indicado solo por su nombre se busca en la carpeta de la
+herramienta (la que contiene `entrada/` y `ajustes/`).
+
+Si volcar no cambia ninguna celda (no hay nada nuevo), **no guarda ni hace
+copia**: antes cada ejecución gastaba una, y a las diez se perdía la
+anterior a la primera sincronización. Si hay cambios, antes de escribir hace
+una copia de seguridad del libro en `datos/copias/`.
 Si esta vez hay menos filas que la anterior, borra las sobrantes, **salvo**
 que haya datos del usuario a los lados del bloque volcado (notas, por
 ejemplo): entonces solo las vacía, para no llevarse esos datos.
@@ -679,12 +734,19 @@ traicionero, porque el Excel cuadra por dentro y nadie se entera):
 - Categoría que asigna una regla pero no está declarada → aviso.
 - Categoría declarada que ninguna regla asigna → aviso (su columna saldrá a 0).
 - Categoría repetida, o que se llama igual que otra columna del resumen → aviso.
-- Regla de la base a una categoría no declarada → descartada.
+- Regla de la base o propia a una categoría no declarada → descartada (la
+  propia, con aviso que la nombra).
+- Etiqueta que dejaría dos columnas del resumen con el mismo nombre →
+  ignorada y avisada.
+- Con cuentas declaradas, otra descarga de una cuenta con un nombre que no
+  casa → no se lee (3.2). Sin declararlas, dos ficheros del mismo tipo que
+  no se parecen → aviso.
 - Corrección manual con una categoría que no existe → ignorada y avisada.
 - Nombre desconocido en `orden_resumen` → ignorado y avisado.
 
 **Contra perder datos:**
-- Copia de seguridad del histórico antes de cada escritura.
+- Copia de seguridad del histórico antes de cada escritura, que además se
+  hace en un temporal y solo al final sustituye al de verdad.
 - Histórico escrito por una versión más nueva → no se toca.
 - Histórico ilegible → se para en vez de empezar de cero y sobrescribirlo.
 - La migración desde la versión antigua copia todo antes de mover y nunca

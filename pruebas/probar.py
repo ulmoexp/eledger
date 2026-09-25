@@ -1465,6 +1465,257 @@ def prueba_sync_formulas(e):
               "y el resto del proceso termina igual")
 
 
+# --- regresiones de la ronda 2 del piloto (pruebas/piloto/HALLAZGOS_2.md) ---
+
+@caso("cuentas-descarga-sin-patron", "Con cuentas declaradas, otra descarga con otro nombre no se duplica")
+def prueba_cuentas_descarga_sin_patron(e):
+    # «movimientos (1).xls» no casaba con ninguna cuenta, entraba como una
+    # tercera «(sin identificar)» y todo lo suyo sumaba dos veces
+    e.escribir_config("cuentas.json", {"negocio": "negocio", "personal": "personal"})
+    negocio = [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+               ("08/04/2026", "COMPRA LIDL", -20.00),
+               ("12/04/2026", "RECIBO GIMNASIO", -30.00)]
+    fx.escribir_html(e.entrada / "negocio_2026.xls", negocio)
+    fx.escribir_html(e.entrada / "personal_2026.xls",
+                     [("06/04/2026", "COMPRA MERCADONA MADRID", -30.00)])
+    fx.escribir_html(e.entrada / "movimientos (1).xls", negocio)
+    salida = e.ejecutar()
+
+    df = e.historico()
+    comprobar(len(df) == 4, "la copia con otro nombre no se suma", f"{len(df)} filas")
+    comprobar("parece otra descarga de «negocio»" in salida,
+              "y se dice cuál es y qué hacer", salida)
+
+    # una cuenta de verdad sin patrón (no se parece a ninguna) sí entra
+    e.vaciar_entrada()
+    fx.escribir_html(e.entrada / "ahorro.xls",
+                     [("09/04/2026", "TRASPASO RECIBIDO", 50.00)])
+    e.ejecutar()
+    comprobar(len(e.historico()) == 5, "una cuenta distinta sin patrón sí entra",
+              f"{len(e.historico())} filas")
+
+
+@caso("tarjetas-sin-declarar", "Dos tarjetas sin cuentas.json: avisa de lo que se funde")
+def prueba_tarjetas_sin_declarar(e):
+    comun = [("14/04/2026", "CAFETERIA LA ESQUINA", -2.60)]
+    fx.escribir_xml_ss(e.entrada / "tarjeta_1111.xls", comun + [
+        ("02/04/2026", "COMPRA A", -10.00), ("10/04/2026", "COMPRA B", -11.00),
+        ("20/04/2026", "COMPRA C", -12.00), ("28/04/2026", "COMPRA G", -13.00)],
+        tarjeta=True)
+    fx.escribir_xml_ss(e.entrada / "tarjeta_2222.xls", comun + [
+        ("01/04/2026", "COMPRA D", -20.00), ("11/04/2026", "COMPRA E", -21.00),
+        ("21/04/2026", "COMPRA F", -22.00), ("29/04/2026", "COMPRA H", -23.00)],
+        tarjeta=True)
+    salida = e.ejecutar()
+    comprobar("Parecen dos tarjetas distintas" in salida, "avisa", salida)
+    comprobar("faltan 2,60 €" in salida, "y dice lo que se ha fundido", salida)
+
+    e.escribir_config("cuentas.json", {"1111": "una", "2222": "otra"})
+    e.ejecutar()
+    df = e.historico()
+    comprobar((df["descripcion"] == "CAFETERIA LA ESQUINA").sum() == 2,
+              "declaradas, salen los dos cafés", str(len(df)))
+
+
+@caso("tarjetas-dos-recibos", "Con dos tarjetas, encuentra el recibo de cada una")
+def prueba_tarjetas_dos_recibos(e):
+    e.escribir_config("exclude_patterns.json", [])
+    e.escribir_config("cuentas.json", {"1111": "una", "2222": "otra", "cuenta": "cuenta"})
+    fx.escribir_xml_ss(e.entrada / "tarjeta_1111.xls",
+                       [("05/04/2026", "COMPRA A", -50.00)], tarjeta=True)
+    fx.escribir_xml_ss(e.entrada / "tarjeta_2222.xls",
+                       [("06/04/2026", "COMPRA B", -30.25)], tarjeta=True)
+    fx.escribir_html(e.entrada / "cuenta.xls", [
+        ("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+        ("02/05/2026", "LIQUIDACION TARJETA 1111", -50.00),
+        ("02/05/2026", "LIQUIDACION TARJETA 2222", -30.25)])
+    salida = e.ejecutar()
+    comprobar("50,00 €" in salida and "30,25 €" in salida
+              and '"liquidacion tarjeta"' in salida,
+              "los dos recibos y la clave común", salida)
+
+
+@caso("base-signo-cobros", "Cobrar de una comunidad de propietarios es ingreso; pagarla, Piso")
+def prueba_base_signo_cobros(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", [
+        ("03/04/2026", "TRANSF. DE COMUNIDAD PROP. SOL FRA 12", 900.00),
+        ("05/04/2026", "RECIBO COMUNIDAD PROPIETARIOS", -65.00),
+        ("12/04/2026", "IMPUESTO VEHICULOS AYTO", -98.40)])
+    e.ejecutar()
+    df = e.historico()
+    comprobar(categoria_de(df, "TRANSF. DE COMUNIDAD") == "Ingresos",
+              "el cobro va a Ingresos", str(categoria_de(df, "TRANSF. DE COMUNIDAD")))
+    comprobar(categoria_de(df, "RECIBO COMUNIDAD") == "Piso",
+              "el recibo sigue en Piso", str(categoria_de(df, "RECIBO COMUNIDAD")))
+    comprobar(categoria_de(df, "IMPUESTO VEHICULOS") == "Transporte",
+              "el impuesto del coche tiene regla", str(categoria_de(df, "IMPUESTO")))
+
+
+@caso("cargo-abono", "Un extracto con Cargo y Abono en dos columnas se lee con su signo")
+def prueba_cargo_abono(e):
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["Extracto"])
+    ws.append([])
+    ws.append(["Fecha", "Concepto", "Cargo", "Abono", "Saldo"])
+    ws.append(["01/04/2026", "NOMINA EMPRESA FICTICIA SL", None, "2.000,00", "7.000,00"])
+    ws.append(["07/04/2026", "COMPRA MERCADONA MADRID", "100,00", None, "6.900,00"])
+    ws.append(["08/04/2026", "COMPRA LIDL", "-20,00", None, "6.880,00"])
+    wb.save(e.entrada / "extracto.xlsx")
+    e.ejecutar()
+    df = e.historico().set_index("descripcion")
+    comprobar(len(df) == 3, "se leen los tres", str(len(df)))
+    comprobar(df.at["NOMINA EMPRESA FICTICIA SL", "importe"] == 2000
+              and df.at["COMPRA MERCADONA MADRID", "importe"] == -100
+              and df.at["COMPRA LIDL", "importe"] == -20,
+              "lo del Abono entra y lo del Cargo sale, venga con el signo que venga",
+              str(df["importe"].to_dict()))
+
+
+@caso("neobanco-payee", "Un CSV con la columna «Payee» se lee sin tocarlo")
+def prueba_neobanco_payee(e):
+    (e.entrada / "transactions.csv").write_text(
+        "Date,Payee,Account number,Transaction type,Payment reference,Amount (EUR)\n"
+        "2026-04-01,Transferencia de PADRES,,Income,,300.00\n"
+        "2026-04-03,Mercadona,,Presentment,,-12.50\n", encoding="utf-8")
+    e.ejecutar()
+    df = e.historico()
+    comprobar(len(df) == 2 and categoria_de(df, "Mercadona") == "Comida",
+              "se leen y clasifican", str(len(df)))
+
+
+@caso("entrada-ilegible", "Si nada de entrada/ se puede leer, no dice que esté vacía")
+def prueba_entrada_ilegible(e):
+    (e.entrada / "rara.csv").write_text("hola;adios\n1;2\n", encoding="utf-8")
+    salida = e.ejecutar()
+    comprobar("está vacía" not in salida and "no he podido leer ningún" in salida,
+              "dice lo que pasa de verdad", salida)
+
+
+@caso("etiquetas-repetidas", "Dos etiquetas iguales avisan y no dejan el histórico a medias")
+def prueba_etiquetas_repetidas(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
+    cat = e.leer_config("categorias.json")
+    cat["etiquetas"] = {"Comida": "Casa", "Piso": "Casa", "Ocio": "Balance"}
+    e.escribir_config("categorias.json", cat)
+    salida = e.ejecutar()
+    comprobar(e.ultimo_codigo == 0 and "❌" not in salida, "no se cae", salida)
+    wb = e.libro_historico()
+    columnas = [c.value for c in wb["RESUMEN"][1]]
+    comprobar(len(columnas) == len(set(columnas)), "ninguna columna repetida",
+              str(columnas))
+    comprobar(wb.sheetnames[0] == "RESUMEN" and len(wb["RESUMEN"]._charts) > 0,
+              "el histórico sale completo, con sus gráficos", str(wb.sheetnames))
+    wb.close()
+    comprobar("se llama igual que" in salida, "y avisa de las que ignora", salida)
+
+
+@caso("regla-categoria-inexistente", "Tu regla a una categoría mal escrita se descarta")
+def prueba_regla_categoria_inexistente(e):
+    # antes se aplicaba y el movimiento se salía de Total Gastos
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
+    e.regla_al_principio("mercadona", "Comidas")
+    salida = e.ejecutar()
+    df = e.historico()
+    comprobar(categoria_de(df, "MERCADONA") == "Comida",
+              "manda la siguiente regla que casa", str(categoria_de(df, "MERCADONA")))
+    comprobar(abs(e.resumen().iloc[0]["Total Gastos"] - TOTAL_GASTOS_ABRIL) < 0.005,
+              "los totales no pierden nada", str(e.resumen().iloc[0]["Total Gastos"]))
+    comprobar("DESCARTADO" in salida, "y se dice", salida)
+
+
+@caso("informe-cobros", "Sin clasificar: los cobros proponen lo común, y la devolución va con su comercio")
+def prueba_informe_cobros(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", [
+        ("02/04/2026", "TRANSF. DE CLIENTE UNO FRA 1", 1000.00),
+        ("09/04/2026", "TRANSF. DE CLIENTE DOS FRA 2", 300.00),
+        ("11/04/2026", "COMPRA FERRETERIA ZOCO", -50.00),
+        ("15/04/2026", "DEVOLUCION FERRETERIA ZOCO", 10.00)])
+    salida = e.ejecutar()
+    comprobar('"uno"' not in salida and '"dos"' not in salida
+              and '{"+": "PON_TU_CATEGORIA"}' in salida,
+              "no propone el nombre de un solo cliente", salida)
+    comprobar("2 mov.  ·  zoco" in salida or "2 mov.  ·  ferreteria" in salida,
+              "la devolución va en el grupo de su comercio", salida)
+
+
+@caso("historico-hoja-propia", "Una hoja añadida al histórico avisa de que se pierde")
+def prueba_historico_hoja_propia(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    wb = e.libro_historico()
+    wb.create_sheet("Mis cuentas")
+    wb.save(e.ruta_historico)
+    wb.close()
+    salida = e.ejecutar()
+    comprobar("«Mis cuentas» ya no está" in salida and "copias" in salida,
+              "avisa y dice dónde está", salida)
+
+
+def _preparar_sync(e, hoja="MOVIMIENTOS"):
+    cfg = e.leer_config("sincronizar.json")
+    cfg["archivo"] = "contabilidad.xlsx"
+    cfg["hoja"] = hoja
+    e.escribir_config("sincronizar.json", cfg)
+
+
+@caso("sync-esquina-ajena", "No se escribe encima de una tabla del usuario")
+def prueba_sync_esquina_ajena(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    from openpyxl import Workbook, load_workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+    ws.append(["Fecha", "Concepto", "Importe", "Categoría"])
+    ws.append(["02/03/2026", "RECIBO A MANO", -10, "Piso"])
+    wb.save(e.dir / "contabilidad.xlsx")
+    _preparar_sync(e, "Datos")
+    salida = e.ejecutar()
+    comprobar("no es la mía" in salida and "NO se ha tocado" in salida,
+              "se niega y dice por qué", salida)
+    wb = load_workbook(e.dir / "contabilidad.xlsx")
+    comprobar(wb["Datos"]["B2"].value == "RECIBO A MANO", "lo del usuario sigue ahí")
+    wb.close()
+
+
+@caso("sync-abierto", "No se escribe en el fichero de contabilidad si está abierto")
+def prueba_sync_abierto(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    fx.escribir_destino(e.dir / "contabilidad.xlsx", filas_previas=0)
+    _preparar_sync(e)
+    (e.dir / ".~lock.contabilidad.xlsx#").write_text("x")
+    salida = e.ejecutar()
+    comprobar("está abierto" in salida and "NO se ha tocado" in salida,
+              "se niega", salida)
+
+
+@caso("sync-sin-cambios", "Sin nada nuevo, ni se reescribe ni gasta una copia")
+def prueba_sync_sin_cambios(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    fx.escribir_destino(e.dir / "contabilidad.xlsx", filas_previas=0)
+    _preparar_sync(e)
+    e.ejecutar()
+    copias = lambda: sorted(p.name for p in (e.datos / "copias").glob("contabilidad_*"))
+    antes = copias()
+    salida = e.ejecutar()
+    comprobar("ya estaba al día" in salida, "lo dice", salida)
+    comprobar(copias() == antes, "y no hay copia nueva", f"{antes} -> {copias()}")
+
+
+@caso("reglas-cli-pares", "reglas.py: cada importe va con el concepto de delante")
+def prueba_reglas_cli_pares(e):
+    e.ejecutar()                         # crea ajustes/
+    proc = subprocess.run(
+        [sys.executable, os.path.join(DIR_APP, "reglas.py"),
+         "BIZUM DE ALGUIEN", "25", "BIZUM A ALGUIEN", "-18,50"],
+        cwd=e.dir, capture_output=True, text=True, encoding="utf-8")
+    lineas = [l for l in proc.stdout.splitlines() if "BIZUM" in l]
+    comprobar(len(lineas) == 2 and "25,00" in lineas[0] and "-18,50" in lineas[1]
+              and "Ingresos" in lineas[0] and "Ocio" in lineas[1],
+              "dos casos, cada uno con su signo", proc.stdout + proc.stderr)
+
+
 @caso("sin-nada", "Sin histórico y sin entrada, un error entendible")
 def prueba_sin_nada(e):
     salida = e.ejecutar()

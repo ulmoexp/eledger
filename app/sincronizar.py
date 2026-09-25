@@ -19,6 +19,7 @@ import json
 import os
 import shutil
 import zipfile
+from pathlib import Path
 
 import pandas as pd
 
@@ -70,6 +71,47 @@ class Config:
         from reglas import leer_json
         datos = {k: v for k, v in leer_json(ruta).items() if not k.startswith("_")}
         return cls(datos, raiz)
+
+
+# =====================================================================
+# FICHEROS ABIERTOS
+# =====================================================================
+# Viven aquí y no en process.py porque los usan los dos: el histórico y el
+# fichero de contabilidad del usuario. Con este último, Windows solo falla
+# al GUARDAR, y Mac y Linux ni eso: se escribía encima de un fichero abierto
+# en LibreOffice, que al guardar después pisaba lo volcado sin avisar.
+
+def _ficheros_de_bloqueo(ruta):
+    """Los que deja al lado quien tiene el fichero abierto. Excel: «~$» más
+    el nombre (con los dos primeros caracteres recortados en nombres
+    largos, según versión). LibreOffice y OnlyOffice: «.~lock.nombre#»."""
+    nombre = ruta.name
+    return [ruta.with_name(n) for n in
+            (f"~${nombre}", f"~${nombre[2:]}", f".~lock.{nombre}#")]
+
+
+def esta_abierto(ruta):
+    """
+    None si se puede escribir sin miedo. Si no, cómo se ha sabido:
+    "sistema" (Windows lo tiene bloqueado: seguro que está abierto) o el
+    fichero de bloqueo encontrado (casi seguro, pero puede ser un resto de
+    un programa que se cerró en falso y no lo borró).
+    """
+    ruta = Path(ruta)
+    if not ruta.exists():
+        return None
+    if os.name == "nt":
+        try:
+            with open(ruta, "r+b"):
+                pass
+        except PermissionError:
+            return "sistema"
+        except OSError:
+            pass
+    for bloqueo in _ficheros_de_bloqueo(ruta):
+        if bloqueo.exists():
+            return bloqueo
+    return None
 
 
 # =====================================================================
@@ -137,6 +179,47 @@ def revisar_hoja(ws) -> list[str]:
                 f"No la sobreescribo: la hoja de destino debe ser solo datos. "
                 f"Comprueba el nombre de la hoja en sincronizar.json."]
     return []
+
+
+def revisar_esquina(ws, f0, c0, columnas) -> list[str]:
+    """
+    El bloque se vacía y se reescribe ENTERO en cada ejecución: es una tabla
+    de la herramienta, no se añade debajo de lo que haya. Si en la esquina
+    configurada ya hay datos del usuario (su hoja de siempre, con junio
+    metido a mano y sus propias cabeceras), escribir se los llevaba por
+    delante, y las fórmulas que tiraban de esas columnas pasaban a sumar
+    otra cosa sin avisar.
+
+    Se reconoce una tabla nuestra por su cabecera: cada celda escrita en la
+    fila de la esquina tiene que ser el nombre de la columna que va ahí. Una
+    fila de cabecera vacía con datos debajo tampoco es nuestra.
+    """
+    ancho = len(columnas)
+    cabecera = [ws.cell(f0, c0 + j).value for j in range(ancho)]
+    ajenas = [(j, v) for j, v in enumerate(cabecera)
+              if v is not None and str(v).strip().lower() != columnas[j]]
+    hay_debajo = any(celda.value is not None
+                     for fila in ws.iter_rows(min_row=f0 + 1, min_col=c0,
+                                              max_col=c0 + ancho - 1)
+                     for celda in fila)
+    vacia = all(v is None or not str(v).strip() for v in cabecera)
+    if not ajenas and not (vacia and hay_debajo):
+        return []
+
+    from openpyxl.utils import get_column_letter
+    esquina = f"{get_column_letter(c0)}{f0}"
+    if ajenas:
+        vistas = ", ".join(f"«{v}»" for _, v in ajenas[:4])
+        que = f"una cabecera que no es la mía ({vistas})"
+    else:
+        que = "datos sin la cabecera de la herramienta"
+    return [f"La hoja «{ws.title}» tiene {que} en la esquina {esquina}, donde "
+            f"empiezo a escribir. Vuelco la tabla ENTERA en cada ejecución (no "
+            f"añado debajo): si escribiera, borraría lo tuyo.",
+            f"Usa una hoja vacía solo para la herramienta y haz que tus "
+            f"fórmulas tiren de ella, o mueve la esquina (fila_inicial, "
+            f"columna_inicial) a un sitio libre. Las columnas que escribo son: "
+            f"{', '.join(columnas)}."]
 
 
 # =====================================================================
@@ -273,14 +356,34 @@ def _recolocar_notas(ws, notas, df, f0):
     return len(mover) - sin_sitio, huerfanas, sin_sitio
 
 
-def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
-    """Vuelca df en la hoja indicada. Devuelve (ruta_de_la_copia, filas escritas)."""
+def _contenido(ws) -> dict:
+    """Lo que hay escrito en la hoja, celda a celda: para saber si volcar
+    cambia algo antes de guardar (y de gastar una copia de seguridad)."""
+    return {(c.row, c.column): c.value for fila in ws.iter_rows()
+            for c in fila if c.value is not None}
+
+
+def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str | None, int]:
+    """Vuelca df en la hoja indicada. Devuelve (ruta_de_la_copia, filas
+    escritas); la copia es None si no había nada que cambiar y el fichero
+    no se ha tocado."""
     from openpyxl import load_workbook
 
     bloqueos, avisos = revisar_libro(cfg.ruta)
     if bloqueos:
         raise RuntimeError("No sincronizo con tu fichero de contabilidad:\n   · "
                            + "\n   · ".join(bloqueos))
+
+    abierto = esta_abierto(cfg.ruta)
+    if abierto:
+        como = ("" if abierto == "sistema" else
+                f"\n   (lo sé por {abierto.name}; si NO lo tienes abierto, es un "
+                f"resto de un cierre en falso: bórralo)")
+        raise RuntimeError(f"'{cfg.archivo}' está abierto en otro programa. "
+                           f"Guárdalo, ciérralo y vuelve a ejecutar: si escribo "
+                           f"ahora, al guardar tú después se perdería lo "
+                           f"volcado.{como}")
+
     for a in avisos:
         print(f"   ℹ️  El libro {a}")
 
@@ -296,12 +399,13 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
                            f"Hojas disponibles: {', '.join(wb.sheetnames)}.")
 
     ws = wb[cfg.hoja]
-    problemas = revisar_hoja(ws)
+    problemas = revisar_hoja(ws) or revisar_esquina(
+        ws, cfg.fila_inicial, cfg.columna_inicial, [str(c) for c in df.columns])
     if problemas:
         wb.close()
         raise RuntimeError("No sincronizo:\n   · " + "\n   · ".join(problemas))
 
-    copia = copia_de_seguridad(cfg.ruta, cfg.copias_de_seguridad)
+    antes = _contenido(ws)
 
     notas = _leer_notas(ws, cfg.fila_inicial, cfg.columna_inicial,
                         len(df.columns), list(df.columns))
@@ -330,16 +434,9 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
                 if texto.startswith("="):        # que no lo tome por fórmula
                     celda.data_type = "s"
 
+    movidas = huerfanas = sin_sitio = 0
     if notas:
         movidas, huerfanas, sin_sitio = _recolocar_notas(ws, notas, df, f0)
-        if movidas:
-            print(f"   ℹ️  {movidas} notas tuyas recolocadas junto a su movimiento "
-                  f"(han entrado movimientos por medio).")
-        if huerfanas or sin_sitio:
-            print(f"   ⚠️  {huerfanas + sin_sitio} notas tuyas no he podido "
-                  f"ponerlas junto a su movimiento (ya no se vuelca, o el sitio\n"
-                  f"      estaba ocupado): se han quedado donde estaban. Están "
-                  f"como antes en la copia {copia}.")
 
     # Si esta vez hay menos filas que la anterior, no basta con vaciarlas: se
     # eliminan, o la hoja arrastra para siempre el rango usado más grande.
@@ -350,14 +447,35 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
     # en las columnas que nos tocan, y lo único que se pierde es el recorte del
     # rango usado, que es cosmético. Perder las notas del usuario no lo es.
     ultima = f0 + len(df)
+    filas_conservadas = False
     if ws.max_row > ultima:
         if _hay_datos_fuera_del_bloque(ws, c0, len(df.columns), ultima + 1):
-            print(f"   ℹ️  Por debajo de la fila {ultima} hay datos tuyos fuera "
-                  f"de las columnas que vuelco.")
-            print(f"      He vaciado esas filas en el bloque volcado, pero no las "
-                  f"he borrado, para no llevarme lo demás.")
+            filas_conservadas = True
         else:
             ws.delete_rows(ultima + 1, ws.max_row - ultima)
+
+    # Sin nada nuevo, ni se guarda ni se copia. Antes cada ejecución gastaba
+    # una copia de seguridad aunque no cambiara nada, y a las diez la única
+    # anterior a la primera sincronización (la que tiene tus datos de antes)
+    # se borraba sola.
+    if _contenido(ws) == antes:
+        wb.close()
+        return None, len(df)
+
+    copia = copia_de_seguridad(cfg.ruta, cfg.copias_de_seguridad)
+    if movidas:
+        print(f"   ℹ️  {movidas} notas tuyas recolocadas junto a su movimiento "
+              f"(han entrado movimientos por medio).")
+    if huerfanas or sin_sitio:
+        print(f"   ⚠️  {huerfanas + sin_sitio} notas tuyas no he podido "
+              f"ponerlas junto a su movimiento (ya no se vuelca, o el sitio\n"
+              f"      estaba ocupado): se han quedado donde estaban. Están "
+              f"como antes en la copia {copia}.")
+    if filas_conservadas:
+        print(f"   ℹ️  Por debajo de la fila {ultima} hay datos tuyos fuera "
+              f"de las columnas que vuelco.")
+        print(f"      He vaciado esas filas en el bloque volcado, pero no las "
+              f"he borrado, para no llevarme lo demás.")
 
     try:
         wb.save(cfg.ruta)
@@ -366,5 +484,4 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str, int]:
                            f"otro programa. Tu copia de seguridad está en {copia}.")
     finally:
         wb.close()
-
     return copia, len(df)

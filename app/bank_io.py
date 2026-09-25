@@ -298,7 +298,7 @@ ALIAS_COLUMNAS = {
     "descripcion": [
         "concepto", "concepto ampliado", "descripcion", "descripcion ampliada",
         "detalle", "comercio", "establecimiento", "movimiento", "observaciones",
-        "concepto comun", "description",
+        "concepto comun", "description", "payee", "counterparty",
     ],
     "importe": [
         "importe de la operacion", "importe operacion", "importe eur",
@@ -311,6 +311,21 @@ ALIAS_COLUMNAS = {
     # movimiento que se tiene.
     "saldo": ["saldo", "saldo posterior", "saldo disponible"],
 }
+
+# Algunos bancos no dan un importe con signo sino DOS columnas: lo que sale
+# (Cargo, Debe) y lo que entra (Abono, Haber). Solo se usan si no hay columna
+# de importe, y solo por coincidencia EXACTA: «cargo» a secas aparece dentro
+# de cabeceras que no son importes («tipo de cargo», «fecha de cargo»).
+ALIAS_CARGO = ["cargo", "cargos", "debe", "debito", "debit", "importe cargo"]
+ALIAS_ABONO = ["abono", "abonos", "haber", "credito", "credit", "importe abono"]
+
+
+def _columna_exacta(cabecera, alias) -> int | None:
+    normalizadas = [normalizar_cabecera(c) for c in cabecera]
+    for a in alias:
+        if a in normalizadas:
+            return normalizadas.index(a)
+    return None
 
 
 def _puntuar_fila_cabecera(fila, requeridas) -> int:
@@ -458,6 +473,16 @@ def parsear_fecha(valor):
     return pd.to_datetime(s, dayfirst=True, errors="coerce")
 
 
+def _importe_de_dos_columnas(cargo, abono):
+    """Lo que entra menos lo que sale. Hay bancos que ponen el cargo en
+    positivo y otros en negativo: cuenta lo que vale, no el signo que traiga.
+    Las dos vacías es una fila sin importe (None), no un movimiento de 0 €."""
+    c, a = parsear_importe(cargo), parsear_importe(abono)
+    if c is None and a is None:
+        return None
+    return abs(a or 0.0) - abs(c or 0.0)
+
+
 # =====================================================================
 # 5. FUNCIÓN PRINCIPAL
 # =====================================================================
@@ -481,6 +506,14 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
     candidatas = []
     for tabla in tablas:
         i = localizar_cabecera(tabla, requeridas)
+        if i < 0 and "importe" in requeridas:
+            # sin columna de importe la cabecera puntúa de menos; con Cargo y
+            # Abono, se busca sin exigir el importe
+            sin_importe = tuple(c for c in requeridas if c != "importe")
+            j = localizar_cabecera(tabla, sin_importe)
+            if j >= 0 and _columna_exacta(tabla[j], ALIAS_CARGO) is not None \
+                    and _columna_exacta(tabla[j], ALIAS_ABONO) is not None:
+                i = j
         if i >= 0:
             candidatas.append((len(tabla) - i, i, tabla))
     if not candidatas:
@@ -494,7 +527,14 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
     _, idx_cab, tabla = max(candidatas)          # la tabla con más datos útiles
     cabecera = tabla[idx_cab]
     mapa = mapear_columnas(cabecera, requeridas)
-    faltan = [c for c in requeridas if c not in mapa]
+    cargo_abono = None
+    if "importe" not in mapa:
+        cargo = _columna_exacta(cabecera, ALIAS_CARGO)
+        abono = _columna_exacta(cabecera, ALIAS_ABONO)
+        if cargo is not None and abono is not None:
+            cargo_abono = (cargo, abono)
+    faltan = [c for c in requeridas
+              if c not in mapa and not (c == "importe" and cargo_abono)]
     if faltan:
         raise RuntimeError(
             f"'{nombre}': no localizo las columnas {faltan}. "
@@ -514,11 +554,15 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
         reg = {}
         for campo, col in mapa.items():
             reg[campo] = fila[col] if col < len(fila) else None
+        if cargo_abono:
+            reg["importe"] = _importe_de_dos_columnas(
+                *(fila[c] if c < len(fila) else None for c in cargo_abono))
         registros.append(reg)
 
     df = pd.DataFrame(registros, columns=list(requeridas) + ["saldo"])
     df["fecha"] = df["fecha"].map(parsear_fecha)
-    df["importe"] = df["importe"].map(parsear_importe)
+    if not cargo_abono:
+        df["importe"] = df["importe"].map(parsear_importe)
     df["saldo"] = df["saldo"].map(parsear_importe)
     df["descripcion"] = df["descripcion"].map(
         lambda v: "" if v is None else str(v).strip()

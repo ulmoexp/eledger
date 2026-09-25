@@ -576,8 +576,46 @@ def _texto_seguro(ws):
                 celda.data_type = "s"
 
 
+HOJAS_PROPIAS = (HOJA_RESUMEN, HOJA_MOVIMIENTOS, HOJA_META)
+
+
+def hojas_ajenas(ruta) -> list[str]:
+    """Las hojas que alguien ha añadido a mano al histórico. Se pierden al
+    regenerarlo, y hay que decirlo: antes desaparecían sin más."""
+    if not os.path.exists(ruta):
+        return []
+    from openpyxl import load_workbook
+    try:
+        wb = load_workbook(ruta, read_only=True)
+    except Exception:
+        return []
+    ajenas = [h for h in wb.sheetnames if h not in HOJAS_PROPIAS]
+    wb.close()
+    return ajenas
+
+
 def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
             catalogo, version: str = VERSION_SIN_SELLO, saldo_real=True) -> None:
+    """
+    Se escribe en un fichero temporal al lado y solo al final se pone en su
+    sitio. Escribiendo directamente, un fallo a mitad (una etiqueta repetida
+    en categorias.json tiraba el programa al dar formato) dejaba el histórico
+    a medias: sin gráficos, sin formato y con las hojas en otro orden. Y en
+    la siguiente ejecución esa versión rota era la que acababa en las copias.
+    """
+    carpeta, nombre = os.path.split(os.path.abspath(ruta))
+    temporal = os.path.join(carpeta, f".{nombre}.escribiendo.xlsx")
+    try:
+        _escribir(temporal, movimientos, resumen, catalogo, version, saldo_real)
+        # en Windows, si el de verdad está abierto, esto da PermissionError,
+        # que es lo que espera quien llama para ir a una copia
+        os.replace(temporal, ruta)
+    finally:
+        if os.path.exists(temporal):
+            os.remove(temporal)
+
+
+def _escribir(ruta, movimientos, resumen, catalogo, version, saldo_real):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 

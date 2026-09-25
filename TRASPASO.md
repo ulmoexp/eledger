@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          99 casos, 385 comprobaciones, ~2 min
+python pruebas/probar.py          114 casos, 415 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -102,8 +102,9 @@ reste de su categoría ya es lo correcto. Hay un caso de prueba que lo fija.
 **Descuadres silenciosos.** Es la clase de fallo que más ha aparecido: un
 movimiento acaba en una categoría que no es columna de ninguna suma del resumen
 y desaparece de los totales sin restar de nada. Hay tres cerrojos: la
-`categoria_manual` inválida se ignora, las reglas de la base a categorías no
-declaradas se descartan, y `Catalogo.validar()` avisa de desajustes.
+`categoria_manual` inválida se ignora, las reglas a categorías no declaradas
+se descartan (las de la base y, desde la 2.13.0, también las del usuario), y
+`Catalogo.validar()` avisa de desajustes.
 **Si añades una vía nueva por la que pueda salir una categoría, ponle su
 cerrojo.**
 

@@ -5,6 +5,13 @@ Siete perfiles: cinco nuevos más Marta y Ana repitiendo. Notas de 7 (pareja),
 7 (Marta) y 8 (Ana): media 6,6, igual que la ronda 1. Informes completos en
 `ronda2/`. Lo marcado «comprobado» se reprodujo a mano o se vio en el código.
 
+**Arreglado en la 2.13.0**: todo lo de «Graves» y de «Menores», salvo lo que
+se indica. Sin tocar: el aviso de doble conteo con tarjeta de débito (ya
+descartado en la ronda 1), el ejemplo de autónomo y los totales por
+trimestre en la guía, la web (`../eledger-web`, que sigue prometiendo
+«cualquier banco») y las peticiones de producto. Cada arreglo tiene su caso
+en `probar.py`, en el bloque «regresiones de la ronda 2 del piloto».
+
 ## Lo arreglado en la 2.12.1 sigue arreglado
 
 - Declarar `cuentas.json` después de la primera ejecución ya no duplica

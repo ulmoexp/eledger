@@ -397,8 +397,10 @@ story += [tabla(
 story += [Spacer(1, 6)]
 story += [Paragraph(
     "También se resuelven solos: la fila de cabecera (esté donde esté), los nombres de "
-    "columna según banco (<i>Importe</i>, <i>Importe de la operación</i>, <i>Cantidad</i>…), "
-    "los acentos, y los importes en formato español "
+    "columna según banco (<i>Importe</i>, <i>Importe de la operación</i>, <i>Cantidad</i>, "
+    "y los de los neobancos en inglés: <i>Amount</i>, <i>Description</i>, <i>Payee</i>…), "
+    "el importe partido en dos columnas (<i>Cargo</i> y <i>Abono</i>, o <i>Debe</i> y "
+    "<i>Haber</i>), los acentos, y los importes en formato español "
     "(<font face='Mono' size='8.2'>1.234,56 €</font>, "
     "<font face='Mono' size='8.2'>(45,00)</font>, "
     "<font face='Mono' size='8.2'>12,50-</font>).", S["pmini"])]
@@ -527,6 +529,15 @@ story += [aviso(
     "exactamente lo correcto. El signo solo hace falta cuando el importe positivo es "
     "un concepto <b>distinto</b> del negativo (Bizum recibido / enviado, prestación / "
     "cuota), no cuando es la devolución del mismo gasto.")]
+story += [Spacer(1, 5)]
+story += [Paragraph(
+    "<b>Los Bizum de amigos que te devuelven una cena</b> entran como ingreso con la "
+    "regla de fábrica. Si prefieres que resten de lo que gastaste, pon delante una "
+    "regla con la palabra que usan tus amigos: con "
+    "<font face='Mono' size='8.2'>\"=cena\": \"Ocio\"</font>, el Bizum que envías "
+    "para pagar la cena suma a Ocio y el que te devuelven le resta, igual que una "
+    "devolución. Si la cena la pagaste con tarjeta, Ocio puede quedar en negativo "
+    "ese mes: es correcto.", S["pmini"])]
 story += [Spacer(1, 8)]
 story += [Paragraph("Añadir reglas", S["h2"])]
 story += [codigo([
@@ -538,7 +549,8 @@ story += [Paragraph(
     "Si la categoría es <b>nueva</b>, declárala también en "
     "<font face='Mono' size='8.2'>categorias.json</font> (como gasto, ingreso o "
     "neutra): si no, las reglas que la usan se descartan y se avisa al ejecutar, "
-    "porque no sumaría en ninguna columna del resumen. "
+    "porque no sumaría en ninguna columna del resumen; esos movimientos siguen con "
+    "las demás reglas, como si la tuya no estuviera. "
     "Usa <font face='Mono' size='8.2'>=</font> siempre que la palabra sea corta "
     "(3-4 letras) o pueda aparecer dentro de otra. Sin ese marcador, "
     "<font face='Mono' size='8.2'>bar</font> se comería BARCELONA y "
@@ -597,11 +609,14 @@ story += [Paragraph(
     "comprobar que no se ha ido nada de más.", S["pmini"])]
 story += [EE]
 
-story += [h1("cuentas.json · si tienes más de una cuenta"), E]
+story += [h1("cuentas.json · varias cuentas o tarjetas"), E]
 story += [p(
-    "Solo hace falta si tienes <b>más de una cuenta del mismo tipo</b> (dos cuentas "
-    "corrientes, por ejemplo). Sin esto, un movimiento idéntico el mismo día en dos "
-    "cuentas distintas se cuenta una sola vez, como si fuera el mismo.")]
+    "Solo hace falta si tienes <b>más de una cuenta o tarjeta del mismo tipo</b> (dos "
+    "cuentas corrientes, o una tarjeta cada miembro de la pareja). Sin esto, un "
+    "movimiento idéntico el mismo día en las dos se cuenta una sola vez, como si "
+    "fuera el mismo: dos cafés de 2,60 €, uno en cada tarjeta, serían uno. Si ve dos "
+    "ficheros del mismo tipo que cubren las mismas fechas sin parecerse, la "
+    "herramienta avisa de que te hace falta.")]
 story += [codigo([
     '{',
     '  "principal": "principal",',
@@ -620,6 +635,14 @@ story += [Paragraph(
     "Vacío (como viene de fábrica), todos los ficheros cuentan como si fueran de la "
     "misma cuenta: es el comportamiento de siempre, y quien solo tiene una cuenta no "
     "nota ningún cambio.", S["pmini"])]
+story += [Spacer(1, 5)]
+story += [aviso(
+    "Una vez declaradas, el nombre del fichero importa",
+    "Cada descarga tiene que llevar en el nombre lo que identifica a su cuenta. Un "
+    "fichero que no casa con ninguna (el «movimientos (1).xls» de volver a "
+    "descargar) cuenta como una cuenta más. Si sus movimientos ya están en una de "
+    "las declaradas, es otra descarga de ella con otro nombre: <b>no se lee</b>, para "
+    "no contarlo dos veces, y se avisa de que lo renombres.")]
 
 story += [h1("El histórico"), E]
 story += [p(
@@ -650,6 +673,12 @@ story += [aviso(
     "única excepción es lo que escribas en <font face='Mono'>categoria_manual</font>: "
     "eso sí se respeta.",
     ACENTO, ACENTO_CL)]
+story += [Spacer(1, 5)]
+story += [Paragraph(
+    "Por lo mismo, el fichero se <b>regenera entero</b>: una hoja que le añadas a "
+    "mano no llega a la siguiente ejecución (se avisa, y queda en la copia de "
+    "<font face='Mono' size='8.2'>datos/copias/</font>). Para tus cálculos, usa un "
+    "libro aparte, o la sincronización.", S["pmini"])]
 story += [EE]
 
 story += [h1("Corregir un movimiento suelto"), E]
@@ -713,7 +742,9 @@ story += [tabla(
       "se agrupa el resumen."],
      ["<font face='Mono'>etiquetas</font>",
       "<i>Opcional.</i> Nombre interno → texto de columna, para cambiar cómo se ve "
-      "una columna sin arriesgar el cuadre letra-por-letra con rules.json."],
+      "una columna sin arriesgar el cuadre letra-por-letra con rules.json. Dos "
+      "columnas no pueden acabar con el mismo nombre: la etiqueta que choque se "
+      "ignora y se avisa. Para juntar dos categorías, lleva sus reglas a una."],
      ["<font face='Mono'>orden_resumen</font>",
       "<i>Opcional.</i> Qué columnas salen y en qué orden, incluidas las de sistema "
       "(Balance, Acumulado...), normalmente fijas al final. Sin él, el orden de "
@@ -733,6 +764,15 @@ story += [aviso(
     "también. Al arrancar se comparan los dos ficheros y se avisa de las que sobran, "
     "las que faltan y las que solo se diferencian en una tilde o una mayúscula.")]
 story += [Spacer(1, 7)]
+story += [Paragraph(
+    "<b>Renombrar una categoría tiene un precio:</b> las reglas de la base que "
+    "apuntaban al nombre viejo se descartan (lo dice al arrancar, con cuántas), y "
+    "esos comercios dejan de clasificarse solos. Si solo quieres que la columna se "
+    "vea con otro nombre, usa <font face='Mono' size='8.2'>etiquetas</font>. De "
+    "fábrica hay también una categoría <b>Impuestos</b> (pagos a Hacienda y la cuota "
+    "de autónomos); si no la quieres, quítala y esos cargos irán a Otros.",
+    S["pmini"])]
+story += [Spacer(1, 5)]
 story += [Paragraph(
     "Por eso los nombres de categoría van <b>sin tildes</b>: así no hay dos maneras de "
     "escribir lo mismo. Y ojo, lo que se declara aquí es el <b>criterio</b> de la "
@@ -823,7 +863,10 @@ story += [p(
     "directamente en tu fichero. Se configura en "
     "<font face='Mono' size='8.6'>sincronizar.json</font>; si ese fichero no existe o "
     "dejas <font face='Mono' size='8.6'>archivo</font> vacío, no se sincroniza nada y "
-    "todo funciona como antes.")]
+    "todo funciona como antes. Una ruta sin carpeta (solo el nombre) se busca en la "
+    "carpeta de la herramienta, la que tiene <font face='Mono' size='8.6'>entrada/</font> "
+    "y <font face='Mono' size='8.6'>ajustes/</font>, no dentro de "
+    "<font face='Mono' size='8.6'>ajustes/</font>.")]
 story += [codigo([
     '{',
     '  "archivo": "contabilidad.xlsx",',
@@ -834,6 +877,15 @@ story += [codigo([
     '  "copias_de_seguridad": 10',
     '}',
 ])]
+story += [Spacer(1, 7)]
+story += [aviso(
+    "La hoja es de la herramienta, no se añade debajo",
+    "En cada ejecución se vuelca la tabla <b>entera</b> a partir de la esquina "
+    "(<font face='Mono'>fila_inicial</font>, <font face='Mono'>columna_inicial</font>), "
+    "con estas columnas: fecha, descripcion, importe, tipo, mes, mes_ajustado y "
+    "categoria. Usa una hoja vacía para ella y haz que tus fórmulas tiren de ahí "
+    "(por ejemplo <font face='Mono'>=SUMIF(Banco!G:G;\"Comida\";Banco!C:C)</font>). "
+    "Si en la esquina hay una tabla tuya con otras cabeceras, no se escribe.")]
 story += [Spacer(1, 7)]
 story += [Paragraph("Qué se conserva de tu libro", S["h2"])]
 story += [p(
@@ -856,8 +908,11 @@ story += [tabla(
       "datos."],
      ["El nombre de la hoja está mal escrito",
       "Se cancela y se listan las hojas que sí existen."],
-     ["El libro está abierto en OnlyOffice o Excel",
-      "Se avisa de que lo cierres. No se escribe a medias."],
+     ["El libro está abierto en OnlyOffice, LibreOffice o Excel",
+      "Se avisa de que lo guardes y lo cierres, y no se escribe: al guardar tú "
+      "después, se perdería lo volcado."],
+     ["En la esquina hay datos tuyos con otras cabeceras",
+      "No se escribe, para no borrarlos. Se dice qué columnas escribiría."],
      ["Tienes notas tuyas al lado de los movimientos",
       "Se recolocan junto a su movimiento aunque entren otros por medio. Si una ya no "
       "tiene movimiento al que acompañar, se queda donde estaba y se avisa."],
@@ -865,7 +920,8 @@ story += [tabla(
       "Las filas sobrantes se eliminan, no quedan restos debajo."],
      ["Cualquier otro fallo",
       "Se hace una copia con fecha en <font face='Mono'>datos/copias/</font> ANTES de cada "
-      "escritura. Se guardan las 10 últimas."]],
+      "escritura. Se guardan las 10 últimas. Si no hay nada nuevo, el fichero no se "
+      "toca y no se gasta ninguna."]],
     [ANCHO * 0.40, ANCHO * 0.60])]
 story += [EE]
 
@@ -949,6 +1005,9 @@ story += [tabla(
       "<font face='Mono'>.</font> o <font face='Mono'>~$</font> se ignoran a propósito, "
       "y también los que no tengan una extensión conocida. Comprueba que lo que has "
       "soltado no es un <font face='Mono'>.zip</font> ni un <font face='Mono'>.pdf</font>."],
+     ["<i>«no he podido leer ningún extracto de entrada/»</i>",
+      "Hay ficheros, pero ninguno se ha podido leer. El motivo de cada uno sale en los "
+      "avisos, justo encima."],
      ["Falta un fichero entero",
       "Mira el listado que sale por pantalla: si un fichero no aparece ahí, no se ha "
       "leído. Si aparece con un aviso, el aviso dice por qué."],

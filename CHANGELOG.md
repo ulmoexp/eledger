@@ -6,6 +6,66 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.13.0
+
+Arreglos de la segunda ronda del piloto con usuarios simulados.
+
+- **Con varias cuentas declaradas, volver a descargar un extracto con otro
+  nombre ya no lo duplica.** Un «movimientos (1).xls» que no casaba con
+  ninguna cuenta de `cuentas.json` entraba como una cuenta más y todo lo
+  suyo contaba dos veces, con el cuadre en verde. Ahora, si sus
+  movimientos ya están en una cuenta declarada, no se lee y se avisa de
+  que lo renombres.
+- **Dos tarjetas (o cuentas) sin declarar: se avisa.** Un cargo idéntico el
+  mismo día en las dos (dos cafés iguales, uno en cada tarjeta) se contaba
+  una sola vez sin decir nada. Ahora, si dos ficheros del mismo tipo cubren
+  las mismas fechas sin parecerse, se avisa de cuánto falta y de que hay
+  que declararlas en `cuentas.json`.
+- **Cobrar de una comunidad de propietarios es un ingreso.** La regla de
+  fábrica de la comunidad no miraba el signo, y un autónomo que factura a
+  una comunidad veía esos cobros en Piso, restando. Ahora solo clasifica
+  los cargos.
+- **Una regla tuya con una categoría mal escrita se descarta**, como ya se
+  hacía con las de la base. Antes se aplicaba y el movimiento se salía de
+  Total Gastos para ir a «Fuera del balance». Ahora sigue con las demás
+  reglas y el aviso dice qué regla es.
+- **Dos etiquetas con el mismo nombre ya no rompen el programa.** Además de
+  caerse, dejaban el histórico a medias (sin gráficos ni formato). Ahora
+  la etiqueta que choca se ignora y se avisa; y el histórico se escribe
+  aparte y solo se pone en su sitio al terminar, así que un fallo a mitad
+  ya no lo estropea.
+- **Sincronización con tu fichero:**
+  - no escribe encima de una tabla tuya: si en la esquina configurada hay
+    otras cabeceras (tu hoja de siempre), se niega y explica qué columnas
+    escribiría. Antes la reescribía entera y tus fórmulas pasaban a sumar
+    otra cosa;
+  - detecta que el fichero está abierto en LibreOffice, OnlyOffice o Excel
+    y no escribe;
+  - si no hay nada nuevo, no toca el fichero ni gasta una copia de
+    seguridad (antes, a las diez ejecuciones se perdía la copia buena).
+- **Se leen más formatos:** el importe en dos columnas (Cargo y Abono, Debe
+  y Haber) y los CSV de neobancos con la columna «Payee» (N26).
+- **Detección del recibo de la tarjeta con dos tarjetas:** busca el recibo
+  de cada una por separado, y un grupo que parece ese recibo ya no recibe
+  en «Sin clasificar» la sugerencia de ponerle categoría.
+- **«Sin clasificar» con dinero que entra** propone lo común a todos los
+  cobros («transf») en vez del nombre de un solo cliente, y la devolución
+  de una compra va en el grupo de su comercio.
+- Mensajes y detalles:
+  - si hay ficheros en `entrada/` pero ninguno se puede leer, lo dice (antes
+    decía que la carpeta estaba vacía);
+  - una hoja que añadas a mano al histórico avisa de que no se conserva y
+    de en qué copia está;
+  - el impuesto de vehículos del ayuntamiento tiene regla (Transporte);
+  - `reglas.py` admite varios conceptos, cada uno con su importe:
+    `"BIZUM DE X" 25 "BIZUM A Y" -18`.
+- Guía: cuentas.json también para tarjetas, qué columnas escribe la
+  sincronización y que la hoja es solo suya, a qué carpeta es relativo
+  `archivo`, el precio de renombrar categorías, la categoría Impuestos y
+  cómo tratar los Bizum de amigos que te devuelven una cena.
+
+---
+
 ## 2.12.1
 
 Arreglos que salieron de un piloto con usuarios simulados.

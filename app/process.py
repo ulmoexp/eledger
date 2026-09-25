@@ -308,36 +308,9 @@ def guardar_excel(df, ruta):
 # otros libros o cambios que no se querían guardar. Guardar y cerrar lo hace
 # la persona, que es quien sabe si lo que tiene escrito vale.
 
-def _ficheros_de_bloqueo(ruta):
-    """Los que deja al lado quien tiene el fichero abierto. Excel: «~$» más
-    el nombre (con los dos primeros caracteres recortados en nombres
-    largos, según versión). LibreOffice y OnlyOffice: «.~lock.nombre#»."""
-    nombre = ruta.name
-    return [ruta.with_name(n) for n in
-            (f"~${nombre}", f"~${nombre[2:]}", f".~lock.{nombre}#")]
-
-
-def esta_abierto(ruta):
-    """
-    None si se puede escribir sin miedo. Si no, cómo se ha sabido:
-    "sistema" (Windows lo tiene bloqueado: seguro que está abierto) o el
-    fichero de bloqueo encontrado (casi seguro, pero puede ser un resto de
-    un programa que se cerró en falso y no lo borró).
-    """
-    if not ruta.exists():
-        return None
-    if os.name == "nt":
-        try:
-            with open(ruta, "r+b"):
-                pass
-        except PermissionError:
-            return "sistema"
-        except OSError:
-            pass
-    for bloqueo in _ficheros_de_bloqueo(ruta):
-        if bloqueo.exists():
-            return bloqueo
-    return None
+# Cómo se sabe si un fichero está abierto (esta_abierto) vive en
+# sincronizar.py: lo usan también para el fichero de contabilidad.
+esta_abierto = sync.esta_abierto
 
 
 def ruta_de_copia(ruta):
@@ -698,6 +671,115 @@ def asignar_cuentas_pendientes(previo) -> int:
     return int(nuevas.ne("").sum())
 
 
+# ========= FICHEROS QUE NO CASAN CON SU CUENTA =========
+# La clave de duplicados lleva la cuenta (hito A3). Eso tiene dos caras:
+#   · con cuentas.json declarado, un fichero cuyo nombre no casa con ningún
+#     patrón (el «movimientos (1).xls» de volver a descargar) entraba como
+#     una cuenta más, sin identificar, y TODO lo suyo se sumaba dos veces;
+#     el cuadre ni se inmutaba, porque esa «cuenta» cuadra consigo misma.
+#   · sin declararlo, dos tarjetas (o cuentas) con un cargo idéntico el
+#     mismo día se funden en uno, que es lo documentado, pero quien tiene
+#     dos tarjetas no sabía que le tocaba declararlas.
+_PARECIDO_MINIMO = 0.5        # fracción de movimientos compartidos a partir
+                              # de la cual dos ficheros son la misma cuenta
+_SOLAPE_MINIMO_DIAS = 7       # por debajo, dos ficheros consecutivos (julio y
+                              # agosto) no dicen nada de si son la misma
+
+
+def _claves_sin_cuenta(df) -> pd.Series:
+    """La clave de duplicados sin la cuenta, con su número de repetición:
+    dos cafés iguales el mismo día son dos claves, no una."""
+    base = hist._clave(df.assign(cuenta=""))
+    return base + "#" + base.groupby(base).cumcount().astype(str)
+
+
+def apartar_copias_sin_cuenta(previo, nuevos):
+    """
+    Con cuentas declaradas, un fichero que no casa con ninguna y cuyos
+    movimientos ya están (en su mayoría) en una cuenta declarada es otra
+    descarga de esa cuenta con otro nombre: NO se lee, y se dice cómo
+    arreglarlo. Si no se parece a ninguna, es una cuenta más y entra como
+    siempre.
+    """
+    if not identificador_cuentas.reglas:
+        return nuevos
+    conocidas = {}
+    for df in [previo] + list(nuevos):
+        con_cuenta = df[df["cuenta"].ne("")]
+        for cuenta, grupo in con_cuenta.groupby("cuenta"):
+            conocidas.setdefault(cuenta, set()).update(_claves_sin_cuenta(grupo))
+    if not conocidas:
+        return nuevos
+
+    quedan = []
+    for df in nuevos:
+        if df.empty or (df["cuenta"] != "").any():
+            quedan.append(df)
+            continue
+        claves = set(_claves_sin_cuenta(df))
+        cuenta, comunes = max(((c, len(claves & k)) for c, k in conocidas.items()),
+                              key=lambda x: x[1])
+        if comunes < _PARECIDO_MINIMO * len(claves):
+            quedan.append(df)
+            continue
+        nombre = df["origen"].iloc[0]
+        print(f"     " + amarillo(f"⚠️  {nombre}: parece otra descarga de "
+                                  f"«{cuenta}»; no lo leo"))
+        avisar(f"No he leído {nombre}: parece otra descarga de «{cuenta}»", [
+            f"Su nombre no casa con ninguna cuenta de "
+            f"{rutas.relativa(rutas.CUENTAS)}, y {comunes} de sus {len(claves)} "
+            f"movimientos ya están en «{cuenta}». Si lo leyera, entraría como "
+            f"una cuenta aparte y todo lo suyo se contaría dos veces.",
+            f"Renómbralo para que lleve lo que identifica a «{cuenta}» en el "
+            f"nombre (o añade un patrón para él en cuentas.json) y vuelve a "
+            f"ejecutar."])
+    return quedan
+
+
+def avisar_cuentas_sin_declarar(nuevos):
+    """
+    Sin cuentas.json: dos ficheros del mismo tipo que cubren las mismas
+    fechas pero casi no comparten movimientos no son dos descargas de lo
+    mismo, sino dos tarjetas (o cuentas). Se avisa, con lo que se ha
+    fundido si ya ha pasado.
+    """
+    if identificador_cuentas.reglas or len(nuevos) < 2:
+        return
+    for i, a in enumerate(nuevos):
+        for b in nuevos[i + 1:]:
+            if a.empty or b.empty or a["tipo"].iloc[0] != b["tipo"].iloc[0]:
+                continue
+            desde = max(a["fecha"].min(), b["fecha"].min())
+            hasta = min(a["fecha"].max(), b["fecha"].max())
+            if (hasta - desde).days < _SOLAPE_MINIMO_DIAS:
+                continue
+            en_a = a[(a["fecha"] >= desde) & (a["fecha"] <= hasta)]
+            en_b = b[(b["fecha"] >= desde) & (b["fecha"] <= hasta)]
+            menor = min(len(en_a), len(en_b))
+            if menor < 3:
+                continue
+            claves_a = _claves_sin_cuenta(en_a)
+            comunes = set(claves_a) & set(_claves_sin_cuenta(en_b))
+            if len(comunes) >= _PARECIDO_MINIMO * menor:
+                continue
+            tipo = a["tipo"].iloc[0]
+            que = "tarjetas" if tipo == "tarjeta" else "cuentas"
+            lineas = [f"«{a['origen'].iloc[0]}» y «{b['origen'].iloc[0]}» "
+                      f"cubren las mismas fechas pero casi no comparten "
+                      f"movimientos: no son dos descargas de lo mismo. Sin "
+                      f"declararlas, un cargo idéntico el mismo día en las dos "
+                      f"(dos cafés iguales, uno en cada tarjeta) se cuenta "
+                      f"UNA sola vez."]
+            if comunes:
+                fundido = -en_a.loc[claves_a.isin(comunes).values, "importe"].sum()
+                lineas.append(f"Aquí ha pasado con {len(comunes)}: faltan "
+                              f"{euros(fundido)} en los totales.")
+            lineas.append(f"Decláralas en {rutas.relativa(rutas.CUENTAS)}, con "
+                          f"una parte del nombre de cada fichero (la guía lo "
+                          f"explica en «Varias cuentas o tarjetas»).")
+            avisar(f"Parecen dos {que} distintas sin declarar", lineas)
+
+
 # ========= CUADRE CON EL SALDO DEL BANCO =========
 # El Acumulado del resumen es saldo inicial + movimientos de cuenta. Si falta
 # alguno (un hueco entre dos extractos, una fila que el lector ha descartado,
@@ -846,7 +928,11 @@ def _agrupar_sin_clasificar(sin_regla):
         filas_de = {}
         for i in pendientes:
             for palabra in candidatas[i]:
-                gasto[palabra] = gasto.get(palabra, 0.0) - sin_regla.at[i, "importe"]
+                # en valor absoluto: se llama con un solo signo cada vez (ver
+                # informe_sin_clasificar), y con el signo tal cual, en lo que
+                # ENTRA ganaba la palabra de MENOS importe (el nombre de un
+                # solo cliente en vez de lo común a todos sus cobros)
+                gasto[palabra] = gasto.get(palabra, 0.0) + abs(sin_regla.at[i, "importe"])
                 filas_de.setdefault(palabra, []).append(i)
         if not gasto:
             break
@@ -893,7 +979,18 @@ def _sugerir_regla(grupo, palabra_principal, descripciones_clasificadas):
     return None
 
 
-def informe_sin_clasificar(df, ignorar=frozenset()):
+# Palabras de un recibo de tarjeta: con tarjeta y sin nada excluido, un grupo
+# así es el recibo, y ponerle categoría contaría las compras dos veces.
+_PALABRAS_RECIBO_TARJETA = {"tarjeta", "tarj", "visa", "mastercard",
+                            "liquidacion", "liq"}
+
+
+def _parece_recibo_tarjeta(filas) -> bool:
+    return all(set(re.findall(r"[a-z]+", normalizar(d))) & _PALABRAS_RECIBO_TARJETA
+               for d in filas["descripcion"]) and filas["importe"].sum() < 0
+
+
+def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
     """
     Hito A1 del roadmap: qué se ha quedado en Otros SIN que ninguna regla
     casara. `regla == ""` es justo eso (ver clasificar()): por construcción
@@ -904,12 +1001,30 @@ def informe_sin_clasificar(df, ignorar=frozenset()):
 
     ignorar: descripciones que otro aviso ya resuelve (el recibo de la
     tarjeta, que hay que excluir, no clasificar).
+
+    tarjeta_sin_excluir: hay tarjeta y nada excluido, pero el detector no ha
+    dado con el recibo. Un grupo que lo parezca no recibe sugerencia de
+    categoría, que era el consejo contrario al del aviso de la tarjeta.
     """
     sin_regla = df[(df["regla"] == "") & ~df["descripcion"].isin(ignorar)]
     if sin_regla.empty:
         return
 
-    grupos = _agrupar_sin_clasificar(sin_regla)
+    # lo que sale y lo que entra, cada uno por su lado: una palabra común a
+    # un cobro y a un cargo no hace de ellos un grupo, y la regla que se
+    # propone es distinta para cada lado
+    # Excepción: un abono con la palabra de un grupo de cargos es su
+    # devolución («DEVOLUCION BRICOMART») y va con él, porque la regla que se
+    # propone para ese comercio también debe cogerla.
+    grupos = _agrupar_sin_clasificar(sin_regla[sin_regla["importe"] < 0])
+    entra = sin_regla[sin_regla["importe"] >= 0]
+    for n, (palabra, filas) in enumerate(grupos):
+        suyas = [i for i in entra.index
+                 if palabra in _palabras_candidatas(entra.at[i, "descripcion"])]
+        if suyas:
+            grupos[n] = (palabra, pd.concat([filas, entra.loc[suyas]]))
+            entra = entra.drop(index=suyas)
+    grupos += _agrupar_sin_clasificar(entra)
     if not grupos:
         return
 
@@ -944,7 +1059,10 @@ def informe_sin_clasificar(df, ignorar=frozenset()):
         print(f"   {cifra}  ·  {len(filas):>3} mov.  ·  {palabra}{tipo}")
         print(gris(f"      ej: {ejemplo}"))
         sugerida = _sugerir_regla(filas, palabra, normalizados)
-        if sugerida and entra:
+        if tarjeta_sin_excluir and _parece_recibo_tarjeta(filas):
+            print("      parece el recibo de la tarjeta: exclúyelo en "
+                  "exclude_patterns.json, no le pongas categoría")
+        elif sugerida and entra:
             print(f'      añade a rules.json:  "{sugerida}": '
                   f'{{"+": "{_PLACEHOLDER_CATEGORIA}"}}')
         elif sugerida:
@@ -1057,11 +1175,32 @@ def detectar_recibo_tarjeta(todo):
         return False, set()
 
     cuenta = todo[todo["tipo"] == "cuenta"]
+    # Con dos tarjetas, cada una se liquida con su propio recibo y la suma de
+    # las dos no cuadra con ninguno: se prueba primero el total del mes y,
+    # si no, cada tarjeta por separado (por su cuenta declarada o, sin
+    # cuentas.json, por el fichero del que sale).
+    tarjeta = todo[todo["tipo"] == "tarjeta"]
+    cual = tarjeta["cuenta"].where(tarjeta["cuenta"].ne(""), tarjeta["origen"])
+    por_tarjeta = tarjeta.groupby([cual, "mes"])["importe"].sum()
+    varias = cual.nunique() > 1
     candidatos = {}
+    usadas = set()
     for mes, importe in tarjeta_por_mes.items():
         fila = _candidato_liquidacion(cuenta, mes, importe)
         if fila is not None:
-            candidatos[mes] = fila
+            candidatos[("", mes)] = (fila, importe)
+            usadas.add(fila.name)
+            continue
+        if not varias:
+            continue
+        for (id_tarjeta, mes_t), importe_t in por_tarjeta.items():
+            if mes_t != mes:
+                continue
+            fila = _candidato_liquidacion(cuenta.drop(index=list(usadas)),
+                                          mes, importe_t)
+            if fila is not None:
+                candidatos[(id_tarjeta, mes)] = (fila, importe_t)
+                usadas.add(fila.name)
 
     titulo = ("Tienes movimientos de tarjeta y ningún patrón en "
               "exclude_patterns.json")
@@ -1074,10 +1213,13 @@ def detectar_recibo_tarjeta(todo):
 
     lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
               "Esto parece el recibo:"]
-    for mes, fila in sorted(candidatos.items()):
-        lineas.append(f"· {mes}: la tarjeta suma {euros(-tarjeta_por_mes[mes])} y "
+    for (id_tarjeta, mes), (fila, importe) in sorted(candidatos.items(),
+                                                     key=lambda x: (x[0][1], x[0][0])):
+        de = f" ({id_tarjeta})" if id_tarjeta else ""
+        lineas.append(f"· {mes}: la tarjeta{de} suma {euros(-importe)} y "
                       f"tu cuenta tiene un cargo de {euros(-fila['importe'])} el "
                       f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
+    candidatos = {k: f for k, (f, _) in candidatos.items()}
 
     ya_usadas = {f.name for f in candidatos.values()}
     otras = [normalizar(d) for i, d in cuenta["descripcion"].items()
@@ -1298,8 +1440,19 @@ def main():
     if not previo.empty:
         print(f"\n📚 Histórico previo: {len(previo)} movimientos.")
     elif not nuevos:
+        # «está vacía» cuando había ficheros que no se han podido leer
+        # mandaba a buscar el problema donde no estaba
+        carpeta = rutas.relativa(rutas.ENTRADA)
+        hay_algo = rutas.ENTRADA.is_dir() and any(
+            not _es_temporal(f) and (rutas.ENTRADA / f).is_file()
+            for f in os.listdir(rutas.ENTRADA))
+        if hay_algo:
+            raise FileNotFoundError(
+                f"No hay histórico y no he podido leer ningún extracto de "
+                f"'{carpeta}/'.\n"
+                f"   El motivo de cada fichero está en los avisos de arriba.")
         raise FileNotFoundError(
-            f"No hay histórico y la carpeta '{rutas.relativa(rutas.ENTRADA)}/' está vacía.\n"
+            f"No hay histórico y la carpeta '{carpeta}/' está vacía.\n"
             f"   Suelta ahí los ficheros que te descargues del banco, con el nombre\n"
             f"   y la extensión que traigan, y vuelve a ejecutar.")
 
@@ -1312,6 +1465,9 @@ def main():
         if len(previo) < antes:
             print(f"🧹 {antes - len(previo)} estaban repetidos (se habían "
                   f"duplicado al declarar las cuentas): quitados.")
+
+    nuevos = apartar_copias_sin_cuenta(previo, nuevos)
+    avisar_cuentas_sin_declarar(nuevos)
 
     crudos, anadidos, repetidos = hist.fusionar(previo, nuevos)
     if repetidos:
@@ -1362,8 +1518,11 @@ def main():
                                      todo[todo["tipo"] == "cuenta"])
     # la copia de seguridad solo si se va a tocar el de verdad: si el
     # resultado va a una copia, el histórico queda como estaba
+    copia_historico = None
+    ajenas = hist.hojas_ajenas(rutas.HISTORICO)
     if os.path.exists(rutas.HISTORICO) and rutas.HISTORICO not in en_copia:
-        sync.copia_de_seguridad(rutas.HISTORICO, cfg_sync.copias_de_seguridad)
+        copia_historico = sync.copia_de_seguridad(rutas.HISTORICO,
+                                                  cfg_sync.copias_de_seguridad)
     copiados = {}
     historico_escrito = guardar_o_copiar(
         rutas.HISTORICO,
@@ -1389,15 +1548,28 @@ def main():
                  f"{hist.HOJA_RESUMEN} y {hist.HOJA_MOVIMIENTOS}"))
     print(f"   {rutas.relativa(limpios_escrito)}  " + gris("·  lo que pegas en A-G"))
     avisar_copias(copiados)
+    if ajenas and historico_escrito == rutas.HISTORICO:
+        cuales = ", ".join(f"«{h}»" for h in ajenas)
+        avisar(f"{rutas.relativa(rutas.HISTORICO)} se regenera entero: {cuales} "
+               f"ya no está", [
+                   f"Lo que añadas a mano al histórico (salvo la columna "
+                   f"categoria_manual) no se conserva de una ejecución a otra. "
+                   f"Está en la copia {rutas.relativa(copia_historico)}.",
+                   "Para tus propios cálculos, usa un libro aparte que tire de "
+                   "este, o la sincronización (ajustes/sincronizar.json)."])
 
     # --- volcado directo en el fichero de contabilidad ---
     if cfg_sync.activa:
         try:
             a_volcar = todo if cfg_sync.incluir_excluidos else df
             copia, filas = sync.escribir(cfg_sync, a_volcar[COLUMNAS_BASE])
-            print(verde(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
-                        f"{filas} filas escritas"))
-            print(gris(f"   copia de seguridad en {copia}"))
+            if copia:
+                print(verde(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
+                            f"{filas} filas escritas"))
+                print(gris(f"   copia de seguridad en {copia}"))
+            else:
+                print(verde(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
+                            f"ya estaba al día ({filas} filas), no lo he tocado"))
         except Exception as e:
             print(f"📗 {cfg_sync.archivo}: " + rojo("✗ no sincronizado")
                   + gris(" (el motivo, en los avisos del final)"))
@@ -1478,7 +1650,8 @@ def main():
     informar_cuadre(comprobar_cuadre(todo))
 
     informe_recurrentes(df, catalogo.gastos)
-    informe_sin_clasificar(df, ignorar=recibos_tarjeta)
+    informe_sin_clasificar(df, ignorar=recibos_tarjeta,
+                           tarjeta_sin_excluir=doble_tarjeta and not recibos_tarjeta)
     # los avisos, lo último antes de salir: juntos, contados y separados de
     # lo demás, que es lo que se lee cuando la ejecución termina
     mostrar_avisos()

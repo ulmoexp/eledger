@@ -28,7 +28,7 @@ repo y activar Pages. Fuera de `/release`, para pushear hay que pedírselo.
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        99 casos, 385 comprobaciones, ~2 min
+python pruebas/probar.py        114 casos, 415 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se
@@ -60,7 +60,7 @@ leyendo el código.
 **Descuadres silenciosos.** Es el fallo recurrente: un movimiento acaba en una
 categoría que no es columna de ninguna suma del resumen y desaparece de los
 totales sin restar de nada. Hay tres cerrojos puestos (`categoria_manual`
-inválida se ignora, reglas de la base a categorías no declaradas se descartan,
+inválida se ignora, reglas —de la base o propias— a categorías no declaradas se descartan,
 `Catalogo.validar()` avisa). **Si abres una vía nueva por la que pueda salir
 una categoría, ponle su cerrojo.**
 

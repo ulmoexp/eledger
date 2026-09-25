@@ -186,6 +186,15 @@ lista. Hasta ahora:
   sincronización siguen a su movimiento, el Acumulado sin saldo ya no se
   llama «saldo», una tanda de mensajes más claros, la categoría Impuestos
   en la plantilla y el guion como espacio al comparar reglas.
+- **2.13.0** — arreglos de la segunda ronda del piloto
+  (`pruebas/piloto/HALLAZGOS_2.md`): otra descarga de una cuenta declarada
+  con otro nombre ya no se duplica, aviso de dos tarjetas sin declarar, la
+  comunidad de propietarios solo en cargos, tus reglas a una categoría
+  inexistente se descartan, etiquetas repetidas no rompen el histórico (que
+  ahora se escribe aparte y se coloca al final), la sincronización no pisa
+  una tabla del usuario, detecta el fichero abierto y no gasta copias sin
+  cambios, lectura de Cargo/Abono y de «Payee», recibo de la tarjeta por
+  tarjeta y «Sin clasificar» por signo.
 
 ## Lo que queda fuera a propósito
 

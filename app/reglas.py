@@ -204,6 +204,8 @@ class Clasificador:
         self.por_defecto_positivo = por_defecto_positivo
         self.reglas = []
         self.descartadas_de_base = []
+        # (clave, [categorías que no existen]) de TUS reglas descartadas
+        self.descartadas_propias = []
         self.desactivadas = []
 
         propias = {k: v for k, v in (reglas or {}).items() if not k.startswith("_")}
@@ -215,10 +217,27 @@ class Clasificador:
                 self.desactivadas.append(clave)
                 continue
             patron, modo = compilar(clave)
-            self.reglas.append(Regla(patron, valor, clave, modo, "tuya"))
+            regla = Regla(patron, valor, clave, modo, "tuya")
+            # Una regla tuya a una categoría que no está en categorias.json
+            # (una errata: «Sofware») se aplicaba igual, y el movimiento se
+            # salía de Total Gastos para ir a parar a «Fuera del balance»: el
+            # descuadre silencioso de siempre, con aviso pero con la cifra ya
+            # mal. Se descarta, como las de la base, y ese movimiento sigue
+            # buscando en las reglas de debajo. Quien la escribió recibe el
+            # aviso por pantalla (Catalogo.validar).
+            if categorias_validas is not None:
+                malas = [c for c in regla.categorias_posibles
+                         if c not in categorias_validas]
+                if malas:
+                    self.descartadas_propias.append((clave, malas))
+                    continue
+            self.reglas.append(regla)
 
+        # una clave tuya DESCARTADA no tapa la de la base: si no, el movimiento
+        # perdía también la regla de fábrica que lo clasificaba bien
+        tapadas = set(propias) - {c for c, _ in self.descartadas_propias}
         for clave, valor in (base or {}).items():
-            if clave.startswith("_") or clave in propias:
+            if clave.startswith("_") or clave in tapadas:
                 continue
             if valor is None:
                 continue
@@ -325,10 +344,38 @@ class Catalogo:
         # vacía, significa que el usuario SÍ ha decidido qué mostrar.
         self.orden_resumen = datos.get("orden_resumen")
         self.desglosar_ingresos = datos.get("desglosar_ingresos", False) is True
+        # lo último: necesita saber ya qué columnas de ingreso hay
+        self.etiquetas_ignoradas = self._quitar_etiquetas_que_chocan()
 
     @property
     def todas(self):
         return self.gastos + self.ingresos + self.neutras
+
+    def _quitar_etiquetas_que_chocan(self) -> list:
+        """
+        Dos columnas del resumen con el mismo nombre visible (dos gastos con
+        la etiqueta «Facturas», o una etiqueta «Balance») tiraban el programa
+        DESPUÉS de empezar a escribir el histórico, que quedaba a medias. Se
+        quitan aquí, al cargar, y se avisa: la columna sale con su nombre de
+        siempre. Juntar dos categorías en una columna no se hace con
+        etiquetas, sino llevando sus reglas a la misma categoría.
+
+        Devuelve [(categoría, etiqueta, con qué choca)].
+        """
+        propias = self.gastos + list(self.columnas_ingreso.values())
+        ignoradas = []
+        for cat, texto in list(self.etiquetas.items()):
+            if cat not in propias:
+                continue                # no se usa; validar() ya lo dice
+            visibles = {self.etiquetas.get(c, c): c for c in propias if c != cat}
+            if texto in self.COLUMNAS_SISTEMA:
+                ignoradas.append((cat, texto, "una columna de sistema"))
+            elif texto in visibles:
+                ignoradas.append((cat, texto, f"la columna de «{visibles[texto]}»"))
+            else:
+                continue
+            del self.etiquetas[cat]
+        return ignoradas
 
     @property
     def ingreso_por_defecto(self) -> str | None:
@@ -378,6 +425,21 @@ class Catalogo:
                         f"diferencian en tildes o mayúsculas. Para Excel son "
                         f"categorías distintas: la columna sumaría 0.")
                     break
+
+        # tus reglas a una categoría que no existe ya no llegan a
+        # clasificador.reglas (se descartan al cargar): se avisa aquí, regla
+        # por regla, para que se sepa cuál corregir
+        for clave, malas in clasificador.descartadas_propias:
+            for mala in malas:
+                parecida = next((de for de in declaradas
+                                 if normalizar(de) == normalizar(mala)), None)
+                motivo = (f"se diferencia de «{parecida}» solo en tildes o "
+                          f"mayúsculas" if parecida else
+                          "no está en categorias.json")
+                avisos.append(
+                    f"La regla «{clave}» de rules.json apunta a «{mala}», que "
+                    f"{motivo}. La he DESCARTADO: esos movimientos siguen con "
+                    f"las demás reglas, para que no desaparezcan de los totales.")
 
         casi = {normalizar(x) for x in declaradas}
         for pr in sorted(producidas - declaradas):
@@ -439,6 +501,13 @@ class Catalogo:
                 avisos.append(
                     "orden_resumen no incluye «Mes»: el resumen saldrá sin la "
                     "columna de los meses. Si no es a propósito, ponla la primera.")
+
+        for cat, texto, choca in self.etiquetas_ignoradas:
+            avisos.append(
+                f"La etiqueta «{texto}» de «{cat}» se llama igual que {choca}: "
+                f"dos columnas del resumen no pueden tener el mismo nombre, así "
+                f"que la ignoro y «{cat}» sale con su nombre. Para juntar dos "
+                f"categorías en una, lleva sus reglas a la misma categoría.")
 
         # una etiqueta para una columna que no existe se ignoraba en silencio,
         # cuando una errata en orden_resumen sí avisaba
@@ -509,6 +578,7 @@ class IdentificadorCuentas:
 # python app/reglas.py                          los ejemplos de siempre
 # python app/reglas.py "BIZUM DE MARTA"         una descripción
 # python app/reglas.py "BIZUM DE MARTA" 25      con importe, para ver el signo
+# python app/reglas.py "A" 25 "B" -10           varios, cada uno con el suyo
 if __name__ == "__main__":
     import sys
 
@@ -522,18 +592,25 @@ if __name__ == "__main__":
                                   por_defecto_positivo=cat.ingreso_por_defecto)
     exc = Excluidor.desde_json(rutas.EXCLUSIONES)
 
-    argumentos = sys.argv[1:]
-    importe = None
-    if len(argumentos) >= 2:
+    def _numero(texto):
         try:
-            importe = float(argumentos[-1].replace(",", "."))
-            argumentos = argumentos[:-1]
+            return float(texto.replace(".", "").replace(",", ".")
+                         if "," in texto else texto)
         except ValueError:
-            pass
+            return None
 
-    if argumentos:
-        casos = [(t, importe) for t in argumentos]
-    else:
+    # Cada importe va con el concepto que tiene DELANTE: «"BIZUM DE X" 25
+    # "BIZUM A Y" -18». Antes el último número valía para todos, y un número
+    # en medio se tomaba por un concepto más.
+    casos = []
+    for arg in sys.argv[1:]:
+        numero = _numero(arg)
+        if numero is not None and casos and casos[-1][1] is None:
+            casos[-1] = (casos[-1][0], numero)
+        else:
+            casos.append((arg, None))
+
+    if not casos:
         casos = [
             ("MEDIA MARKT ONLINE", -200.0), ("SUPERMERCADOS DIA MADRID", -50.0),
             ("GUARDIA CIVIL", -30.0), ("BAR LA ESQUINA", -18.0),
@@ -556,6 +633,9 @@ if __name__ == "__main__":
     if clf.descartadas_de_base:
         print(f"De la base, descartadas por apuntar a una categoría que no tienes "
               f"en categorias.json: {', '.join(clf.descartadas_de_base)}")
+    for clave, malas in clf.descartadas_propias:
+        print(f"Tuya, DESCARTADA: «{clave}» apunta a {', '.join(malas)}, que no "
+              f"está en categorias.json")
     print()
 
     ancho = max(len(t) for t, _ in casos)

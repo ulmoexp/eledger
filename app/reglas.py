@@ -82,10 +82,16 @@ import unicodedata
 
 
 def normalizar(texto) -> str:
-    """'COMPRA NÓMINA  S.L.' -> 'compra nomina s.l.'"""
+    """'COMPRA NÓMINA  S.L.' -> 'compra nomina s.l.'; 'BASIC-FIT' -> 'basic fit'.
+
+    El guion cuenta como espacio: unos bancos escriben «BASIC-FIT» y otros
+    «BASIC FIT», y la regla «basic fit» no encontraba el primero. Se aplica
+    igual al texto y a la clave de la regla, así que «basic-fit» también
+    sigue valiendo como clave.
+    """
     t = unicodedata.normalize("NFKD", str(texto))
     t = "".join(c for c in t if not unicodedata.combining(c))
-    return re.sub(r"\s+", " ", t.lower()).strip()
+    return re.sub(r"[\s\-]+", " ", t.lower()).strip()
 
 
 def leer_json(ruta):

@@ -30,7 +30,7 @@ if not exist "app\process.py" (
   echo Tiene que quedar asi:
   echo     esta_carpeta\instalar.bat
   echo     esta_carpeta\app\process.py
-  echo     esta_carpeta\ajustes\rules.json
+  echo     esta_carpeta\app\rules_base.json
   echo.
   pause
   exit /b 1

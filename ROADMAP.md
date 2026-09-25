@@ -184,7 +184,8 @@ lista. Hasta ahora:
   cuentas.json tarde ya no duplica el histórico, lo que entra sin regla va a
   Ingresos, los ingresos van primero en la base de reglas, las notas de la
   sincronización siguen a su movimiento, el Acumulado sin saldo ya no se
-  llama «saldo», y una tanda de mensajes más claros.
+  llama «saldo», una tanda de mensajes más claros, la categoría Impuestos
+  en la plantilla y el guion como espacio al comparar reglas.
 
 ## Lo que queda fuera a propósito
 

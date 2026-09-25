@@ -45,6 +45,14 @@ Arreglos que salieron de un piloto con usuarios simulados.
   - en Linux, el instalador ya dice `ejecutar.sh`.
 - De fábrica, la pensión también cuenta en el mes anterior (como la
   nómina), y Telefónica va a Fibra/móvil.
+- **Categoría nueva, Impuestos**, en la plantilla: pagos a Hacienda (renta,
+  IVA, IRPF) y cuota de autónomos. Si ya usas la herramienta, añádela a tu
+  `categorias.json` (en `gastos`) para tenerla; si no, esos cargos siguen en
+  «Otros» como hasta ahora.
+- Las reglas encuentran el concepto aunque el banco escriba un guion donde
+  tu regla tiene un espacio: `basic fit` encuentra «BASIC-FIT».
+- Si falta la carpeta del programa, los lanzadores ya no ponen de ejemplo
+  `ajustes/rules.json`, que no viene en el ZIP.
 
 ---
 

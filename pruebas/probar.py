@@ -874,6 +874,26 @@ def prueba_cuentas_cura_duplicados(e):
               "sin perder la corrección manual", str(df["categoria_manual"].tolist()))
 
 
+@caso("guion-e-impuestos", "BASIC-FIT casa con «basic fit», y los pagos a Hacienda van a Impuestos")
+def prueba_guion_e_impuestos(e):
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("03/04/2026", "RECIBO BASIC-FIT", -29.99),
+                      ("10/04/2026", "AEAT MODELO 303 IVA 1T", -612.30),
+                      ("20/04/2026", "DEVOLUCION AEAT RENTA 2025", 320.00)])
+    e.ejecutar()
+    df = e.historico().set_index("descripcion")
+
+    comprobar(df.at["RECIBO BASIC-FIT", "categoria"] == "Ocio",
+              "el guion no impide que case la regla con espacio",
+              str(df["categoria"].to_dict()))
+    comprobar(df.at["AEAT MODELO 303 IVA 1T", "categoria"] == "Impuestos"
+              and df.at["DEVOLUCION AEAT RENTA 2025", "categoria"] == "Ingresos",
+              "lo que se paga a Hacienda es Impuestos; lo que devuelve, ingreso",
+              str(df["categoria"].to_dict()))
+    comprobar(abs(e.resumen().iloc[0]["Impuestos"] - 612.30) < 0.005,
+              "y tiene su columna en el resumen", str(list(e.resumen().columns)))
+
+
 @caso("importes-formato", "Los importes de la pantalla van en formato español")
 def prueba_importes_formato(e):
     # 5000 € de saldo inicial (lo fija fixtures.py) y una nómina de 2000 €:

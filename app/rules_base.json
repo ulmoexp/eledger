@@ -243,6 +243,15 @@
   "vinted": "Otros",
   "correos": "Otros",
 
+  "_impuestos": "Pagos a Hacienda y cuota de autonomos. Solo el lado negativo: lo que devuelve Hacienda ya es un ingreso (=aeat, arriba). El IBI va a Piso y el impuesto del coche (=dgt) a Transporte. Quien no tenga la categoria Impuestos en categorias.json no pierde nada: estas reglas se descartan y esos cargos caen en Otros, como hasta ahora.",
+  "aeat": {"-": "Impuestos"},
+  "agencia tributaria": {"-": "Impuestos"},
+  "=irpf": {"-": "Impuestos"},
+  "seg social regimen autonomos": "Impuestos",
+  "cuota autonomos": "Impuestos",
+  "=reta": "Impuestos",
+  "tgss": {"-": "Impuestos"},
+
   "traspaso": "Transferencias internas",
   "abono en tarjeta de credito": "Transferencias internas"
 }

@@ -16,7 +16,7 @@ if [ ! -f "app/process.py" ]; then
   echo "Descomprime el ZIP completo, que ya trae las carpetas hechas, y ejecuta"
   echo "esto desde la carpeta que sale del ZIP. Tiene que quedar asi:"
   echo "    esta_carpeta/app/process.py"
-  echo "    esta_carpeta/ajustes/rules.json"
+  echo "    esta_carpeta/app/rules_base.json"
   echo
   read -r -p "Pulsa Intro para cerrar..."
   exit 1

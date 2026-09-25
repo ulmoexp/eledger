@@ -433,7 +433,10 @@ movimientos acabarían en una categoría que no es columna de nada.
 cualquiera en España: cadenas de supermercados, gasolineras, operadores,
 comercializadoras, plataformas, cadenas de restauración, aseguradoras de
 salud, tiendas online, y conceptos bancarios como nómina, préstamo, alquiler
-o IBI. Nada que dependa de la vida de alguien (su casero, su colegio, sus
+o IBI. Desde la 2.12.1, también los pagos a Hacienda y la cuota de autónomos,
+en la categoría **Impuestos** que trae la plantilla de `categorias.json`
+(quien actualiza y no la tiene no pierde nada: esas reglas se descartan y
+los cargos siguen en Otros). Nada que dependa de la vida de alguien (su casero, su colegio, sus
 transferencias). Tampoco lo ambiguo: `renta` (la de Hacienda o la del piso),
 `credito` (el recibo de la tarjeta), `paypal` (lo que importa es el comercio
 que va detrás), los seguros genéricos (coche, casa o vida) o las marcas que
@@ -448,7 +451,8 @@ prueba que fija estos casos.
 ### Cómo casa una regla
 
 El concepto se normaliza antes de comparar: minúsculas, sin tildes, espacios
-colapsados. "NÓMINA" y "nomina" son lo mismo.
+colapsados y el guion como un espacio. "NÓMINA" y "nomina" son lo mismo, y
+la regla "basic fit" encuentra tanto «BASIC FIT» como «BASIC-FIT».
 
 | Clave | Casa con... | Para qué |
 |---|---|---|

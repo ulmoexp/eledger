@@ -217,28 +217,50 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### En curso: 2.12.1 (sesión del 25/09/2026), sin release todavía
+### En curso: 2.13.0 (sesión del 25/09/2026), con push y sin release
 
-Salió de un **piloto con cinco usuarios simulados** (subagentes que prueban la
-release como alguien que la descarga, sin ver el código). Todo el material
-está en `pruebas/piloto/`: `INSTRUCCIONES.md` (cómo lanzarlo y el texto para
-los perfiles), `generar.py` (carpetas y extractos inventados),
-`HALLAZGOS_1.md` (qué se arregló y qué se descartó a propósito) y los cinco
-informes en `ronda1/`. Lo arreglado está en `CHANGELOG.md` (2.12.1).
+Salió de un **piloto con usuarios simulados** (subagentes que prueban la
+release como alguien que la descarga, sin ver el código), en dos rondas. Todo
+el material está en `pruebas/piloto/`: `INSTRUCCIONES.md` (cómo lanzarlo),
+`generar.py` (carpetas y extractos inventados; `--ronda 1` o `2`),
+`HALLAZGOS_1.md` y `HALLAZGOS_2.md` (qué se arregló y qué se descartó a
+propósito) y los informes de `ronda1/` y `ronda2/`.
+
+- **2.12.1** (ronda 1), nunca publicada: su contenido va dentro de la 2.13.0.
+- **2.13.0** (ronda 2): otra descarga de una cuenta declarada con otro nombre
+  ya no se duplica; se avisa de dos tarjetas sin declarar; la comunidad de
+  propietarios va solo a cargos; las reglas propias a una categoría
+  inexistente se descartan; las etiquetas repetidas no rompen nada (y el
+  histórico se escribe en un temporal que sustituye al bueno al terminar);
+  la sincronización no pisa una tabla del usuario, detecta el fichero
+  abierto y no gasta copias sin cambios; se leen Cargo/Abono y «Payee».
+  Detalle en `CHANGELOG.md`.
 
 **Lo siguiente, por este orden:**
-1. **Ronda 2 del piloto**, en sesión nueva, sobre la 2.12.1: perfiles nuevos,
-   Marta y Ana repetidas y datos más realistas (ver el final de
-   `INSTRUCCIONES.md`). Antes, `app/exportar.py` para que haya ZIP de la
-   2.12.1, que es el que coge `generar.py`.
-2. Arreglar lo que salga.
-3. **Probar en Windows** los lanzadores: en la 2.12.1 cambió el texto del
-   aviso de carpeta incompleta en `ejecutar.bat` e `instalar.bat` (solo un
-   `echo`, pero la regla es probarlo).
-4. `/release` de la 2.12.1.
+1. **Probar en Windows** (lo hace el usuario):
+   - Con `historico.xlsx` abierto en Excel, ejecutar. El histórico ahora se
+     guarda con `os.replace` desde `.historico.xlsx.escribiendo.xlsx`; tiene
+     que ir a la copia con fecha y no dejar el temporal en `datos/`.
+   - Con el fichero de contabilidad abierto en Excel, la sincronización se
+     tiene que negar.
+   - Los `.bat`: en la 2.12.1 cambió el aviso de carpeta incompleta de
+     `ejecutar.bat` e `instalar.bat` (solo un `echo`, pero la regla es
+     probarlo).
+2. `/release` de la 2.13.0.
+3. **Siguiente mejora de producto: el resumen por cuenta o tarjeta.** Lo
+   pidieron Marta en las dos rondas y la pareja. Diseñarla antes de tocar
+   código (¿hoja nueva o columnas en RESUMEN?, ¿cómo convive con
+   `orden_resumen` y la sincronización?).
+4. Ronda 3 del piloto, corta, sobre la 2.13.0: repetir la pareja, Raúl y
+   Carmen, que encontraron los fallos graves.
 
-Decisiones del usuario en esta sesión: nada de cerrar la hoja de cálculo por
-su cuenta (2.12.0); la ronda 2 va después de las mejoras, no antes.
+Otras peticiones, sin decidir, en `HALLAZGOS_2.md`: la sincronización en modo
+«añadir debajo» o con columnas elegibles, los totales por trimestre y el
+ejemplo de autónomo en la guía, e importar el histórico de otra app con sus
+categorías.
+
+Decisiones del usuario: nada de cerrar la hoja de cálculo por su cuenta
+(2.12.0); la ronda 2 va después de las mejoras, no antes.
 
 ### Hecho: 2.12.0 (sesión del 24/09/2026)
 

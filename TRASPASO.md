@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          114 casos, 415 comprobaciones, ~2 min
+python pruebas/probar.py          123 casos, 444 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -217,47 +217,41 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### En curso: 2.13.0 (sesión del 25/09/2026), con push y sin release
+### En curso: 2.14.0 (sesión del 25/09/2026), sin release
 
 Salió de un **piloto con usuarios simulados** (subagentes que prueban la
-release como alguien que la descarga, sin ver el código), en dos rondas. Todo
+release como alguien que la descarga, sin ver el código), en tres rondas. Todo
 el material está en `pruebas/piloto/`: `INSTRUCCIONES.md` (cómo lanzarlo),
-`generar.py` (carpetas y extractos inventados; `--ronda 1` o `2`),
-`HALLAZGOS_1.md` y `HALLAZGOS_2.md` (qué se arregló y qué se descartó a
-propósito) y los informes de `ronda1/` y `ronda2/`.
+`generar.py` (carpetas y extractos inventados; `--ronda 1`, `2` o `3`),
+`HALLAZGOS_1.md` a `HALLAZGOS_3.md` (qué se arregló y qué se descartó a
+propósito) y los informes de `ronda1/` a `ronda3/`. Notas medias: 6,6, 6,6 y,
+en la ronda 3 (solo los tres perfiles que encontraron fallos graves), 8,3.
 
-- **2.12.1** (ronda 1), nunca publicada: su contenido va dentro de la 2.13.0.
-- **2.13.0** (ronda 2): otra descarga de una cuenta declarada con otro nombre
-  ya no se duplica; se avisa de dos tarjetas sin declarar; la comunidad de
-  propietarios va solo a cargos; las reglas propias a una categoría
-  inexistente se descartan; las etiquetas repetidas no rompen nada (y el
-  histórico se escribe en un temporal que sustituye al bueno al terminar);
-  la sincronización no pisa una tabla del usuario, detecta el fichero
-  abierto y no gasta copias sin cambios; se leen Cargo/Abono y «Payee».
+- **2.12.1** (ronda 1) y **2.13.0** (ronda 2) no se publicaron: van dentro de
+  la 2.14.0. La 2.13.0 sí tiene push.
+- **2.14.0**: hoja CUENTAS por cuenta o tarjeta; sincronización en modo
+  «añadir» (la hoja del usuario, solo se añade lo que falta) y con columnas
+  propias; `importar_categorias` para el export de otra app; `equivalencias`
+  para juntar categorías de fábrica sin perder sus reglas; copia del
+  histórico solo si cambia; sin aviso del recibo cuando solo hay tarjetas.
   Detalle en `CHANGELOG.md`.
 
 **Lo siguiente, por este orden:**
 1. **Probar en Windows** (lo hace el usuario):
-   - Con `historico.xlsx` abierto en Excel, ejecutar. El histórico ahora se
-     guarda con `os.replace` desde `.historico.xlsx.escribiendo.xlsx`; tiene
-     que ir a la copia con fecha y no dejar el temporal en `datos/`.
+   - Con `historico.xlsx` abierto en Excel, ejecutar. El histórico se guarda
+     con `os.replace` desde `.historico.xlsx.escribiendo.xlsx`; tiene que ir
+     a la copia con fecha y no dejar el temporal en `datos/`.
    - Con el fichero de contabilidad abierto en Excel, la sincronización se
-     tiene que negar.
+     tiene que negar (en los dos modos).
    - Los `.bat`: en la 2.12.1 cambió el aviso de carpeta incompleta de
      `ejecutar.bat` e `instalar.bat` (solo un `echo`, pero la regla es
      probarlo).
-2. `/release` de la 2.13.0.
-3. **Siguiente mejora de producto: el resumen por cuenta o tarjeta.** Lo
-   pidieron Marta en las dos rondas y la pareja. Diseñarla antes de tocar
-   código (¿hoja nueva o columnas en RESUMEN?, ¿cómo convive con
-   `orden_resumen` y la sincronización?).
-4. Ronda 3 del piloto, corta, sobre la 2.13.0: repetir la pareja, Raúl y
-   Carmen, que encontraron los fallos graves.
+2. `/release` de la 2.14.0.
+3. La guía web (`eledger-web/guia/index.html`) está al día con la 2.14.0,
+   pero **sin comitear**: en ese repo solo se comitea si el usuario lo pide.
 
-Otras peticiones, sin decidir, en `HALLAZGOS_2.md`: la sincronización en modo
-«añadir debajo» o con columnas elegibles, los totales por trimestre y el
-ejemplo de autónomo en la guía, e importar el histórico de otra app con sus
-categorías.
+Pendiente sin decidir: la portada no menciona a quien viene de otra app (ver
+`HALLAZGOS_3.md`).
 
 Decisiones del usuario: nada de cerrar la hoja de cálculo por su cuenta
 (2.12.0); la ronda 2 va después de las mejoras, no antes.

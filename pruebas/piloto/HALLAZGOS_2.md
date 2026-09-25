@@ -5,12 +5,23 @@ Siete perfiles: cinco nuevos más Marta y Ana repitiendo. Notas de 7 (pareja),
 7 (Marta) y 8 (Ana): media 6,6, igual que la ronda 1. Informes completos en
 `ronda2/`. Lo marcado «comprobado» se reprodujo a mano o se vio en el código.
 
-**Arreglado en la 2.13.0**: todo lo de «Graves» y de «Menores», salvo lo que
-se indica. Sin tocar: el aviso de doble conteo con tarjeta de débito (ya
-descartado en la ronda 1), el ejemplo de autónomo y los totales por
-trimestre en la guía, la web (`../eledger-web`, que sigue prometiendo
-«cualquier banco») y las peticiones de producto. Cada arreglo tiene su caso
-en `probar.py`, en el bloque «regresiones de la ronda 2 del piloto».
+**Arreglado en la 2.13.0**: todo lo de «Graves» y de «Menores». Cada arreglo
+tiene su caso en `probar.py`, en el bloque «regresiones de la ronda 2 del
+piloto».
+
+**Y en la 2.14.0**, lo que quedaba:
+- las cuatro peticiones de producto: hoja CUENTAS, sincronización en modo
+  «añadir» con columnas propias, `importar_categorias` y la receta de
+  trimestres (en la guía, no como función);
+- la receta de autónomo en la guía;
+- el aviso de la tarjeta de débito, solo en el caso de Ana: sin extracto de
+  cuenta no puede haber ningún recibo, así que ya no avisa. Con cuenta y tarjeta
+  sigue avisando, como se decidió en la ronda 1;
+- Vodafone «desde 06/2026» era cosa de `generar.py`: `recibo()` adelantaba
+  el cargo, además de retrasarlo, y dejaba intervalos de 36-37 días. Ahora
+  solo lo retrasa, como un banco. El saldo inicial negativo del perfil de
+  otra app es coherente con sus datos (el saldo de julio no es el de abril
+  más lo que pasó entre medias): también es cosa del generador.
 
 ## Lo arreglado en la 2.12.1 sigue arreglado
 

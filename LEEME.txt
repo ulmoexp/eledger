@@ -20,7 +20,8 @@ Cómo se usa
 -----------
 1. Descarga los extractos del banco y déjalos en la carpeta  entrada/
    Con el nombre y la extensión que traigan. No hay que renombrar nada
-   (salvo si declaras varias cuentas en ajustes/cuentas.json: ver la guía).
+   (salvo si declaras varias cuentas o tarjetas en ajustes/cuentas.json,
+   por ejemplo una tarjeta cada miembro de la pareja: ver la guía).
 2. Doble clic en  ejecutar.bat   (en Mac: ejecutar.command; en Linux: ejecutar.sh)
 3. Al terminar, pulsa 1 para abrir  datos/historico.xlsx  (o ábrelo tú con
    Microsoft Excel, OnlyOffice o LibreOffice).

@@ -195,7 +195,8 @@ class Clasificador:
     """
 
     def __init__(self, reglas: dict, por_defecto: str = "Otros", base: dict = None,
-                 categorias_validas=None, por_defecto_positivo: str | None = None):
+                 categorias_validas=None, por_defecto_positivo: str | None = None,
+                 equivalencias: dict | None = None):
         self.por_defecto = por_defecto
         # Lo que entra sin ninguna regla (un cobro, una recarga) no puede ir a
         # «Otros», que es de gasto: restaba y dejaba el mes con gastos
@@ -241,6 +242,13 @@ class Clasificador:
                 continue
             if valor is None:
                 continue
+            # equivalencias (categorias.json): «lo que la base manda a
+            # Luz/Agua, para mí es Facturas». Juntar dos categorías de fábrica
+            # en una tuya descartaba todas sus reglas de la base (endesa,
+            # movistar...) y esos comercios acababan en Otros.
+            if equivalencias:
+                valor = ({k: equivalencias.get(v, v) for k, v in valor.items()}
+                         if isinstance(valor, dict) else equivalencias.get(valor, valor))
             patron, modo = compilar(clave)
             regla = Regla(patron, valor, clave, modo, "base")
 
@@ -286,13 +294,14 @@ class Clasificador:
 
     @classmethod
     def desde_json(cls, ruta, por_defecto="Otros", ruta_base=None,
-                   categorias_validas=None, por_defecto_positivo=None):
+                   categorias_validas=None, por_defecto_positivo=None,
+                   equivalencias=None):
         propias = leer_json(ruta)
         base = {}
         if ruta_base and os.path.exists(ruta_base):
             base = leer_json(ruta_base)
         return cls(propias, por_defecto, base, categorias_validas,
-                   por_defecto_positivo)
+                   por_defecto_positivo, equivalencias)
 
 
 class Catalogo:
@@ -344,6 +353,19 @@ class Catalogo:
         # vacía, significa que el usuario SÍ ha decidido qué mostrar.
         self.orden_resumen = datos.get("orden_resumen")
         self.desglosar_ingresos = datos.get("desglosar_ingresos", False) is True
+        # {"fichero": patrón del nombre, "traducir": {"de la otra app": "tuya"}}
+        # o None. Ver process.importar_categorias().
+        self.importar = datos.get("importar_categorias") or None
+        # {"categoría de fábrica": "tuya"}: ver Clasificador. Solo las que
+        # apuntan a una categoría declarada; las otras las avisa validar().
+        equivalencias = datos.get("equivalencias") or {}
+        self.equivalencias_malas = (
+            [] if isinstance(equivalencias, dict) else [("", str(equivalencias))])
+        equivalencias = equivalencias if isinstance(equivalencias, dict) else {}
+        self.equivalencias = {str(k): str(v) for k, v in equivalencias.items()
+                              if v in self.todas}
+        self.equivalencias_malas += [(str(k), str(v)) for k, v in equivalencias.items()
+                                     if v not in self.todas]
         # lo último: necesita saber ya qué columnas de ingreso hay
         self.etiquetas_ignoradas = self._quitar_etiquetas_que_chocan()
 
@@ -367,11 +389,16 @@ class Catalogo:
         for cat, texto in list(self.etiquetas.items()):
             if cat not in propias:
                 continue                # no se usa; validar() ya lo dice
-            visibles = {self.etiquetas.get(c, c): c for c in propias if c != cat}
-            if texto in self.COLUMNAS_SISTEMA:
+            # sin mayúsculas, acentos ni espacios de más: «facturas » y
+            # «Facturas» se leen igual en el Excel aunque no sean iguales
+            visibles = {normalizar(self.etiquetas.get(c, c)): c
+                        for c in propias if c != cat}
+            sistema = {normalizar(c) for c in self.COLUMNAS_SISTEMA}
+            if normalizar(texto) in sistema:
                 ignoradas.append((cat, texto, "una columna de sistema"))
-            elif texto in visibles:
-                ignoradas.append((cat, texto, f"la columna de «{visibles[texto]}»"))
+            elif normalizar(texto) in visibles:
+                ignoradas.append((cat, texto,
+                                  f"la columna de «{visibles[normalizar(texto)]}»"))
             else:
                 continue
             del self.etiquetas[cat]
@@ -413,6 +440,10 @@ class Catalogo:
         producidas.add(clasificador.por_defecto)
         if clasificador.por_defecto_positivo:
             producidas.add(clasificador.por_defecto_positivo)
+        # lo que llega del export de otra app también «asigna» categoría: sin
+        # contarlo, se avisaba de que su columna saldría a 0 cuando no
+        if isinstance(self.importar, dict) and isinstance(self.importar.get("traducir"), dict):
+            producidas.update(v for v in self.importar["traducir"].values() if v)
         declaradas = set(self.todas)
         avisos = []
 
@@ -449,11 +480,15 @@ class Catalogo:
                     f"esos movimientos no aparecerán en ninguna columna del resumen.")
 
         casi_pr = {normalizar(x) for x in producidas}
+        # con importar_categorias, una que ya se llama igual en el export
+        # llega sin traducir, y eso no se sabe hasta leer los ficheros
+        salvo = (" (salvo lo que traiga importar_categorias)"
+                 if self.importar is not None else "")
         for de in sorted(declaradas - producidas):
             if normalizar(de) not in casi_pr:
                 avisos.append(
-                    f"«{de}» está en categorias.json pero ninguna regla la asigna: "
-                    f"su columna saldrá siempre a 0.")
+                    f"«{de}» está en categorias.json pero ninguna regla la "
+                    f"asigna{salvo}: su columna saldrá a 0.")
 
         repes = {c for c in self.todas if self.todas.count(c) > 1}
         for c in sorted(repes):
@@ -508,6 +543,28 @@ class Catalogo:
                 f"dos columnas del resumen no pueden tener el mismo nombre, así "
                 f"que la ignoro y «{cat}» sale con su nombre. Para juntar dos "
                 f"categorías en una, lleva sus reglas a la misma categoría.")
+
+        for de, a in self.equivalencias_malas:
+            avisos.append(
+                f"equivalencias manda «{de}» a «{a}», que no está en "
+                f"categorias.json: la ignoro." if de else
+                "equivalencias tiene que ser {\"Categoría de fábrica\": \"Tuya\"}.")
+
+        if self.importar is not None:
+            imp = self.importar
+            if (not isinstance(imp, dict) or not str(imp.get("fichero", "")).strip()
+                    or not isinstance(imp.get("traducir"), dict)):
+                avisos.append(
+                    "importar_categorias tiene que ser {\"fichero\": \"parte del "
+                    "nombre del fichero\", \"traducir\": {\"Su categoría\": "
+                    "\"Tuya\", ...}}. Lo ignoro.")
+            else:
+                for de, a in imp["traducir"].items():
+                    if a not in self.todas and a != "(excluido)":
+                        avisos.append(
+                            f"importar_categorias traduce «{de}» a «{a}», que no "
+                            f"está en categorias.json: esos movimientos se quedan "
+                            f"con lo que digan las reglas.")
 
         # una etiqueta para una columna que no existe se ignoraba en silencio,
         # cuando una errata en orden_resumen sí avisaba
@@ -589,7 +646,8 @@ if __name__ == "__main__":
     cat = Catalogo.desde_json(rutas.CATEGORIAS)
     clf = Clasificador.desde_json(rutas.REGLAS, ruta_base=rutas.REGLAS_BASE,
                                   categorias_validas=set(cat.todas),
-                                  por_defecto_positivo=cat.ingreso_por_defecto)
+                                  por_defecto_positivo=cat.ingreso_por_defecto,
+                                  equivalencias=cat.equivalencias)
     exc = Excluidor.desde_json(rutas.EXCLUSIONES)
 
     def _numero(texto):

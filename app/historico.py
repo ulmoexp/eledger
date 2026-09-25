@@ -226,7 +226,10 @@ def fusionar(historico: pd.DataFrame, nuevos: list[pd.DataFrame]):
     for df in nuevos:
         df = df.copy()
         df["n_rep"] = df.groupby(_clave(df)).cumcount()
-        df["categoria_manual"] = ""
+        # vacía salvo la que trae importada del export de otra app
+        # (process.importar_categorias)
+        df["categoria_manual"] = (df["categoria_manual"].fillna("").astype(str)
+                                  if "categoria_manual" in df else "")
         preparados.append(df[COLUMNAS_CRUDAS])
 
     entrantes = (pd.concat(preparados, ignore_index=True) if preparados
@@ -239,6 +242,21 @@ def fusionar(historico: pd.DataFrame, nuevos: list[pd.DataFrame]):
     # el histórico va primero en el concat, así que keep="first" conserva
     # la categoria_manual ya escrita en lugar de pisarla con la fila entrante
     todo["_k"] = _clave(todo) + "#" + todo["n_rep"].astype(str)
+
+    # Una categoría importada para un movimiento que YA estaba (se activó
+    # importar_categorias después de la primera ejecución) iría a parar a la
+    # fila entrante, que se descarta por repetida. Se pasa a la del histórico,
+    # solo si esa no tiene ya una corrección escrita.
+    n = len(historico)
+    entrante = todo.iloc[n:]
+    importada = entrante.loc[entrante["categoria_manual"].ne(""),
+                             ["_k", "categoria_manual"]].drop_duplicates("_k")
+    if n and not importada.empty:
+        mapa = importada.set_index("_k")["categoria_manual"]
+        vacia = todo.index[:n][todo["categoria_manual"].iloc[:n].eq("")
+                               & todo["_k"].iloc[:n].isin(mapa.index)]
+        todo.loc[vacia, "categoria_manual"] = todo.loc[vacia, "_k"].map(mapa)
+
     antes = len(todo)
     todo = todo.drop_duplicates(subset="_k", keep="first")
 
@@ -374,6 +392,61 @@ def construir_resumen(df: pd.DataFrame, catalogo, saldo_inicial: float = 0.0,
     propias = set(catalogo.gastos) | set(columnas_ingreso.values())
     etiquetas = {c: catalogo.etiqueta(c) for c in orden if c in propias}
     return resultado.rename(columns=etiquetas)
+
+
+HOJA_CUENTAS = "CUENTAS"
+SIN_IDENTIFICAR = "(sin identificar)"
+
+
+def construir_por_cuenta(df: pd.DataFrame, catalogo, movimientos_cuenta: pd.DataFrame,
+                         saldos_iniciales: dict, sin_saldo=()) -> pd.DataFrame:
+    """
+    Lo mismo que RESUMEN, pero partido por cuenta o tarjeta (las de
+    ajustes/cuentas.json): cuánto gastó y cuánto entró en cada una, y el
+    saldo de cada cuenta al cerrar el mes. Lo pidieron quien lleva dos
+    cuentas (negocio y personal) y una pareja con una tarjeta cada uno.
+
+    Va en su propia hoja y no como columnas de RESUMEN: así RESUMEN, su
+    orden_resumen y lo que lean de él las fórmulas de cada cual no cambian.
+    Vacío si no hay al menos dos cuentas declaradas: con una, sería repetir
+    RESUMEN.
+
+    Las mismas reglas que RESUMEN: gastos en positivo (-suma, sin ABS), solo
+    categorías de gasto o de ingreso (un traspaso entre cuentas no es de
+    ninguna de las dos), y el saldo con todos los movimientos de cuenta,
+    excluidos incluidos. El saldo solo sale para las cuentas cuyo saldo de
+    partida se conoce (sin_saldo): sin él no sería el saldo, y no se puede
+    llamar así.
+    """
+    todas = set(df["cuenta"].fillna("")) | set(movimientos_cuenta["cuenta"].fillna(""))
+    if len(todas - {""}) < 2:
+        return pd.DataFrame()
+    col_mes = catalogo.columna_mes
+    meses = sorted(set(df[col_mes]) | set(movimientos_cuenta[col_mes]))
+    nombre = lambda c: c or SIN_IDENTIFICAR
+    orden = sorted(todas, key=lambda c: (c == "", c))
+
+    columnas = {"Mes": meses}
+    gastos = df[df["categoria"].isin(catalogo.gastos)]
+    ingresos = df[df["categoria"].isin(catalogo.ingresos)]
+    for c in orden:
+        g = -gastos[gastos["cuenta"].fillna("") == c].groupby(col_mes)["importe"].sum()
+        i = ingresos[ingresos["cuenta"].fillna("") == c].groupby(col_mes)["importe"].sum()
+        columnas[f"{nombre(c)} · gastos"] = [round(float(g.get(m, 0.0)), 2) for m in meses]
+        # una tarjeta no cobra nada: una columna de ceros solo estorba
+        if not i.empty and (i.abs() >= 0.005).any():
+            columnas[f"{nombre(c)} · ingresos"] = [round(float(i.get(m, 0.0)), 2)
+                                                    for m in meses]
+        suyos = movimientos_cuenta[movimientos_cuenta["cuenta"].fillna("") == c]
+        if suyos.empty or c in sin_saldo:
+            continue
+        por_mes = suyos.groupby(col_mes)["importe"].sum()
+        saldo, valores = float(saldos_iniciales.get(c, 0.0)), []
+        for m in meses:
+            saldo += float(por_mes.get(m, 0.0))
+            valores.append(round(saldo, 2))
+        columnas[f"{nombre(c)} · saldo"] = valores
+    return pd.DataFrame(columnas)
 
 
 # =====================================================================
@@ -576,7 +649,19 @@ def _texto_seguro(ws):
                 celda.data_type = "s"
 
 
-HOJAS_PROPIAS = (HOJA_RESUMEN, HOJA_MOVIMIENTOS, HOJA_META)
+HOJAS_PROPIAS = (HOJA_RESUMEN, HOJA_CUENTAS, HOJA_MOVIMIENTOS, HOJA_META)
+
+
+def mismos_movimientos(a, b) -> bool:
+    """¿Tienen los dos históricos la misma hoja MOVIMIENTOS? Es lo único que
+    no se puede rehacer (el resto sale de ella), así que si coincide, una
+    copia nueva no guardaría nada que no esté ya en la anterior."""
+    try:
+        x, y = (pd.read_excel(r, sheet_name=HOJA_MOVIMIENTOS).fillna("").astype(str)
+                for r in (a, b))
+    except Exception:
+        return False
+    return x.equals(y)
 
 
 def hojas_ajenas(ruta) -> list[str]:
@@ -595,7 +680,8 @@ def hojas_ajenas(ruta) -> list[str]:
 
 
 def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
-            catalogo, version: str = VERSION_SIN_SELLO, saldo_real=True) -> None:
+            catalogo, version: str = VERSION_SIN_SELLO, saldo_real=True,
+            por_cuenta: pd.DataFrame | None = None) -> None:
     """
     Se escribe en un fichero temporal al lado y solo al final se pone en su
     sitio. Escribiendo directamente, un fallo a mitad (una etiqueta repetida
@@ -606,7 +692,8 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
     carpeta, nombre = os.path.split(os.path.abspath(ruta))
     temporal = os.path.join(carpeta, f".{nombre}.escribiendo.xlsx")
     try:
-        _escribir(temporal, movimientos, resumen, catalogo, version, saldo_real)
+        _escribir(temporal, movimientos, resumen, catalogo, version, saldo_real,
+                  por_cuenta)
         # en Windows, si el de verdad está abierto, esto da PermissionError,
         # que es lo que espera quien llama para ir a una copia
         os.replace(temporal, ruta)
@@ -615,7 +702,8 @@ def guardar(ruta: str, movimientos: pd.DataFrame, resumen: pd.DataFrame,
             os.remove(temporal)
 
 
-def _escribir(ruta, movimientos, resumen, catalogo, version, saldo_real):
+def _escribir(ruta, movimientos, resumen, catalogo, version, saldo_real,
+              por_cuenta=None):
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
@@ -623,6 +711,8 @@ def _escribir(ruta, movimientos, resumen, catalogo, version, saldo_real):
         movimientos.to_excel(writer, sheet_name=HOJA_MOVIMIENTOS, index=False)
         if not resumen.empty:
             resumen.to_excel(writer, sheet_name=HOJA_RESUMEN, index=False)
+        if por_cuenta is not None and not por_cuenta.empty:
+            por_cuenta.to_excel(writer, sheet_name=HOJA_CUENTAS, index=False)
         _meta(version, movimientos).to_excel(
             writer, sheet_name=HOJA_META, index=False)
 
@@ -683,9 +773,26 @@ def _escribir(ruta, movimientos, resumen, catalogo, version, saldo_real):
 
         _graficos(ws, resumen, catalogo, saldo_real)
 
+    # --- por cuenta: el mismo aspecto que RESUMEN, sin gráficos
+    if HOJA_CUENTAS in wb.sheetnames:
+        ws = wb[HOJA_CUENTAS]
+        ws.column_dimensions["A"].width = 11
+        for i in range(2, len(por_cuenta.columns) + 1):
+            letra = get_column_letter(i)
+            ws.column_dimensions[letra].width = 16
+            for j, c in enumerate(ws[letra][1:], start=2):
+                c.number_format = '#,##0.00 €'
+                c.border = borde
+                if por_cuenta.columns[i - 1].endswith("· saldo"):
+                    c.font = Font(bold=True, size=10)
+                elif j % 2 == 0:
+                    c.fill = suave
+
     # RESUMEN es lo que se viene a mirar: primera hoja y la que se ve al
     # abrir. MOVIMIENTOS es el detalle, para cuando haga falta. _meta la
     # última, que no es para leerla a diario.
+    if HOJA_CUENTAS in wb.sheetnames:
+        wb.move_sheet(HOJA_CUENTAS, offset=-wb.sheetnames.index(HOJA_CUENTAS))
     if HOJA_RESUMEN in wb.sheetnames:
         wb.move_sheet(HOJA_RESUMEN, offset=-wb.sheetnames.index(HOJA_RESUMEN))
         for hoja in wb.worksheets:

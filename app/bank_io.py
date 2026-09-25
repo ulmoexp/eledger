@@ -316,6 +316,12 @@ ALIAS_COLUMNAS = {
 # (Cargo, Debe) y lo que entra (Abono, Haber). Solo se usan si no hay columna
 # de importe, y solo por coincidencia EXACTA: «cargo» a secas aparece dentro
 # de cabeceras que no son importes («tipo de cargo», «fecha de cargo»).
+# La categoría que ya trae el fichero (el export de otra app de finanzas).
+# Solo se usa si el usuario lo pide en categorias.json (importar_categorias):
+# hay bancos que exportan su propia «Categoría», y no puede pisar las reglas
+# sin que nadie lo haya decidido. Solo coincidencia exacta.
+ALIAS_CATEGORIA = ["categoria", "category", "categoria del movimiento"]
+
 ALIAS_CARGO = ["cargo", "cargos", "debe", "debito", "debit", "importe cargo"]
 ALIAS_ABONO = ["abono", "abonos", "haber", "credito", "credit", "importe abono"]
 
@@ -547,6 +553,10 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
     if "saldo" in mapa_saldo and mapa_saldo["saldo"] not in mapa.values():
         mapa["saldo"] = mapa_saldo["saldo"]
 
+    col_categoria = _columna_exacta(cabecera, ALIAS_CATEGORIA)
+    if col_categoria in mapa.values():
+        col_categoria = None
+
     registros = []
     for fila in tabla[idx_cab + 1:]:
         if not any(str(c).strip() for c in fila if c is not None):
@@ -557,9 +567,11 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
         if cargo_abono:
             reg["importe"] = _importe_de_dos_columnas(
                 *(fila[c] if c < len(fila) else None for c in cargo_abono))
+        if col_categoria is not None and col_categoria < len(fila):
+            reg["categoria_fichero"] = fila[col_categoria]
         registros.append(reg)
 
-    df = pd.DataFrame(registros, columns=list(requeridas) + ["saldo"])
+    df = pd.DataFrame(registros, columns=list(requeridas) + ["saldo", "categoria_fichero"])
     df["fecha"] = df["fecha"].map(parsear_fecha)
     if not cargo_abono:
         df["importe"] = df["importe"].map(parsear_importe)
@@ -567,6 +579,9 @@ def leer_tabla_bancaria(ruta: str, requeridas=("fecha", "descripcion", "importe"
     df["descripcion"] = df["descripcion"].map(
         lambda v: "" if v is None else str(v).strip()
     )
+    df["categoria_fichero"] = df["categoria_fichero"].map(
+        lambda v: "" if v is None or (isinstance(v, float) and pd.isna(v))
+        else str(v).strip())
 
     antes = len(df)
     df = df.dropna(subset=["fecha", "importe"])

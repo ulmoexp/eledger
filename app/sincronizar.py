@@ -50,6 +50,13 @@ class Config:
         self.columna_inicial = int(datos.get("columna_inicial", 1))
         self.incluir_excluidos = bool(datos.get("incluir_excluidos", False))
         self.copias_de_seguridad = int(datos.get("copias_de_seguridad", 10))
+        # «tabla» (lo de siempre): la hoja es de la herramienta y se reescribe
+        # entera. «añadir»: la hoja es TUYA; solo se añaden debajo los
+        # movimientos que aún no están, y lo que ya hay no se toca nunca.
+        self.modo = str(datos.get("modo", "tabla")).strip().lower() or "tabla"
+        # {"Tu cabecera": "campo"}, en el orden en que van. None = las siete
+        # de siempre con su nombre.
+        self.columnas = datos.get("columnas") or None
 
     @property
     def activa(self) -> bool:
@@ -181,6 +188,46 @@ def revisar_hoja(ws) -> list[str]:
     return []
 
 
+MODOS = ("tabla", "añadir")
+# lo mínimo para reconocer un movimiento en la hoja: sin esto no se pueden
+# recolocar las notas (tabla) ni saber qué falta por añadir (añadir)
+CAMPOS_OBLIGATORIOS = ("fecha", "descripcion", "importe")
+
+
+def columnas_a_volcar(cfg: Config, disponibles: list[str]) -> tuple[list, list]:
+    """(campos, cabeceras): qué columnas del resultado se escriben y con qué
+    texto de cabecera. Un error de configuración para en seco, con el
+    fichero sin tocar."""
+    if cfg.modo not in MODOS:
+        raise RuntimeError(f"En sincronizar.json, «modo» tiene que ser "
+                           f"\"tabla\" o \"añadir\", no «{cfg.modo}».")
+    if cfg.columnas is None:
+        return list(disponibles), list(disponibles)
+    if not isinstance(cfg.columnas, dict) or not cfg.columnas:
+        raise RuntimeError("En sincronizar.json, «columnas» tiene que ser "
+                           "{\"Tu cabecera\": \"campo\", ...}.")
+    cabeceras = [str(k) for k in cfg.columnas]
+    campos = [str(v).strip().lower() for v in cfg.columnas.values()]
+    malos = [c for c in campos if c not in disponibles]
+    if malos:
+        raise RuntimeError(f"En sincronizar.json, «columnas» usa {', '.join(malos)}, "
+                           f"que no es ninguno de los campos que vuelco: "
+                           f"{', '.join(disponibles)}.")
+    if len(set(campos)) < len(campos):
+        raise RuntimeError("En sincronizar.json, «columnas» repite un campo.")
+    faltan = [c for c in CAMPOS_OBLIGATORIOS if c not in campos]
+    if faltan:
+        raise RuntimeError(f"En sincronizar.json, a «columnas» le falta "
+                           f"{', '.join(faltan)}: sin fecha, concepto e importe "
+                           f"no puedo reconocer tus movimientos en la hoja.")
+    return campos, cabeceras
+
+
+def _igual(a, b) -> bool:
+    from reglas import normalizar
+    return normalizar(a) == normalizar(b)
+
+
 def revisar_esquina(ws, f0, c0, columnas) -> list[str]:
     """
     El bloque se vacía y se reescribe ENTERO en cada ejecución: es una tabla
@@ -197,7 +244,7 @@ def revisar_esquina(ws, f0, c0, columnas) -> list[str]:
     ancho = len(columnas)
     cabecera = [ws.cell(f0, c0 + j).value for j in range(ancho)]
     ajenas = [(j, v) for j, v in enumerate(cabecera)
-              if v is not None and str(v).strip().lower() != columnas[j]]
+              if v is not None and str(v).strip() and not _igual(v, columnas[j])]
     hay_debajo = any(celda.value is not None
                      for fila in ws.iter_rows(min_row=f0 + 1, min_col=c0,
                                               max_col=c0 + ancho - 1)
@@ -219,12 +266,25 @@ def revisar_esquina(ws, f0, c0, columnas) -> list[str]:
             f"Usa una hoja vacía solo para la herramienta y haz que tus "
             f"fórmulas tiren de ella, o mueve la esquina (fila_inicial, "
             f"columna_inicial) a un sitio libre. Las columnas que escribo son: "
-            f"{', '.join(columnas)}."]
+            f"{', '.join(columnas)}.",
+            "Si es tu hoja de siempre y quieres que los movimientos nuevos se "
+            "añadan debajo, pon \"modo\": \"añadir\" y en \"columnas\" tus "
+            "cabeceras (la guía lo explica)."]
 
 
 # =====================================================================
 # COPIA DE SEGURIDAD
 # =====================================================================
+
+def ultima_copia(ruta) -> str | None:
+    """La copia más reciente de ese fichero, si hay alguna."""
+    if not os.path.isdir(CARPETA_COPIAS):
+        return None
+    base = os.path.splitext(os.path.basename(str(ruta)))[0]
+    previas = sorted(f for f in os.listdir(CARPETA_COPIAS)
+                     if f.startswith(base + "_") and f.endswith(".xlsx"))
+    return os.path.join(CARPETA_COPIAS, previas[-1]) if previas else None
+
 
 def copia_de_seguridad(ruta: str, maximo: int) -> str:
     os.makedirs(CARPETA_COPIAS, exist_ok=True)
@@ -284,16 +344,28 @@ def _hay_datos_fuera_del_bloque(ws, columna_inicial, ancho, desde_fila) -> bool:
 # acompaña y se vuelve a poner a su lado.
 
 def _clave_fila(fecha, descripcion, importe):
-    """(fecha, concepto, importe) de una fila volcada, o None si la fila no
-    parece un movimiento (sin fecha o sin importe): lo que el usuario tenga
-    junto a otras cosas no se toca."""
+    """(fecha, concepto, importe) de una fila, o None si la fila no parece un
+    movimiento (sin fecha o sin importe): lo que el usuario tenga junto a
+    otras cosas no se toca.
+
+    Admite lo que alguien teclea a mano en su hoja («02/06/2026», «-64,35»)
+    y compara el concepto sin mayúsculas ni acentos: en modo «añadir» las
+    filas de junio metidas a mano tienen que reconocerse como las mismas que
+    trae el banco, o se añadirían otra vez."""
+    from bank_io import parsear_fecha, parsear_importe
+    from reglas import normalizar
     if not hasattr(fecha, "strftime"):
-        return None
+        fecha = parsear_fecha(fecha) if isinstance(fecha, str) else None
+        if fecha is None or pd.isna(fecha):
+            return None
+    imp = parsear_importe(importe) if isinstance(importe, str) else importe
     try:
-        imp = round(float(importe), 2)
+        imp = round(float(imp), 2)
     except (TypeError, ValueError):
         return None
-    return fecha.strftime("%Y-%m-%d"), str(descripcion or "").strip(), imp
+    if pd.isna(imp):
+        return None
+    return fecha.strftime("%Y-%m-%d"), normalizar(descripcion or ""), imp
 
 
 def _con_repeticion(claves):
@@ -384,6 +456,9 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str | None, int]:
                            f"ahora, al guardar tú después se perdería lo "
                            f"volcado.{como}")
 
+    campos, cabeceras = columnas_a_volcar(cfg, [str(c) for c in df.columns])
+    df = df[campos]
+
     for a in avisos:
         print(f"   ℹ️  El libro {a}")
 
@@ -399,40 +474,43 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str | None, int]:
                            f"Hojas disponibles: {', '.join(wb.sheetnames)}.")
 
     ws = wb[cfg.hoja]
-    problemas = revisar_hoja(ws) or revisar_esquina(
-        ws, cfg.fila_inicial, cfg.columna_inicial, [str(c) for c in df.columns])
+    revisar = revisar_cabecera_propia if cfg.modo == "añadir" else revisar_esquina
+    problemas = revisar_hoja(ws) or revisar(
+        ws, cfg.fila_inicial, cfg.columna_inicial, cabeceras)
     if problemas:
         wb.close()
         raise RuntimeError("No sincronizo:\n   · " + "\n   · ".join(problemas))
 
     antes = _contenido(ws)
+    if cfg.modo == "añadir":
+        nuevos, anteriores, cats_nuevas = _anadir(
+            ws, cfg.fila_inicial, cfg.columna_inicial, df, cabeceras)
+        if _contenido(ws) == antes:
+            wb.close()
+            return None, 0
+        copia = copia_de_seguridad(cfg.ruta, cfg.copias_de_seguridad)
+        if cats_nuevas:
+            print(f"   ℹ️  Categorías que tu hoja no tenía hasta ahora: "
+                  + ", ".join(f"{c} ({n})" for c, n in cats_nuevas)
+                  + ".\n      Si tus totales van por categoría, añádelas o no "
+                    "sumarán en ninguno.")
+        if anteriores:
+            print(f"   ℹ️  {anteriores} de los añadidos son anteriores al último "
+                  f"que ya tenías: van al final. Ordena la hoja por fecha si "
+                  f"quieres verlos en su sitio.")
+        _guardar(wb, cfg, copia)
+        return copia, nuevos
 
     notas = _leer_notas(ws, cfg.fila_inicial, cfg.columna_inicial,
                         len(df.columns), list(df.columns))
     _limpiar_bloque(ws, cfg.fila_inicial, cfg.columna_inicial, len(df.columns))
 
     f0, c0 = cfg.fila_inicial, cfg.columna_inicial
-    for j, nombre in enumerate(df.columns):
-        ws.cell(row=f0, column=c0 + j, value=str(nombre))
+    for j, cabecera in enumerate(cabeceras):
+        ws.cell(row=f0, column=c0 + j, value=cabecera)
 
     for i, (_, registro) in enumerate(df.iterrows(), start=1):
-        for j, nombre in enumerate(df.columns):
-            valor = registro[nombre]
-            celda = ws.cell(row=f0 + i, column=c0 + j)
-            if isinstance(valor, pd.Timestamp):
-                celda.value = valor.to_pydatetime()
-                celda.number_format = "DD/MM/YYYY"
-            elif pd.isna(valor):
-                celda.value = None
-            elif isinstance(valor, (int, float)) and not isinstance(valor, bool):
-                celda.value = float(valor)
-                if nombre == "importe":
-                    celda.number_format = '#,##0.00 €'
-            else:
-                texto = str(valor)
-                celda.value = texto
-                if texto.startswith("="):        # que no lo tome por fórmula
-                    celda.data_type = "s"
+        _escribir_fila(ws, f0 + i, c0, registro)
 
     movidas = huerfanas = sin_sitio = 0
     if notas:
@@ -477,6 +555,11 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str | None, int]:
         print(f"      He vaciado esas filas en el bloque volcado, pero no las "
               f"he borrado, para no llevarme lo demás.")
 
+    _guardar(wb, cfg, copia)
+    return copia, len(df)
+
+
+def _guardar(wb, cfg, copia):
     try:
         wb.save(cfg.ruta)
     except PermissionError:
@@ -484,4 +567,108 @@ def escribir(cfg: Config, df: pd.DataFrame) -> tuple[str | None, int]:
                            f"otro programa. Tu copia de seguridad está en {copia}.")
     finally:
         wb.close()
-    return copia, len(df)
+
+
+def _escribir_fila(ws, fila, c0, registro):
+    for j, (nombre, valor) in enumerate(registro.items()):
+        celda = ws.cell(row=fila, column=c0 + j)
+        if isinstance(valor, pd.Timestamp):
+            celda.value = valor.to_pydatetime()
+            celda.number_format = "DD/MM/YYYY"
+        elif pd.isna(valor):
+            celda.value = None
+        elif isinstance(valor, (int, float)) and not isinstance(valor, bool):
+            celda.value = float(valor)
+            if nombre == "importe":
+                celda.number_format = '#,##0.00 €'
+        else:
+            texto = str(valor)
+            celda.value = texto
+            if texto.startswith("="):        # que no lo tome por fórmula
+                celda.data_type = "s"
+
+
+# --- modo «añadir»: la hoja es del usuario ---
+# Para quien lleva su contabilidad en su propia hoja desde hace años (con
+# meses metidos a mano y sus cabeceras) y solo quiere dejar de copiar y
+# pegar. Nada de lo que ya hay se mueve, se reescribe ni se borra: se
+# reconoce cada movimiento por fecha, concepto e importe, y solo se añaden
+# debajo los que faltan. El precio: lo ya añadido no se reclasifica si luego
+# cambias una regla (es tuyo, como lo que tecleas a mano).
+
+def revisar_cabecera_propia(ws, f0, c0, cabeceras) -> list[str]:
+    """La cabecera de la esquina tiene que ser la de «columnas», o estar
+    vacía con la hoja vacía debajo (primera vez)."""
+    from openpyxl.utils import get_column_letter
+    ancho = len(cabeceras)
+    vistas = [ws.cell(f0, c0 + j).value for j in range(ancho)]
+    if all(v is None or not str(v).strip() for v in vistas):
+        hay_debajo = any(c.value is not None
+                         for fila in ws.iter_rows(min_row=f0 + 1, min_col=c0,
+                                                  max_col=c0 + ancho - 1)
+                         for c in fila)
+        if not hay_debajo:
+            return []
+        return [f"La hoja «{ws.title}» tiene datos pero no cabecera en la fila "
+                f"{f0}: pon ahí tus cabeceras ({', '.join(cabeceras)}) o "
+                f"cambia fila_inicial a la fila donde las tengas."]
+    distintas = [f"{get_column_letter(c0 + j)}{f0}: «{v or ''}» en vez de «{e}»"
+                 for j, (v, e) in enumerate(zip(vistas, cabeceras))
+                 if not _igual(v or "", e)]
+    if not distintas:
+        return []
+    return [f"La cabecera de «{ws.title}» no coincide con «columnas» de "
+            f"sincronizar.json ({'; '.join(distintas[:4])}). No añado nada: "
+            f"escribiría cada dato en la columna que no es.",
+            "Pon en «columnas» tus cabeceras tal cual, en su orden, y a qué "
+            "campo corresponde cada una."]
+
+
+def _anadir(ws, f0, c0, df, cabeceras) -> tuple[int, int, list]:
+    """Añade debajo lo que no está. Devuelve (añadidos, cuántos de ellos son
+    anteriores al último que ya había, categorías nuevas en la hoja)."""
+    ancho = len(cabeceras)
+    campos = list(df.columns)
+    if all(ws.cell(f0, c0 + j).value in (None, "") for j in range(ancho)):
+        for j, cabecera in enumerate(cabeceras):
+            ws.cell(row=f0, column=c0 + j, value=cabecera)
+
+    cf, cd, ci = (c0 + campos.index(c) for c in CAMPOS_OBLIGATORIOS)
+    ultima, claves = f0, []
+    for r in range(f0 + 1, ws.max_row + 1):
+        if any(ws.cell(r, c0 + j).value not in (None, "") for j in range(ancho)):
+            ultima = r
+        claves.append(_clave_fila(ws.cell(r, cf).value, ws.cell(r, cd).value,
+                                  ws.cell(r, ci).value))
+    ya = {k for k in _con_repeticion(claves) if k is not None}
+    mas_reciente = max((k[0][0] for k in ya), default="")
+
+    # Las filas nuevas con el formato de la última que ya había (su formato
+    # de fecha, sus euros): si no, la hoja quedaba con dos aspectos.
+    formatos = ({j: ws.cell(ultima, c0 + j).number_format for j in range(ancho)}
+                if ultima > f0 else {})
+    # Qué categorías usaba ya la hoja: una nueva (Higiene, que la hoja nunca
+    # tuvo) no la recoge ningún total que vaya por categoría, y se dice.
+    col_cat = c0 + campos.index("categoria") if "categoria" in campos else None
+    usadas = ({str(ws.cell(r, col_cat).value).strip() for r in range(f0 + 1, ultima + 1)
+               if ws.cell(r, col_cat).value not in (None, "")}
+              if col_cat and ultima > f0 else None)
+    nuevas = {}
+
+    df = df.sort_values("fecha", kind="stable")
+    entrantes = _con_repeticion([_clave_fila(r["fecha"], r["descripcion"], r["importe"])
+                                 for _, r in df.iterrows()])
+    anadidos = anteriores = 0
+    for (_, registro), k in zip(df.iterrows(), entrantes):
+        if k is None or k in ya:
+            continue
+        ultima += 1
+        _escribir_fila(ws, ultima, c0, registro)
+        for j, formato in formatos.items():
+            ws.cell(ultima, c0 + j).number_format = formato
+        anadidos += 1
+        anteriores += k[0][0] < mas_reciente
+        cat = str(registro.get("categoria", "") or "").strip()
+        if usadas is not None and cat and cat not in usadas:
+            nuevas[cat] = nuevas.get(cat, 0) + 1
+    return anadidos, anteriores, sorted(nuevas.items())

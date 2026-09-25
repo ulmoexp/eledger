@@ -195,6 +195,14 @@ lista. Hasta ahora:
   una tabla del usuario, detecta el fichero abierto y no gasta copias sin
   cambios, lectura de Cargo/Abono y de «Payee», recibo de la tarjeta por
   tarjeta y «Sin clasificar» por signo.
+- **2.14.0** — lo que quedaba de la ronda 2: hoja CUENTAS (gasto, ingreso y
+  saldo de cada cuenta o tarjeta), sincronización en modo «añadir» y con
+  columnas propias, `importar_categorias` para el export de otra app, sin
+  aviso del recibo cuando solo hay tarjetas, y la receta de autónomo y
+  trimestres en la guía. Tras la ronda 3 del piloto (solo los tres perfiles
+  con fallos graves, notas 8,5, 8 y 8,5): `equivalencias` para juntar
+  categorías de fábrica sin perder sus reglas, copia del histórico solo si
+  cambia, y una tanda de avisos más precisos.
 
 ## Lo que queda fuera a propósito
 

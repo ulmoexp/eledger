@@ -601,7 +601,9 @@ story += [Paragraph(
     "No hace falta buscarlo a ojo: si el fichero está vacío y hay movimientos de "
     "tarjeta, al terminar el script busca en la cuenta un cargo que cuadre con lo "
     "que suma la tarjeta ese mes y propone la línea lista para pegar aquí. Con "
-    "cualquier patrón ya puesto, no dice nada más.", S["pmini"])]
+    "cualquier patrón ya puesto, no dice nada más. Con varias tarjetas, busca el "
+    "recibo de cada una. Y si solo tienes tarjetas, sin extracto de la cuenta, no "
+    "hay recibo que pueda contarse dos veces: ni avisa.", S["pmini"])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
     "Lo descartado no se pierde: acaba en "
@@ -658,6 +660,12 @@ story += [tabla(
       "La matriz mes × categoría con los totales, el balance y el saldo de la "
       "cuenta. Debajo, tres gráficos: el Acumulado, los ingresos y gastos de cada "
       "mes, y el gasto medio al mes por categoría."],
+     ["<font face='Mono'>CUENTAS</font>",
+      "Solo si tienes dos o más cuentas o tarjetas declaradas en "
+      "<font face='Mono'>cuentas.json</font>: lo que se gastó y lo que entró en "
+      "cada una, mes a mes, y el saldo de cada cuenta al cerrar el mes. Las "
+      "cuentas juntas suman lo mismo que RESUMEN; un fichero que no casa con "
+      "ninguna sale como «(sin identificar)»."],
      ["<font face='Mono'>MOVIMIENTOS</font>",
       "Todos los movimientos, uno por fila, incluidos los excluidos (marcados en la "
       "columna <font face='Mono'>excluido</font>). La cabecera naranja señala la "
@@ -753,8 +761,32 @@ story += [tabla(
       "<i>Opcional.</i> Con <font face='Mono'>true</font>, cada categoría de ingreso "
       "tiene su columna, además del total <b>Ingresos</b>. La que se llama "
       "«Ingresos» sale como <b>Otros ingresos</b>, y así se la nombra en "
-      "etiquetas y orden_resumen."]],
+      "etiquetas y orden_resumen."],
+     ["<font face='Mono'>importar_categorias</font>",
+      "<i>Opcional.</i> Para quien viene de otra app de finanzas y trae su export "
+      "con una columna de categoría: ver «Si vienes de otra app», justo debajo."]],
     [ANCHO * 0.24, ANCHO * 0.76])]
+story += [Spacer(1, 7)]
+story += [Paragraph("Si vienes de otra app", S["h2"])]
+story += [p(
+    "Su export (fecha, concepto, importe) se lee como cualquier extracto: déjalo "
+    "en <font face='Mono' size='8.6'>entrada/</font> junto a los del banco, y "
+    "lo que se solape no se cuenta dos veces. Si además trae una columna de "
+    "categoría y quieres conservar lo que ya tenías clasificado, dilo aquí:")]
+story += [codigo([
+    '"importar_categorias": {',
+    '  "fichero": "export",',
+    '  "traducir": {"Supermercado": "Comida", "Vivienda": "Piso"}',
+    '}',
+])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
+    "<font face='Mono' size='8.2'>fichero</font> es un trozo del nombre del "
+    "export (como en cuentas.json): solo se usa la categoría de ese fichero, "
+    "porque hay bancos que traen la suya y no debe pisar tus reglas. Cada una "
+    "se traduce a una tuya; las que ya se llaman igual valen tal cual. Lo "
+    "traducido va a <font face='Mono' size='8.2'>categoria_manual</font>, donde "
+    "puedes corregirlo, y de lo que no sepa traducir se avisa.", S["pmini"])]
 story += [Spacer(1, 7)]
 story += [aviso(
     "El fallo que esto evita",
@@ -768,7 +800,12 @@ story += [Paragraph(
     "<b>Renombrar una categoría tiene un precio:</b> las reglas de la base que "
     "apuntaban al nombre viejo se descartan (lo dice al arrancar, con cuántas), y "
     "esos comercios dejan de clasificarse solos. Si solo quieres que la columna se "
-    "vea con otro nombre, usa <font face='Mono' size='8.2'>etiquetas</font>. De "
+    "vea con otro nombre, usa <font face='Mono' size='8.2'>etiquetas</font>. Si "
+    "quieres juntar dos de fábrica en una tuya (Luz/Agua y Fibra/movil en "
+    "Facturas), declara la tuya y añade "
+    "<font face='Mono' size='8.2'>\"equivalencias\": {\"Luz/Agua\": "
+    "\"Facturas\", \"Fibra/movil\": \"Facturas\"}</font>: las reglas de la "
+    "base que iban a las viejas van a la tuya, y no se pierde ninguna. De "
     "fábrica hay también una categoría <b>Impuestos</b> (pagos a Hacienda y la cuota "
     "de autónomos); si no la quieres, quítala y esos cargos irán a Otros.",
     S["pmini"])]
@@ -871,6 +908,8 @@ story += [codigo([
     '{',
     '  "archivo": "contabilidad.xlsx",',
     '  "hoja": "MOVIMIENTOS",',
+    '  "modo": "tabla",',
+    '  "columnas": {},',
     '  "fila_inicial": 1,',
     '  "columna_inicial": 1,',
     '  "incluir_excluidos": false,',
@@ -878,14 +917,47 @@ story += [codigo([
     '}',
 ])]
 story += [Spacer(1, 7)]
+story += [tabla(
+    ["modo", "Para quién", "Qué hace"],
+    [["<font face='Mono'>tabla</font>",
+      "Quien monta sus fórmulas sobre una hoja aparte.",
+      "La hoja es de la herramienta: se reescribe <b>entera</b> en cada ejecución, "
+      "siempre al día con tus reglas."],
+     ["<font face='Mono'>añadir</font>",
+      "Quien lleva años con su propia hoja y solo quiere dejar de copiar y pegar.",
+      "La hoja es <b>tuya</b>: solo se añaden debajo los movimientos que falten "
+      "(los reconoce por fecha, concepto e importe, también los que tecleaste a "
+      "mano). Lo que ya hay no se toca nunca, ni se reclasifica si luego cambias "
+      "una regla. Si borras una fila que vino del banco, vuelve."]],
+    [ANCHO * 0.14, ANCHO * 0.36, ANCHO * 0.50])]
+story += [Spacer(1, 5)]
+story += [Paragraph(
+    "<font face='Mono' size='8.2'>columnas</font> dice qué se escribe y con qué "
+    "cabecera, en su orden; vacío, las siete de siempre. En modo añadir, pon tus "
+    "cabeceras tal cual: "
+    "<font face='Mono' size='8.2'>{\"Fecha\": \"fecha\", \"Concepto\": "
+    "\"descripcion\", \"Importe\": \"importe\", \"Categoría\": "
+    "\"categoria\"}</font>. Fecha, concepto e importe no pueden faltar. En modo "
+    "añadir, las filas nuevas copian el formato de la última que ya tenías, lo "
+    "que escribas a mano (una nota, una categoría cambiada) se queda donde está "
+    "porque nada se mueve, y se avisa si entra una categoría que tu hoja no "
+    "usaba (tus totales no la recogerían).", S["pmini"])]
+story += [Spacer(1, 5)]
+story += [Paragraph(
+    "<b>La primera vez, sobre una copia</b> de tu fichero: pon su nombre en "
+    "<font face='Mono' size='8.2'>archivo</font>, ejecuta y ábrela. Cuando veas "
+    "que sale lo que esperas, cambia al fichero de verdad.", S["pmini"])]
+story += [Spacer(1, 7)]
 story += [aviso(
-    "La hoja es de la herramienta, no se añade debajo",
+    "En modo tabla, la hoja es de la herramienta",
     "En cada ejecución se vuelca la tabla <b>entera</b> a partir de la esquina "
     "(<font face='Mono'>fila_inicial</font>, <font face='Mono'>columna_inicial</font>), "
     "con estas columnas: fecha, descripcion, importe, tipo, mes, mes_ajustado y "
-    "categoria. Usa una hoja vacía para ella y haz que tus fórmulas tiren de ahí "
-    "(por ejemplo <font face='Mono'>=SUMIF(Banco!G:G;\"Comida\";Banco!C:C)</font>). "
-    "Si en la esquina hay una tabla tuya con otras cabeceras, no se escribe.")]
+    "categoria (o las de <font face='Mono'>columnas</font>). Usa una hoja vacía "
+    "para ella y haz que tus fórmulas tiren de ahí (por ejemplo "
+    "<font face='Mono'>=SUMIF(Banco!G:G;\"Comida\";Banco!C:C)</font>). Si en la "
+    "esquina hay una tabla tuya con otras cabeceras, no se escribe: para tu hoja "
+    "de siempre, usa el modo añadir.")]
 story += [Spacer(1, 7)]
 story += [Paragraph("Qué se conserva de tu libro", S["h2"])]
 story += [p(
@@ -912,7 +984,9 @@ story += [tabla(
       "Se avisa de que lo guardes y lo cierres, y no se escribe: al guardar tú "
       "después, se perdería lo volcado."],
      ["En la esquina hay datos tuyos con otras cabeceras",
-      "No se escribe, para no borrarlos. Se dice qué columnas escribiría."],
+      "Modo tabla: no se escribe, para no borrarlos. Modo añadir: si la cabecera "
+      "no es la de <font face='Mono'>columnas</font>, no se escribe, para no poner "
+      "cada dato en la columna que no es."],
      ["Tienes notas tuyas al lado de los movimientos",
       "Se recolocan junto a su movimiento aunque entren otros por medio. Si una ya no "
       "tiene movimiento al que acompañar, se queda donde estaba y se avisa."],
@@ -951,6 +1025,40 @@ story += [aviso(
     "es el mes contable. Si el criterio del mes apunta a <b>E</b>, el ajuste de nóminas "
     "y prestaciones no se aplica y esos ingresos cuentan en el mes en que entraron. "
     "Para que el ajuste sirva de algo, la fórmula tiene que filtrar por <b>F</b>.")]
+story += [Spacer(1, 7)]
+story += [Paragraph("Totales de un trimestre", S["h2"])]
+story += [p(
+    "RESUMEN va por meses. Para un trimestre (lo que pide el gestor), suma sus "
+    "tres filas: con julio, agosto y septiembre en las filas 8 a 10, "
+    "<font face='Mono' size='8.6'>=SUMA(B8:B10)</font> debajo de la columna que "
+    "quieras. En tu propio libro, suma las tres fórmulas de arriba, una por mes.")]
+story += [Spacer(1, 7)]
+story += [Paragraph("Si eres autónomo", S["h2"])]
+story += [p(
+    "Una receta de partida, para separar lo que facturas del resto y lo que "
+    "gastas en el negocio. En <font face='Mono' size='8.6'>categorias.json</font>: "
+    "<b>Facturas</b> en <font face='Mono' size='8.6'>ingresos</font> (junto a "
+    "Ingresos), <b>Material</b> y <b>Gasoil</b> en "
+    "<font face='Mono' size='8.6'>gastos</font>, y "
+    "<font face='Mono' size='8.6'>\"desglosar_ingresos\": true</font> para que "
+    "Facturas tenga su columna. <b>Impuestos</b> ya viene de fábrica: los "
+    "modelos de Hacienda y la cuota de autónomos van ahí solos, y lo que te "
+    "devuelve Hacienda cuenta como ingreso. En "
+    "<font face='Mono' size='8.6'>rules.json</font>:")]
+story += [codigo([
+    '"transf. de": {"+": "Facturas"},',
+    '"leroy merlin": "Material",',
+    '"bricomart":    "Material",',
+    '"repsol":       "Gasoil",',
+])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
+    "Con el <font face='Mono' size='8.2'>+</font>, solo lo que entra por "
+    "transferencia es factura: una transferencia que haces tú sigue buscando "
+    "regla más abajo. Las devoluciones de material restan de Material solas. "
+    "Si tienes una cuenta para el negocio y otra personal, decláralas en "
+    "<font face='Mono' size='8.2'>cuentas.json</font> y tendrás cada una por "
+    "separado en la hoja CUENTAS.", S["pmini"])]
 story += [EE]
 
 story += [h1("Dárselo a otra persona"), E]

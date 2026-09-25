@@ -10,7 +10,7 @@ Todo es sintético: ningún dato sale de ajustes/ ni de datos/.
 
     app/.venv/bin/python pruebas/piloto/generar.py [--ronda N] DESTINO [ZIP] [WEB]
 
---ronda  qué perfiles generar (1 o 2; por defecto, la última)
+--ronda  qué perfiles generar (1, 2 o 3; por defecto, la última)
 DESTINO  carpeta donde crear los perfiles (mejor el scratchpad de la sesión)
 ZIP      release a probar; por defecto, el eledger_v*.zip más nuevo de la raíz
 WEB      copia local de la web; por defecto, ../eledger-web
@@ -234,8 +234,11 @@ def frecuentes(m, comercio, veces, lo, hi, primero=1, ultimo=28):
 
 
 def recibo(m, concepto, dia, importe, baile=3):
-    """Un recibo que el banco pasa cerca de su día, no siempre el mismo."""
-    return (mes(m, min(28, max(1, dia + random.randint(-baile, baile)))), concepto, importe)
+    """Un recibo que el banco pasa en su día o unos días DESPUÉS (fin de
+    semana, festivo), nunca antes. En la ronda 2 bailaba hacia los dos
+    lados, y dos recibos seguidos podían quedar a 36-37 días: «Cargos que se
+    repiten» cortaba la serie por un intervalo que un banco real no da."""
+    return (mes(m, min(28, max(1, dia + random.randint(0, baile)))), concepto, importe)
 
 
 def pareja(d):
@@ -398,6 +401,8 @@ RONDAS = {
     # Marta y Ana repiten con los mismos objetivos para confirmar lo arreglado.
     2: {"p1_pareja": pareja, "p2_migrante": migrante, "p3_estudiante": estudiante,
         "p4_autonomo": autonomo, "p5_sync": sync, "p6_marta": marta, "p7_ana": ana},
+    # Los tres que encontraron fallos graves en la ronda 2, sobre la 2.14.0.
+    3: {"p1_pareja": pareja, "p2_migrante": migrante, "p3_carmen": sync},
 }
 
 

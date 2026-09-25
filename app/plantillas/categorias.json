@@ -29,6 +29,10 @@
     "Transferencias internas"
   ],
 
+  "_equivalencias": "Opcional, para juntar categorias de fabrica en una tuya sin perder sus reglas de la base: \"equivalencias\": {\"Luz/Agua\": \"Facturas\", \"Fibra/movil\": \"Facturas\"}. Declara Facturas en gastos; lo que la base mandaba a Luz/Agua o a Fibra/movil va a Facturas.",
+
+  "_importar_categorias": "Opcional, para quien viene de otra app de finanzas: si su export trae una columna de categoria, se puede conservar. Se pone asi: \"importar_categorias\": {\"fichero\": \"parte del nombre del export\", \"traducir\": {\"Supermercado\": \"Comida\", \"Vivienda\": \"Piso\"}}. Lo traducido va a categoria_manual; las que ya se llaman como una tuya valen sin traducir.",
+
   "_columna_mes": "Qué columna manda para agrupar por mes: 'mes' (el real) o 'mes_ajustado' (con las nóminas de los días 1-3 movidas al mes anterior).",
   "columna_mes": "mes_ajustado"
 }

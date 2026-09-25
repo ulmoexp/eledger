@@ -12,7 +12,9 @@ a extractos reales (una IA inventa los formatos) ni a probar en Windows.
 La ronda 1 (25/09/2026, sobre la 2.12.0) está en `ronda1/` y resumida en
 `HALLAZGOS_1.md`: lo que se arregló en la 2.12.1 y lo que se descartó a
 propósito. La ronda 2 (25/09/2026, sobre la 2.12.1) está en `ronda2/` y
-`HALLAZGOS_2.md`. Léelos antes de lanzar otra, para no volver sobre lo mismo.
+`HALLAZGOS_2.md`; la ronda 3 (sobre la 2.14.0, solo los tres perfiles que
+encontraron fallos graves en la 2), en `ronda3/` y `HALLAZGOS_3.md`. Léelos
+antes de lanzar otra, para no volver sobre lo mismo.
 
 ## Cómo lanzarlo
 

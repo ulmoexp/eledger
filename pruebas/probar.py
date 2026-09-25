@@ -1597,7 +1597,8 @@ def prueba_entrada_ilegible(e):
 def prueba_etiquetas_repetidas(e):
     fx.escribir_html(e.entrada / "cuenta.xls", ABRIL)
     cat = e.leer_config("categorias.json")
-    cat["etiquetas"] = {"Comida": "Casa", "Piso": "Casa", "Ocio": "Balance"}
+    cat["etiquetas"] = {"Comida": "Casa", "Piso": "Casa", "Ocio": "Balance",
+                        "Transporte": "casa "}
     e.escribir_config("categorias.json", cat)
     salida = e.ejecutar()
     comprobar(e.ultimo_codigo == 0 and "❌" not in salida, "no se cae", salida)
@@ -1714,6 +1715,219 @@ def prueba_reglas_cli_pares(e):
     comprobar(len(lineas) == 2 and "25,00" in lineas[0] and "-18,50" in lineas[1]
               and "Ingresos" in lineas[0] and "Ocio" in lineas[1],
               "dos casos, cada uno con su signo", proc.stdout + proc.stderr)
+
+
+@caso("tarjeta-sin-cuenta", "Solo con tarjetas no hay recibo que avisar")
+def prueba_tarjeta_sin_cuenta(e):
+    e.escribir_config("exclude_patterns.json", [])
+    fx.escribir_xml_ss(e.entrada / "tarjeta_debito.xls",
+                       [("05/04/2026", "COMPRA A", -50.00)], tarjeta=True)
+    salida = e.ejecutar()
+    comprobar("ningún patrón en" not in salida and "contando dos veces" not in salida,
+              "sin extracto de cuenta, calla", salida)
+
+
+@caso("hoja-cuentas", "Con varias cuentas, la hoja CUENTAS reparte gastos, ingresos y saldo")
+def prueba_hoja_cuentas(e):
+    e.escribir_config("cuentas.json", {"negocio": "negocio", "personal": "personal"})
+    fx.escribir_html(e.entrada / "negocio_2026.xls",
+                     [("05/04/2026", "NOMINA EMPRESA FICTICIA SL", 1000.00),
+                      ("08/04/2026", "COMPRA LIDL", -20.00)])
+    fx.escribir_html(e.entrada / "personal_2026.xls",
+                     [("06/04/2026", "COMPRA MERCADONA MADRID", -30.00)])
+    salida = e.ejecutar()
+    import pandas as pd
+    wb = e.libro_historico()
+    comprobar(wb.sheetnames[:2] == ["RESUMEN", "CUENTAS"], "va justo detrás de RESUMEN",
+              str(wb.sheetnames))
+    wb.close()
+    c = pd.read_excel(e.ruta_historico, sheet_name="CUENTAS").iloc[0]
+    comprobar(c["negocio · gastos"] == 20 and c["personal · gastos"] == 30
+              and c["negocio · ingresos"] == 1000,
+              "gastos e ingresos de cada una", str(c.to_dict()))
+    # fixtures.py parte de 5000 € en cada extracto
+    comprobar(abs(c["negocio · saldo"] - 5980) < 0.005
+              and abs(c["personal · saldo"] - 4970) < 0.005,
+              "y el saldo de cada cuenta", str(c.to_dict()))
+    comprobar("personal · ingresos" not in c.index, "sin columnas que son siempre 0",
+              str(list(c.index)))
+    comprobar("CUENTAS" in salida, "se dice por pantalla", salida)
+    limpios = pd.read_excel(e.salida / "movimientos_limpios.xlsx")
+    comprobar(list(limpios.columns)[:7] == ["fecha", "descripcion", "importe", "tipo",
+                                            "mes", "mes_ajustado", "categoria"]
+              and "cuenta" in limpios.columns,
+              "movimientos_limpios lleva la cuenta, después de A-G",
+              str(list(limpios.columns)))
+
+
+@caso("hoja-cuentas-una", "Con una sola cuenta no hay hoja CUENTAS")
+def prueba_hoja_cuentas_una(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    wb = e.libro_historico()
+    comprobar("CUENTAS" not in wb.sheetnames, "no sale", str(wb.sheetnames))
+    wb.close()
+
+
+def _hoja_propia(ruta):
+    """El Excel de siempre de alguien: su cabecera y un mes metido a mano."""
+    from openpyxl import Workbook
+    import datetime as dt
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+    ws.append(["Fecha", "Concepto", "Importe", "Categoría"])
+    ws.append([dt.datetime(2026, 3, 2), "RECIBO A MANO", -10, "Piso"])
+    ws.append([dt.datetime(2026, 4, 7), "compra mercadona madrid", -100, "Comida"])
+    wb.save(ruta)
+
+
+@caso("sync-anadir", "Modo añadir: solo lo nuevo, debajo, sin tocar lo del usuario")
+def prueba_sync_anadir(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    _hoja_propia(e.dir / "contabilidad.xlsx")
+    cfg = e.leer_config("sincronizar.json")
+    cfg.update(archivo="contabilidad.xlsx", hoja="Datos", modo="añadir",
+               columnas={"Fecha": "fecha", "Concepto": "descripcion",
+                         "Importe": "importe", "Categoría": "categoria"})
+    e.escribir_config("sincronizar.json", cfg)
+    salida = e.ejecutar()
+
+    from openpyxl import load_workbook
+    ws = load_workbook(e.dir / "contabilidad.xlsx")["Datos"]
+    filas = list(ws.iter_rows(values_only=True))
+    comprobar(filas[1][1] == "RECIBO A MANO" and filas[2][1] == "compra mercadona madrid",
+              "lo tecleado a mano sigue igual y en su sitio", str(filas[:3]))
+    # de los tres de abril, el Mercadona ya estaba (escrito en minúsculas)
+    comprobar(len(filas) == 5 and filas[3][1] == "NOMINA EMPRESA FICTICIA SL",
+              "se añaden solo los dos que faltan, debajo", str(filas))
+    comprobar(filas[3][3] == "Ingresos", "cada dato en su columna", str(filas[3]))
+    comprobar(ws.cell(4, 1).number_format == ws.cell(3, 1).number_format,
+              "con el formato de las filas que ya había",
+              f"{ws.cell(4, 1).number_format!r} / {ws.cell(3, 1).number_format!r}")
+    comprobar("no tenía hasta ahora: Ingresos (1)" in salida,
+              "y avisa de las categorías que la hoja no usaba", salida)
+    comprobar("2 movimientos añadidos debajo" in salida, "lo dice", salida)
+
+    salida = e.ejecutar()
+    comprobar("ningún movimiento nuevo" in salida
+              and load_workbook(e.dir / "contabilidad.xlsx")["Datos"].max_row == 5,
+              "la segunda vez no añade nada", salida)
+
+
+@caso("sync-anadir-cabecera", "Modo añadir con una cabecera que no cuadra: no escribe")
+def prueba_sync_anadir_cabecera(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    _hoja_propia(e.dir / "contabilidad.xlsx")
+    cfg = e.leer_config("sincronizar.json")
+    cfg.update(archivo="contabilidad.xlsx", hoja="Datos", modo="añadir",
+               columnas={"Fecha": "fecha", "Importe": "importe",
+                         "Concepto": "descripcion"})
+    e.escribir_config("sincronizar.json", cfg)
+    salida = e.ejecutar()
+    comprobar("no coincide" in salida and "NO se ha tocado" in salida,
+              "se niega y dice dónde", salida)
+
+
+@caso("sync-columnas-propias", "Modo tabla con tus nombres de columna")
+def prueba_sync_columnas_propias(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    from openpyxl import Workbook, load_workbook
+    wb = Workbook()
+    wb.active.title = "MOVIMIENTOS"      # vacía, como la primera vez
+    wb.save(e.dir / "contabilidad.xlsx")
+    cfg = e.leer_config("sincronizar.json")
+    cfg.update(archivo="contabilidad.xlsx",
+               columnas={"Día": "fecha", "Qué": "descripcion", "Cuánto": "importe"})
+    e.escribir_config("sincronizar.json", cfg)
+    e.ejecutar()
+    ws = load_workbook(e.dir / "contabilidad.xlsx")["MOVIMIENTOS"]
+    comprobar([c.value for c in ws[1]] == ["Día", "Qué", "Cuánto"],
+              "tus cabeceras, y solo esas columnas", str([c.value for c in ws[1]]))
+    comprobar(ws.max_row == 4, "con los tres movimientos", str(ws.max_row))
+    salida = e.ejecutar()
+    comprobar("ya estaba al día" in salida, "y la segunda vez la reconoce como suya",
+              salida)
+
+
+@caso("importar-categorias", "Las categorías del export de otra app, solo si se pide")
+def prueba_importar_categorias(e):
+    (e.entrada / "export_otra_app.csv").write_text(
+        "date,description,category,amount\n"
+        "2026-04-01,Recibo Casero,Vivienda,-750.00\n"
+        "2026-04-03,Cena Con Amigos,Restaurantes,-40.00\n"
+        "2026-04-05,Cosa Rara,Varios,-5.00\n", encoding="utf-8")
+    salida = e.ejecutar()
+    df = e.historico()
+    comprobar((df["categoria_manual"].fillna("") == "").all(),
+              "sin pedirlo, no se usa", str(df["categoria_manual"].tolist()))
+    comprobar("importar_categorias" in salida, "pero se dice que se puede", salida)
+
+    cat = e.leer_config("categorias.json")
+    cat["gastos"].append("Varios")
+    cat["importar_categorias"] = {"fichero": "export",
+                                  "traducir": {"Vivienda": "Piso", "Restaurantes": "Ocio"}}
+    e.escribir_config("categorias.json", cat)
+    salida = e.ejecutar()
+    df = e.historico()
+    comprobar(categoria_de(df, "Casero") == "Piso" and categoria_de(df, "Cena") == "Ocio",
+              "pedido, se traduce (también lo que ya estaba en el histórico)",
+              str(df[["descripcion", "categoria", "categoria_manual"]].values.tolist()))
+    comprobar("sin traducir" not in salida and categoria_de(df, "Cosa Rara") == "Varios",
+              "la que se llama como una tuya vale sin traducir", salida)
+    comprobar("salvo lo que traiga importar_categorias" in " ".join(salida.split()),
+              "y el aviso de «saldrá a 0» no lo da por seguro", salida)
+
+    cat["importar_categorias"]["traducir"] = {"Vivienda": "Piso"}
+    cat["gastos"].remove("Varios")
+    e.escribir_config("categorias.json", cat)
+    e.vaciar_entrada()
+    (e.entrada / "export_otra_app.csv").write_text(
+        "date,description,category,amount\n"
+        "2026-05-03,Otra Cena,Restaurantes,-30.00\n", encoding="utf-8")
+    salida = e.ejecutar()
+    comprobar("Restaurantes" in salida and "sin traducir" in salida,
+              "avisa de lo que no sabe traducir", salida)
+
+
+@caso("equivalencias", "Juntar dos categorías de fábrica en una sin perder sus reglas")
+def prueba_equivalencias(e):
+    cat = e.leer_config("categorias.json")
+    cat["gastos"] = ["Facturas" if g == "Luz/Agua" else g for g in cat["gastos"]
+                     if g != "Fibra/movil"]
+    cat["equivalencias"] = {"Luz/Agua": "Facturas", "Fibra/movil": "Facturas"}
+    e.escribir_config("categorias.json", cat)
+    fx.escribir_html(e.entrada / "cuenta.xls", [
+        ("05/04/2026", "RECIBO IBERDROLA CLIENTES", -60.00),
+        ("08/04/2026", "RECIBO MOVISTAR", -40.00)])
+    salida = e.ejecutar()
+    df = e.historico()
+    comprobar(set(df["categoria"]) == {"Facturas"}, "las dos van a la tuya",
+              str(df["categoria"].tolist()))
+    comprobar("iberdrola" not in salida.lower().split("descartadas")[-1][:400]
+              if "descartadas" in salida else True,
+              "sin descartar sus reglas de la base", salida)
+
+
+@caso("historico-copias-sin-cambios", "Sin nada nuevo, no se gasta otra copia del histórico")
+def prueba_historico_copias_sin_cambios(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", ABRIL[:3])
+    e.ejecutar()
+    e.ejecutar()
+    copias = lambda: sorted((e.datos / "copias").glob("historico_*.xlsx"))
+    antes = copias()
+    import time
+    time.sleep(1.1)                      # que una copia nueva tuviera otro nombre
+    e.ejecutar()
+    comprobar(copias() == antes and len(antes) == 1, "la misma copia de antes",
+              f"{[c.name for c in antes]} -> {[c.name for c in copias()]}")
+    # la copia guarda lo que había ANTES de escribir: la de mayo sale en la
+    # ejecución siguiente a la que lo mete
+    fx.escribir_html(e.entrada / "mayo.xls", [("03/05/2026", "COMPRA LIDL", -9.00)])
+    e.ejecutar()
+    time.sleep(1.1)
+    e.ejecutar()
+    comprobar(len(copias()) == 2, "con algo nuevo, sí", str(len(copias())))
 
 
 @caso("sin-nada", "Sin histórico y sin entrada, un error entendible")

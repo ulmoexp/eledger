@@ -123,6 +123,18 @@ de lo que sale y otra de lo que entra** ("cargo"/"abono", "debe"/"haber"),
 reconocidas solo por coincidencia exacta, el importe es lo que entra menos
 lo que sale, venga el cargo en positivo o en negativo.
 
+**La categoría que trae el fichero.** Si la cabecera tiene una columna
+"categoria" o "category" (coincidencia exacta), se lee también. Solo se usa
+si `categorias.json` tiene `importar_categorias` y el nombre del fichero casa
+con su patrón `fichero` (misma sintaxis que `cuentas.json`): es para el
+export de otra app de finanzas, y un banco que trae su propia "Categoría" no
+puede pisar las reglas sin que el usuario lo haya pedido. Cada valor se
+traduce con `traducir` (sin mayúsculas ni acentos); el que ya se llama como
+una categoría declarada vale tal cual. Lo traducido va a `categoria_manual`
+(3.5), así que manda sobre las reglas y se puede corregir a mano; lo que no
+se sabe traducir se queda con las reglas y se avisa de qué valores eran. Sin
+esa configuración, solo se dice por pantalla que el fichero trae categoría.
+
 **Convertir los valores.**
 - Importes en formato español y sus variantes: `1.234,56 €`, `-45,00`,
   `(45,00)` y `45,00-` como negativos, y una heurística para decidir si el
@@ -169,7 +181,9 @@ del mismo tipo cubren al menos 7 días en común y, en esas fechas (con al
 menos 3 movimientos cada uno), comparten menos de la mitad de sus
 movimientos, no son dos descargas de lo mismo: se avisa de que hay que
 declararlas y, si ya se ha fundido algún cargo idéntico de las dos, de
-cuánto falta en los totales.
+cuánto falta en los totales. La línea de «ya estaban» lo señala, y
+el aviso del recibo de la tarjeta remite a declararlas: con cargos fundidos,
+una tarjeta deja de sumar lo que paga su recibo.
 
 ### 3.3 Cargar el histórico
 
@@ -216,7 +230,10 @@ El **nombre del fichero no forma parte de la identidad**, a propósito: si no,
 dos descargas solapadas con nombres distintos duplicarían todo.
 
 Si ya estaba en el histórico, gana la fila del histórico, así que una
-corrección manual ya escrita no se pierde al volver a leer el extracto. Por
+corrección manual ya escrita no se pierde al volver a leer el extracto. La
+excepción es una categoría importada (3.2) para un movimiento que ya estaba
+sin corrección: se pasa a la fila del histórico, para que activar
+`importar_categorias` después de la primera ejecución también sirva. Por
 pantalla se dice cuántos movimientos son nuevos y cuántos ya estaban.
 
 ### 3.5 Clasificar (desde cero, todo el histórico)
@@ -344,7 +361,10 @@ pone al día. En ese caso no se hace copia de seguridad del histórico (no se
 ha tocado).
 
 1. **Copia de seguridad** del histórico anterior en `datos/copias/`, con fecha
-   y hora en el nombre. Se conservan las últimas 10 (configurable en
+   y hora en el nombre, **solo si su hoja MOVIMIENTOS es distinta de la de la
+   última copia** (el resto del fichero sale de ella); si no, la última ya lo
+   guarda. Siempre que tenga hojas añadidas a mano, porque el aviso dice que
+   están en la copia. Se conservan las últimas 10 (configurable en
    `sincronizar.json`); las más antiguas se borran.
 2. **`datos/historico.xlsx`**, reescrito entero (apartado 6). Se escribe en
    un fichero temporal al lado (`.historico.xlsx.escribiendo.xlsx`) y solo
@@ -458,6 +478,13 @@ movimientos acabarían en una categoría que no es columna de nada. Desde la
 con un aviso que nombra la regla; y si su clave era la misma que una de la
 base, la de la base vuelve a aplicarse.
 
+**Equivalencias.** `categorias.json` puede declarar `equivalencias`
+(`{"Luz/Agua": "Facturas"}`): antes de comprobar si una regla de la base
+apunta a una categoría declarada, su categoría se traduce con ellas. Así
+quien junta dos categorías de fábrica en una suya no pierde las reglas de
+la base de ninguna de las dos. Solo cuentan las que apuntan a una categoría
+declarada; las demás se avisan.
+
 **Qué hay en la base.** Solo nombres y conceptos que significan lo mismo para
 cualquiera en España: cadenas de supermercados, gasolineras, operadores,
 comercializadoras, plataformas, cadenas de restauración, aseguradoras de
@@ -529,8 +556,10 @@ y quien decide es el usuario.
 
 ### 5.1 El recibo de la tarjeta
 
-Solo se activa si hay movimientos de tarjeta y `exclude_patterns.json` está
-vacío. Con cualquier patrón puesto, se da por resuelto.
+Solo se activa si hay movimientos de tarjeta, **también de cuenta**, y
+`exclude_patterns.json` está vacío. Con cualquier patrón puesto, se da por
+resuelto. Sin ningún extracto de cuenta (solo tarjetas, una de débito, un
+neobanco) no hay recibo que pueda contarse dos veces, y no se dice nada.
 
 Para cada mes de tarjeta suma lo que debe la tarjeta ese mes (ya descontadas
 las devoluciones), y busca en la cuenta **un único cargo** por ese mismo
@@ -663,8 +692,19 @@ LibreOffice lo pasan por alto y OnlyOffice lo obedece. Ahora cada eje se
 coloca en su sitio a mano. La copia de los valores dentro es de la 2.9.0:
 sin ella, OnlyOffice lo dibujaba vacío.
 
+**CUENTAS** — solo si hay al menos dos cuentas o tarjetas declaradas en
+`cuentas.json` (con una sería repetir RESUMEN). Por mes y por cada una: lo
+gastado (`· gastos`, en positivo como en RESUMEN), lo que entró (`·
+ingresos`, solo si alguna vez entró algo) y, para las cuentas cuyo saldo de
+partida se conoce, el saldo al cerrar el mes (`· saldo`, con todos sus
+movimientos, excluidos incluidos). Mismas categorías que RESUMEN, así que
+las cuentas juntas suman lo mismo que Total Gastos e Ingresos; un traspaso
+entre ellas no es gasto de ninguna. Lo que no casa con ninguna cuenta sale
+como «(sin identificar)». Va en su propia hoja para no cambiar RESUMEN ni lo
+que lean de él `orden_resumen` y las fórmulas de cada cual.
+
 Orden de las hojas: **RESUMEN primero** (y es la que se ve al abrir el
-fichero), luego MOVIMIENTOS y por último _meta.
+fichero), luego CUENTAS si la hay, MOVIMIENTOS y por último _meta.
 
 **_meta** — qué versión escribió el fichero, cuándo y con cuántos
 movimientos. Es lo que permite migrar un histórico antiguo y negarse a tocar
@@ -675,7 +715,8 @@ bandas, primera fila y columna fijas). Cualquier texto que empiece por `=` se
 guarda como texto, para que Excel no lo tome por una fórmula (hay reglas que
 se llaman `=dia`).
 
-`salida/movimientos_limpios.xlsx` son esas siete columnas más origen y regla,
+`salida/movimientos_limpios.xlsx` son esas siete columnas más origen, regla y
+cuenta,
 solo de lo que cuenta: es lo que se pega en una hoja propia si no se usa la
 sincronización.
 
@@ -687,6 +728,31 @@ Opcional (`sincronizar.json`; sin fichero indicado, no hace nada). Vuelca los
 movimientos que cuentan (o todos, si se pide) en **una hoja concreta** de un
 `.xlsx` del usuario, a partir de la fila y columna indicadas, conservando el
 resto del libro (fórmulas de otras hojas, formatos, gráficos, imágenes).
+
+**Qué columnas.** Sin `columnas`, las siete de siempre (fecha a categoria)
+con esos nombres. Con `columnas` (`{"Tu cabecera": "campo"}`), solo esas, en
+ese orden y con esas cabeceras; fecha, descripcion e importe son
+obligatorias, porque sin ellas no se reconoce un movimiento en la hoja.
+
+**Dos modos.**
+- **tabla** (el de siempre): la hoja es de la herramienta. El bloque se
+  vacía y se reescribe entero en cada ejecución, siempre clasificado con las
+  reglas de hoy. Es lo que describe el resto de este apartado.
+- **añadir**: la hoja es del usuario, con sus cabeceras y lo que haya metido
+  a mano. La cabecera de la esquina tiene que ser la de `columnas` (sin
+  mayúsculas ni acentos), o estar vacía con la hoja vacía debajo (la primera
+  vez se escribe). Cada fila se reconoce por fecha + concepto (sin
+  mayúsculas ni acentos) + importe + número de repetición, también si se
+  tecleó como texto («02/06/2026», «-64,35»). Se añaden debajo de la última
+  fila con algo, en orden de fecha, solo los movimientos que no están; lo que
+  ya hay no se mueve, no se reescribe y no se borra nunca (y por eso tampoco
+  se reclasifica si cambia una regla). Un movimiento del banco que el
+  usuario borre de su hoja vuelve en la siguiente ejecución, porque sigue en
+  el histórico. Si alguno de los añadidos es anterior al último que había,
+  se dice, porque queda al final. Las filas nuevas toman el formato de
+  número de la última que ya había (sus fechas, sus euros), y si entra una
+  categoría que la hoja no tenía en ninguna fila, se avisa: un total por
+  categoría de la hoja no la recogería.
 
 Se niega a escribir, y lo explica, si:
 - el fichero es `.xlsm` (perdería las macros) o no es `.xlsx`;

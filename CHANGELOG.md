@@ -6,6 +6,49 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.14.0
+
+Lo que quedaba pendiente de la segunda ronda del piloto.
+
+- **Hoja nueva, CUENTAS**, si tienes dos o más cuentas o tarjetas
+  declaradas en `cuentas.json`: lo que se gastó y lo que entró en cada una,
+  mes a mes, y el saldo de cada cuenta. Sirve para ver el negocio y lo
+  personal por separado, o cuánto gasta cada uno con su tarjeta. RESUMEN no
+  cambia.
+- **Sincronización con tu hoja de siempre:**
+  - modo nuevo, `"modo": "añadir"`: la hoja es tuya, con tus cabeceras y
+    lo que ya tengas metido a mano, y solo se añaden debajo los movimientos
+    que falten. Lo que ya hay no se toca;
+  - `"columnas"` elige qué columnas se escriben y con qué cabecera
+    (`{"Fecha": "fecha", "Concepto": "descripcion", ...}`), en los dos
+    modos.
+- **Si vienes de otra app de finanzas**, su export se puede traer con sus
+  categorías: `importar_categorias` en `categorias.json` dice de qué fichero
+  y cómo se traduce cada una. Lo traducido va a `categoria_manual`.
+- **Solo con tarjetas, sin extracto de la cuenta, ya no se avisa del recibo
+  de la tarjeta**: no hay recibo que pueda contarse dos veces.
+- **Juntar categorías de fábrica sin perder sus reglas:** con
+  `"equivalencias": {"Luz/Agua": "Facturas", "Fibra/movil": "Facturas"}` en
+  `categorias.json`, las reglas de la base que iban a las viejas van a la
+  tuya. Antes se descartaban y esos comercios acababan en Otros.
+- **La copia de seguridad del histórico solo se hace si ha cambiado algo.**
+  Antes cada ejecución gastaba una, y con diez seguidas se perdía la última
+  que era distinta.
+- `movimientos_limpios.xlsx` lleva la columna `cuenta`, después de A-G.
+- Con dos tarjetas sin declarar, el aviso del recibo y la línea de «ya
+  estaban» remiten a `cuentas.json` en vez de callar la causa.
+- Modo añadir: las filas nuevas copian el formato de las tuyas, y se avisa
+  si entra una categoría que tu hoja no usaba.
+- Etiquetas que solo se diferencian en mayúsculas o espacios cuentan como
+  repetidas; el aviso de «su columna saldrá a 0» tiene en cuenta lo
+  importado; se explica un saldo inicial negativo; la regla de Digi ya no
+  pilla «DIGITAL».
+- Guía: receta de partida para autónomos (facturas, material, impuestos),
+  cómo sacar los totales de un trimestre y «la primera vez, sobre una
+  copia» para la sincronización.
+
+---
+
 ## 2.13.0
 
 Arreglos de la segunda ronda del piloto con usuarios simulados.

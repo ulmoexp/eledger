@@ -277,7 +277,8 @@ def cargar_configuracion():
     clasificador = Clasificador.desde_json(
         rutas.REGLAS, ruta_base=rutas.REGLAS_BASE,
         categorias_validas=set(catalogo.todas),
-        por_defecto_positivo=catalogo.ingreso_por_defecto)
+        por_defecto_positivo=catalogo.ingreso_por_defecto,
+        equivalencias=catalogo.equivalencias)
     excluidor = Excluidor.desde_json(rutas.EXCLUSIONES)
     identificador_cuentas = IdentificadorCuentas.desde_json(rutas.CUENTAS)
     cfg_sync = sync.Config.desde_json(rutas.SINCRONIZAR, raiz=rutas.RAIZ)
@@ -513,12 +514,55 @@ def leer_entrada():
             # nada repetir "cuenta: " vacío en cada línea.
             extra = f" · cuenta: {cuenta}" if cuenta else ""
             print(f"     → {tipo} " + gris(f"({motivo}){extra}"))
+            importar_categorias(df, nombre)
             dfs.append(df)
         except Exception as e:
             print(f"   · {nombre}: " + rojo("✗ no se ha podido leer")
                   + gris(" (el motivo, en los avisos del final)"))
             avisar(f"No he podido leer {nombre}", str(e).splitlines())
     return dfs
+
+
+def importar_categorias(df, nombre):
+    """
+    El export de otra app de finanzas trae ya su categoría. Si en
+    categorias.json se ha pedido (importar_categorias, con qué ficheros y
+    cómo se traduce cada una), va a categoria_manual: es lo que ya habías
+    decidido tú en la otra app, y ahí se puede corregir como cualquier otra.
+
+    Solo con esa configuración: hay bancos que exportan su propia columna
+    «Categoría», y no puede pisar tus reglas sin que lo hayas decidido. Lo
+    que no se traduce a una categoría tuya se queda con las reglas, y se
+    avisa de qué valores eran.
+    """
+    trae = df["categoria_fichero"].ne("")
+    imp = catalogo.importar
+    valido = (isinstance(imp, dict) and isinstance(imp.get("traducir"), dict)
+              and str(imp.get("fichero", "")).strip())
+    if not trae.any():
+        return
+    if not valido or not compilar(str(imp["fichero"]))[0].search(normalizar(nombre)):
+        print(gris("     (trae una columna de categoría; si es el export de otra "
+                   "app, mira importar_categorias en la guía)"))
+        return
+    validas = set(catalogo.todas) | {hist.MARCA_EXCLUIDO}
+    # la que ya se llama como una tuya vale tal cual, sin traducirla
+    traducir = {normalizar(c): c for c in catalogo.todas}
+    traducir.update({normalizar(k): v for k, v in imp["traducir"].items()
+                     if v in validas})
+    traducida = df["categoria_fichero"].map(lambda c: traducir.get(normalizar(c), ""))
+    df["categoria_manual"] = traducida
+    print(f"     → {int(traducida.ne('').sum())} con la categoría del fichero "
+          + gris("(importar_categorias)"))
+    sin = sorted(set(df.loc[trae & traducida.eq(""), "categoria_fichero"]))
+    if sin:
+        avisar(f"{nombre}: categorías sin traducir", [
+            f"{', '.join(sin)}: no están en «traducir» de importar_categorias "
+            f"(o apuntan a una categoría que no tienes). Esos movimientos se "
+            f"quedan con lo que digan tus reglas.",
+            "Lo que ya se importó antes está en categoria_manual y se queda "
+            "ahí aunque quites su traducción: bórralo en esa columna si "
+            "quieres que manden las reglas."])
 
 
 # ========= CLASIFICACIÓN =========
@@ -741,10 +785,12 @@ def avisar_cuentas_sin_declarar(nuevos):
     Sin cuentas.json: dos ficheros del mismo tipo que cubren las mismas
     fechas pero casi no comparten movimientos no son dos descargas de lo
     mismo, sino dos tarjetas (o cuentas). Se avisa, con lo que se ha
-    fundido si ya ha pasado.
+    fundido si ya ha pasado. Devuelve (hay aviso, cuántos se han fundido):
+    lo usan la línea de «ya estaban» y el aviso del recibo de la tarjeta.
     """
+    hay, fundidos = False, 0
     if identificador_cuentas.reglas or len(nuevos) < 2:
-        return
+        return hay, fundidos
     for i, a in enumerate(nuevos):
         for b in nuevos[i + 1:]:
             if a.empty or b.empty or a["tipo"].iloc[0] != b["tipo"].iloc[0]:
@@ -770,6 +816,8 @@ def avisar_cuentas_sin_declarar(nuevos):
                       f"declararlas, un cargo idéntico el mismo día en las dos "
                       f"(dos cafés iguales, uno en cada tarjeta) se cuenta "
                       f"UNA sola vez."]
+            hay = True
+            fundidos += len(comunes)
             if comunes:
                 fundido = -en_a.loc[claves_a.isin(comunes).values, "importe"].sum()
                 lineas.append(f"Aquí ha pasado con {len(comunes)}: faltan "
@@ -778,6 +826,7 @@ def avisar_cuentas_sin_declarar(nuevos):
                           f"una parte del nombre de cada fichero (la guía lo "
                           f"explica en «Varias cuentas o tarjetas»).")
             avisar(f"Parecen dos {que} distintas sin declarar", lineas)
+    return hay, fundidos
 
 
 # ========= CUADRE CON EL SALDO DEL BANCO =========
@@ -1157,7 +1206,7 @@ def _clave_liquidacion(descripciones):
     return max(trozos, key=len).strip()
 
 
-def detectar_recibo_tarjeta(todo):
+def detectar_recibo_tarjeta(todo, sin_declarar=False):
     """Hito A2 del roadmap. Solo actúa si exclude_patterns.json está vacío:
     con cualquier patrón ya puesto se asume resuelto, sea o no el de la
     tarjeta (así lo pide el roadmap, y evitar el aviso es tan fácil como
@@ -1174,7 +1223,12 @@ def detectar_recibo_tarjeta(todo):
     if tarjeta_por_mes.empty:
         return False, set()
 
+    # Sin ningún extracto de cuenta no hay recibo que pueda contarse dos
+    # veces: quien solo tiene tarjetas (una de débito, un neobanco) recibía
+    # el aviso en cada ejecución sin poder hacer nada con él.
     cuenta = todo[todo["tipo"] == "cuenta"]
+    if cuenta.empty:
+        return False, set()
     # Con dos tarjetas, cada una se liquida con su propio recibo y la suma de
     # las dos no cuadra con ninguno: se prueba primero el total del mes y,
     # si no, cada tarjeta por separado (por su cuenta declarada o, sin
@@ -1204,11 +1258,17 @@ def detectar_recibo_tarjeta(todo):
 
     titulo = ("Tienes movimientos de tarjeta y ningún patrón en "
               "exclude_patterns.json")
+    # con tarjetas sin declarar fundidas, alguna deja de cuadrar con su
+    # recibo; se decía «no encuentro una clave segura» sin decir por qué
+    pista = ([f"Primero declara tus tarjetas en {rutas.relativa(rutas.CUENTAS)} "
+              f"(ver el aviso de las dos tarjetas): con cargos de las dos fundidos "
+              f"en uno, la tarjeta ya no suma lo que paga su recibo y no lo "
+              f"encuentro."] if sin_declarar else [])
     if not candidatos:
         avisar(titulo, [
             "Si tu cuenta paga la tarjeta con un recibo, cada gasto se está "
             "contando DOS VECES y no lo he sabido encontrar solo.",
-            "Revísalo a mano: LEEME.txt explica cómo excluirlo."])
+            "Revísalo a mano: LEEME.txt explica cómo excluirlo."] + pista)
         return True, set()
 
     lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
@@ -1237,7 +1297,7 @@ def detectar_recibo_tarjeta(todo):
         lineas.append("No encuentro una clave segura que proponer (podría "
                       "excluir algún otro movimiento tuyo); añádelo tú a mano "
                       "con lo que ves arriba.")
-    avisar(titulo, lineas)
+    avisar(titulo, lineas + pista)
     return True, {f["descripcion"] for f in candidatos.values()}
 
 
@@ -1467,7 +1527,7 @@ def main():
                   f"duplicado al declarar las cuentas): quitados.")
 
     nuevos = apartar_copias_sin_cuenta(previo, nuevos)
-    avisar_cuentas_sin_declarar(nuevos)
+    sin_declarar, fundidos = avisar_cuentas_sin_declarar(nuevos)
 
     crudos, anadidos, repetidos = hist.fusionar(previo, nuevos)
     if repetidos:
@@ -1476,6 +1536,11 @@ def main():
         # Decir solo «se solapan» confundía al repetir una ejecución.
         print(f"🔁 {repetidos} movimientos ya estaban (en el histórico o en otro "
               f"extracto); no se cuentan dos veces.")
+        # «ya estaban» sonaba a todo en orden justo cuando se estaban
+        # perdiendo cargos de dos tarjetas distintas
+        if fundidos:
+            print(amarillo(f"   ⚠️  De ellos, {fundidos} pueden ser cargos distintos "
+                           f"de dos tarjetas o cuentas: mira los avisos del final."))
     if anadidos:
         print(f"➕ {anadidos} movimientos nuevos.")
     elif nuevos:
@@ -1516,22 +1581,33 @@ def main():
     # Acumulado es lo que hay en la cuenta, no lo que suma el Balance
     resumen = hist.construir_resumen(df, catalogo, saldo_inicial,
                                      todo[todo["tipo"] == "cuenta"])
+    por_cuenta = hist.construir_por_cuenta(df, catalogo, todo[todo["tipo"] == "cuenta"],
+                                           saldos_por_cuenta, sin_saldo)
     # la copia de seguridad solo si se va a tocar el de verdad: si el
     # resultado va a una copia, el histórico queda como estaba
     copia_historico = None
     ajenas = hist.hojas_ajenas(rutas.HISTORICO)
     if os.path.exists(rutas.HISTORICO) and rutas.HISTORICO not in en_copia:
-        copia_historico = sync.copia_de_seguridad(rutas.HISTORICO,
-                                                  cfg_sync.copias_de_seguridad)
+        # Sin nada nuevo desde la última copia, no se hace otra: antes cada
+        # ejecución gastaba una, y con diez seguidas se perdía la última
+        # que de verdad era distinta.
+        ultima = sync.ultima_copia(rutas.HISTORICO)
+        # (con hojas propias sí: el aviso dice que están en la copia)
+        if ultima and not ajenas and hist.mismos_movimientos(rutas.HISTORICO, ultima):
+            copia_historico = ultima
+        else:
+            copia_historico = sync.copia_de_seguridad(rutas.HISTORICO,
+                                                      cfg_sync.copias_de_seguridad)
     copiados = {}
     historico_escrito = guardar_o_copiar(
         rutas.HISTORICO,
         lambda r: hist.guardar(r, todo[COLUMNAS_HISTORICO], resumen, catalogo,
-                               version=rutas.version(), saldo_real=saldo_real),
+                               version=rutas.version(), saldo_real=saldo_real,
+                               por_cuenta=por_cuenta),
         en_copia, copiados)
     limpios_escrito = guardar_o_copiar(
         rutas.LIMPIOS,
-        lambda r: guardar_excel(df[COLUMNAS_BASE + ["origen", "regla"]], r),
+        lambda r: guardar_excel(df[COLUMNAS_BASE + ["origen", "regla", "cuenta"]], r),
         en_copia, copiados)
     if not excluidos.empty:
         guardar_o_copiar(
@@ -1544,8 +1620,10 @@ def main():
     # actualizado, y un ✅ verde lo hacía pasar por bueno
     pintar, marca = ((verde, "✅") if historico_escrito == rutas.HISTORICO
                      else (amarillo, "⚠️ "))
+    hojas = [hist.HOJA_RESUMEN] + ([hist.HOJA_CUENTAS] if not por_cuenta.empty
+                                   else []) + [hist.HOJA_MOVIMIENTOS]
     print(pintar(f"{marca} {rutas.relativa(historico_escrito)}  ·  hojas "
-                 f"{hist.HOJA_RESUMEN} y {hist.HOJA_MOVIMIENTOS}"))
+                 f"{', '.join(hojas[:-1])} y {hojas[-1]}"))
     print(f"   {rutas.relativa(limpios_escrito)}  " + gris("·  lo que pegas en A-G"))
     avisar_copias(copiados)
     if ajenas and historico_escrito == rutas.HISTORICO:
@@ -1563,13 +1641,21 @@ def main():
         try:
             a_volcar = todo if cfg_sync.incluir_excluidos else df
             copia, filas = sync.escribir(cfg_sync, a_volcar[COLUMNAS_BASE])
+            destino = f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
             if copia:
-                print(verde(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
-                            f"{filas} filas escritas"))
-                print(gris(f"   copia de seguridad en {copia}"))
+                if cfg_sync.modo == "añadir":
+                    que = ("1 movimiento añadido debajo" if filas == 1
+                           else f"{filas} movimientos añadidos debajo")
+                else:
+                    que = f"{filas} filas escritas"
+                print(verde(f"{destino}{que}"))
+                print(gris(f"   copia de seguridad en {rutas.relativa(copia)}"))
+            elif cfg_sync.modo == "añadir":
+                print(verde(f"{destino}ningún movimiento nuevo que añadir, "
+                            f"no lo he tocado"))
             else:
-                print(verde(f"📗 {cfg_sync.archivo} · hoja {cfg_sync.hoja}: "
-                            f"ya estaba al día ({filas} filas), no lo he tocado"))
+                print(verde(f"{destino}ya estaba al día ({filas} filas), no lo "
+                            f"he tocado"))
         except Exception as e:
             print(f"📗 {cfg_sync.archivo}: " + rojo("✗ no sincronizado")
                   + gris(" (el motivo, en los avisos del final)"))
@@ -1600,6 +1686,15 @@ def main():
               f"de la suma:")
         for id_cuenta, saldo in sorted(detectados.items()):
             print(f"   {id_cuenta or '(sin identificar)'}: {euros(saldo)}")
+    # un saldo de partida negativo casi siempre es un fichero SIN saldo (un
+    # export antiguo) delante del primero que lo trae: se calcula hacia
+    # atrás a través de él, y si ese fichero no es de la misma cuenta, o le
+    # faltan movimientos, el número sale raro sin que nada lo explique
+    if any(v < 0 for v in detectados.values()):
+        print(gris("   Es negativo. Si tu cuenta no estaba en números rojos, "
+                   "algún fichero sin columna de saldo\n   va antes del primero "
+                   "que la trae, y el cálculo hacia atrás lo arrastra: el saldo "
+                   "del\n   final sí es el del banco."))
     if sin_saldo:
         cuales = ("de tu cuenta" if sin_saldo == [""] else
                   "de " + ", ".join(c or "(sin identificar)" for c in sin_saldo))
@@ -1613,7 +1708,7 @@ def main():
 
     # si se están contando dos veces los gastos de la tarjeta, que se sepa
     # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
-    doble_tarjeta, recibos_tarjeta = detectar_recibo_tarjeta(todo)
+    doble_tarjeta, recibos_tarjeta = detectar_recibo_tarjeta(todo, sin_declarar)
 
     # orden_resumen puede haber quitado cualquiera de estas columnas del
     # resumen: se enseña solo lo que haya. Pedirlas a pelo rompía aquí,

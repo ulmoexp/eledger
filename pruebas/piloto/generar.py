@@ -8,8 +8,9 @@ lectores y cabeceras diferentes.
 
 Todo es sintético: ningún dato sale de ajustes/ ni de datos/.
 
-    app/.venv/bin/python pruebas/piloto/generar.py DESTINO [ZIP] [WEB]
+    app/.venv/bin/python pruebas/piloto/generar.py [--ronda N] DESTINO [ZIP] [WEB]
 
+--ronda  qué perfiles generar (1 o 2; por defecto, la última)
 DESTINO  carpeta donde crear los perfiles (mejor el scratchpad de la sesión)
 ZIP      release a probar; por defecto, el eledger_v*.zip más nuevo de la raíz
 WEB      copia local de la web; por defecto, ../eledger-web
@@ -17,8 +18,8 @@ WEB      copia local de la web; por defecto, ../eledger-web
 Ojo, aprendido en la ronda 1: con UNA compra al mes en el mismo súper, el
 mismo día, el informe de cargos que se repiten la toma por un recibo. Eso es
 un artefacto de los datos, no del programa: en un extracto real hay varias
-compras al mes en el mismo sitio. Para la ronda 2, generar compras
-frecuentes con fechas e importes variados.
+compras al mes en el mismo sitio. Por eso los perfiles de la ronda 2 usan
+frecuentes() y recibo() en vez de un día fijo por comercio.
 """
 import random
 import shutil
@@ -223,25 +224,202 @@ def ana(d):
     (d / "extracto_vacio.xls").write_bytes(b"")
 
 
-PERFILES = {"p1_lucia": lucia, "p2_javier": javier, "p3_marta": marta,
-            "p4_pedro": pedro, "p5_ana": ana}
+# ---------------------------------------------------------------- ronda 2
+# Datos más parecidos a un extracto real: el súper varias veces al mes con
+# importes distintos, recibos que bailan unos días, devoluciones y algún
+# cargo idéntico repetido de verdad (la deduplicación no debe comérselo).
+def frecuentes(m, comercio, veces, lo, hi, primero=1, ultimo=28):
+    dias = sorted(random.sample(range(primero, ultimo + 1), veces))
+    return [(mes(m, d), comercio, -round(random.uniform(lo, hi), 2)) for d in dias]
+
+
+def recibo(m, concepto, dia, importe, baile=3):
+    """Un recibo que el banco pasa cerca de su día, no siempre el mismo."""
+    return (mes(m, min(28, max(1, dia + random.randint(-baile, baile)))), concepto, importe)
+
+
+def pareja(d):
+    """Pareja con cuenta conjunta (CSV) y una tarjeta cada uno, del mismo
+    banco y con el mismo formato: dos ficheros de tarjeta casi iguales y dos
+    cafés idénticos el mismo día en cada una."""
+    conj, t1, t2 = [], [], []
+    for m in (7, 8, 9):
+        conj += [recibo(m, "TRANSFERENCIA NOMINA INDRA SISTEMAS", 27, 1890.00, 1),
+                 recibo(m, "TRANSFERENCIA NOMINA HOSPITAL QUIRON", 28, 1620.00, 1),
+                 recibo(m, "ADEUDO PRESTAMO HIPOTECARIO", 1, -845.20, 0),
+                 recibo(m, "RECIBO IBERDROLA CLIENTES", 6, -round(random.uniform(55, 95), 2)),
+                 recibo(m, "RECIBO ESCUELA INFANTIL LOS PINOS", 3, -310.00),
+                 recibo(m, "RECIBO MAPFRE SEGURO HOGAR", 15, -32.40),
+                 recibo(m, "RECIBO ORANGE ESPAGNE", 20, -54.95)]
+        conj += frecuentes(m, "COMPRA MERCADONA", 5, 35, 140)
+        conj += frecuentes(m, "COMPRA ALCAMPO", 2, 60, 180)
+        for tarjeta, final in ((t1, "1111"), (t2, "2222")):
+            tarjeta += frecuentes(m, "CAFETERIA LA ESQUINA", 6, 1.8, 4.5)
+            tarjeta += frecuentes(m, "GASOLINERA CEPSA", 2, 45, 70)
+            tarjeta += frecuentes(m, "AMAZON MARKETPLACE", 2, 9, 60)
+        t1 += frecuentes(m, "DECATHLON", 1, 20, 90)
+        t2 += frecuentes(m, "PRIMARK", 1, 15, 60)
+    # Los dos cafés iguales, el mismo día, en cada tarjeta: gastos reales.
+    for t in (t1, t2):
+        t += [(mes(8, 14), "CAFETERIA LA ESQUINA", -2.60)] * 2
+    t2.append((mes(8, 22), "DEVOLUCION PRIMARK", 24.99))
+    # Cada tarjeta se liquida en la conjunta el día 2 del mes siguiente.
+    for t, final in ((t1, "1111"), (t2, "2222")):
+        for m in (7, 8):
+            suma = round(sum(i for a, _, i in t if a.month == m), 2)
+            conj.append((mes(m + 1, 2), f"LIQUIDACION TARJETA {final}", suma))
+    cab = ["Fecha", "Fecha valor", "Concepto", "Importe", "Saldo"]
+    csv(d / "movimientos_cuenta_conjunta.csv",
+        [(dmy(a), dmy(a), c, es(i), es(s)) for a, c, i, s in con_saldo(conj, 4200.00)], cab)
+    for t, final in ((t1, "1111"), (t2, "2222")):
+        xml_xls(d / f"Tarjeta_{final}_movimientos.xls",
+                [(dmy(a), c, es(i)) for a, c, i in sorted(t)],
+                ["Fecha operación", "Comercio", "Importe de la operación"])
+
+
+def migrante(d):
+    """Viene de otra app de finanzas: trae un CSV exportado de ella, con sus
+    propias categorías, y los extractos del banco (con columnas Cargo y
+    Abono separadas, como exportan algunos bancos)."""
+    movs = []
+    for m in (4, 5, 6, 7, 8, 9):
+        movs += [recibo(m, "NOMINA ACCENTURE", 28, 2150.00, 1),
+                 recibo(m, "RECIBO ALQUILER C/ MAYOR 12", 1, -750.00, 1),
+                 recibo(m, "ADEUDO NATURGY", 12, -round(random.uniform(35, 70), 2)),
+                 recibo(m, "RECIBO VODAFONE", 8, -35.00),
+                 recibo(m, "SPOTIFY P1234ABC", 4, -11.99, 0)]
+        movs += frecuentes(m, "COMPRA TARJ LIDL", 4, 15, 70)
+        movs += frecuentes(m, "COMPRA TARJ BURGER KING", 2, 8, 16)
+        movs += frecuentes(m, "RENFE CERCANIAS", 3, 2.4, 2.4)
+    movs.append((mes(6, 18), "DEVOLUCION ADEUDO NATURGY", 48.20))
+    antes = sorted(x for x in movs if x[0].month <= 6)
+    despues = sorted(x for x in movs if x[0].month >= 7)
+    cats = {"NOMINA": "Salario", "ALQUILER": "Vivienda", "NATURGY": "Facturas", "VODAFONE": "Facturas",
+            "SPOTIFY": "Ocio", "LIDL": "Supermercado", "BURGER": "Restaurantes", "RENFE": "Transporte"}
+    cat = lambda c: next((v for k, v in cats.items() if k in c), "Otros")
+    csv(d / "export_otra_app_2026-06-30.csv",
+        [(a.isoformat(), c.title(), cat(c), f"{i:.2f}") for a, c, i in antes],
+        ["date", "description", "category", "amount"], sep=",", encoding="utf-8", preambulo=())
+    saldo = 1800.00
+    filas = []
+    for a, c, i in despues:
+        saldo = round(saldo + i, 2)
+        filas.append((dmy(a), c, es(-i) if i < 0 else "", es(i) if i > 0 else "", es(saldo)))
+    xlsx(d / "Extracto_cuenta_jul-sep_2026.xlsx", filas, ["Fecha", "Concepto", "Cargo", "Abono", "Saldo"])
+
+
+def estudiante(d):
+    """Estudiante con un único neobanco (CSV en inglés, otro formato que el
+    de la ronda 1). Importes pequeños, Bizum y la ayuda de sus padres."""
+    movs = []
+    for m in (7, 8, 9):
+        movs.append(recibo(m, "Transferencia de PADRES GARCIA", 1, 300.00, 2))
+        movs += frecuentes(m, "CAFE BAR UNIVERSIDAD", 8, 1.2, 3.5)
+        movs += frecuentes(m, "Mercadona", 3, 8, 35)
+        movs += frecuentes(m, "Glovo", 2, 9, 22)
+        movs += [(mes(m, 11), "Netflix", -5.49), recibo(m, "Tuenti Movil", 5, -10.00, 1),
+                 recibo(m, "Bizum a MARIO piso gastos", 3, -120.00, 1)]
+        for _ in range(3):
+            movs.append((mes(m, random.randint(1, 28)), "Bizum de LUCAS cena", round(random.uniform(5, 20), 2)))
+    movs += [(mes(9, 9), "CAFE BAR UNIVERSIDAD", -1.30)] * 2
+    movs.append((mes(9, 15), "Beca MEC MINISTERIO EDUCACION", 1500.00))
+    movs.append((mes(8, 3), "Zalando", -39.95))
+    movs.append((mes(8, 19), "Zalando Refund", 39.95))
+    cab = ["Date", "Payee", "Account number", "Transaction type", "Payment reference",
+           "Amount (EUR)", "Amount (Foreign Currency)", "Type Foreign Currency", "Exchange Rate"]
+    csv(d / "n26-csv-transactions.csv",
+        [(a.isoformat(), c, "", "Presentment" if i < 0 else "Income", "", f"{i:.2f}", "", "", "")
+         for a, c, i in sorted(movs)], cab, sep=",", encoding="utf-8", preambulo=())
+
+
+def autonomo(d):
+    """Autónomo de verdad: facturas cobradas, IVA trimestral (303), IRPF
+    fraccionado (130), cuota, gastos deducibles y la devolución de la renta.
+    Prueba la categoría Impuestos de la 2.12.1."""
+    movs = []
+    for m in (7, 8, 9):
+        for _ in range(random.randint(2, 4)):
+            movs.append((mes(m, random.randint(1, 28)), random.choice(
+                ("TRANSF. DE REFORMAS GIL SL FRA", "TRANSF. DE COMUNIDAD PROP. SOL FRA",
+                 "TRANSF. DE PARTICULAR ANTONIO RUIZ")) + f" 2026-{random.randint(10, 99)}",
+                round(random.uniform(300, 2400), 2)))
+        movs += [recibo(m, "CUOTA AUTONOMOS TGSS", 28, -320.00, 0),
+                 recibo(m, "RECIBO GESTORIA ASESORES DEL SUR", 5, -60.50, 1),
+                 recibo(m, "RECIBO SEGURO RC MAPFRE", 10, -41.20, 2),
+                 recibo(m, "RECIBO ALQUILER NAVE POLIGONO", 1, -450.00, 1)]
+        movs += frecuentes(m, "COMPRA LEROY MERLIN", 3, 25, 260)
+        movs += frecuentes(m, "BRICOMART", 2, 40, 400)
+        movs += frecuentes(m, "GASOLINERA REPSOL", 3, 50, 85)
+    movs += [(mes(7, 18), "AEAT MODELO 303 2T 2026", -1184.62),
+             (mes(7, 18), "AEAT MODELO 130 2T 2026", -402.10),
+             (mes(7, 3), "DEVOLUCION AEAT IRPF 2025", 612.00),
+             (mes(8, 12), "IMPUESTO VEHICULOS AYTO", -98.40),
+             (mes(9, 5), "DEVOLUCION BRICOMART TICKET", 62.30)]
+    cab = ["Fecha", "Concepto", "Importe", "Saldo"]
+    html_xls(d / "Movimientos_cuenta_empresa.xls",
+             [(dmy(a), c, es(i), es(s)) for a, c, i, s in con_saldo(movs, 6200.00)], cab)
+
+
+def sync(d):
+    """Solo quiere que los movimientos entren en SU Excel de siempre (con su
+    hoja de datos y otra de totales), no el Excel de la herramienta."""
+    movs = []
+    for m in (7, 8, 9):
+        movs += [recibo(m, "NOMINA AYUNTAMIENTO", 30 if m != 9 else 28, 1740.00, 0),
+                 recibo(m, "RECIBO HIPOTECA", 2, -612.00, 0),
+                 recibo(m, "RECIBO ENDESA", 9, -round(random.uniform(40, 80), 2)),
+                 recibo(m, "RECIBO JAZZTEL", 14, -38.00)]
+        movs += frecuentes(m, "COMPRA CONSUM", 4, 20, 95)
+        movs += frecuentes(m, "FARMACIA", 2, 5, 25)
+    cab = ["Fecha", "Concepto", "Importe", "Saldo"]
+    html_xls(d / "extracto_julio_sept.xls",
+             [(dmy(a), c, es(i), es(s)) for a, c, i, s in con_saldo(movs, 900.00)], cab)
+    # Su contabilidad de siempre: una hoja de datos con lo de junio metido a
+    # mano y otra de totales con fórmulas que apuntan a ella.
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+    ws.append(["Fecha", "Concepto", "Importe", "Categoría"])
+    for a, c, i, cat in ((date(2026, 6, 2), "RECIBO HIPOTECA", -612.00, "Piso"),
+                         (date(2026, 6, 9), "RECIBO ENDESA", -55.10, "Luz/Agua"),
+                         (date(2026, 6, 20), "COMPRA CONSUM", -64.35, "Comida"),
+                         (date(2026, 6, 30), "NOMINA AYUNTAMIENTO", 1740.00, "Ingresos")):
+        ws.append([a, c, i, cat])
+    t = wb.create_sheet("Totales")
+    t.append(["Categoría", "Total"])
+    for i, cat in enumerate(("Piso", "Luz/Agua", "Comida", "Ingresos"), start=2):
+        t.append([cat, f'=SUMIF(Datos!D:D,A{i},Datos!C:C)'])
+    wb.save(d / "mi_contabilidad.xlsx")
+
+
+RONDAS = {
+    1: {"p1_lucia": lucia, "p2_javier": javier, "p3_marta": marta,
+        "p4_pedro": pedro, "p5_ana": ana},
+    # Marta y Ana repiten con los mismos objetivos para confirmar lo arreglado.
+    2: {"p1_pareja": pareja, "p2_migrante": migrante, "p3_estudiante": estudiante,
+        "p4_autonomo": autonomo, "p5_sync": sync, "p6_marta": marta, "p7_ana": ana},
+}
 
 
 def main():
     import sys
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    ronda = max(RONDAS)
+    if args[:1] == ["--ronda"]:
+        ronda, args = int(args[1]), args[2:]
+    if not args:
         sys.exit(__doc__)
-    destino = Path(sys.argv[1]).resolve()
+    destino = Path(args[0]).resolve()
     zips = sorted(RAIZ.glob("eledger_v*.zip"), key=lambda p: p.stat().st_mtime)
-    zip_release = Path(sys.argv[2]) if len(sys.argv) > 2 else (zips[-1] if zips else None)
-    web = Path(sys.argv[3]) if len(sys.argv) > 3 else RAIZ.parent / "eledger-web"
+    zip_release = Path(args[1]) if len(args) > 1 else (zips[-1] if zips else None)
+    web = Path(args[2]) if len(args) > 2 else RAIZ.parent / "eledger-web"
     if not zip_release or not zip_release.exists():
         sys.exit("No encuentro el ZIP de la release: genéralo con app/exportar.py "
                  "o pásalo como segundo argumento.")
     if not web.is_dir():
         sys.exit(f"No encuentro la web en {web}: pásala como tercer argumento.")
-    print(f"Release: {zip_release.name} · web: {web}")
-    for nombre, generar in PERFILES.items():
+    print(f"Ronda {ronda} · release: {zip_release.name} · web: {web}")
+    for nombre, generar in RONDAS[ronda].items():
         base = destino / nombre
         if base.exists():
             shutil.rmtree(base)

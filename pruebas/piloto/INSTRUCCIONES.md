@@ -11,7 +11,8 @@ a extractos reales (una IA inventa los formatos) ni a probar en Windows.
 
 La ronda 1 (25/09/2026, sobre la 2.12.0) está en `ronda1/` y resumida en
 `HALLAZGOS_1.md`: lo que se arregló en la 2.12.1 y lo que se descartó a
-propósito. Léelo antes de lanzar otra, para no volver sobre lo mismo.
+propósito. La ronda 2 (25/09/2026, sobre la 2.12.1) está en `ronda2/` y
+`HALLAZGOS_2.md`. Léelos antes de lanzar otra, para no volver sobre lo mismo.
 
 ## Cómo lanzarlo
 
@@ -22,6 +23,8 @@ propósito. Léelo antes de lanzar otra, para no volver sobre lo mismo.
    ```
    app/.venv/bin/python pruebas/piloto/generar.py <scratchpad>/piloto
    ```
+
+   Genera los perfiles de la última ronda; `--ronda 1` para los anteriores.
 
    Cada perfil queda en su carpeta con `eledger/` (la release), `web/` y
    `descargas/`.
@@ -78,7 +81,7 @@ Coste: cada perfil gasta unos 75.000–100.000 tokens y tarda unos 4 minutos.
 Los objetivos concretos de cada uno están en la primera sección de su informe
 en `ronda1/`.
 
-## Para la ronda 2 (pendiente)
+## Para la ronda 2 (hecha: los perfiles son los de `RONDAS[2]` en `generar.py`)
 
 - **Perfiles nuevos**, para que no vayan por caminos ya conocidos: una pareja
   con cuenta conjunta y dos tarjetas; alguien que viene de otra app; un

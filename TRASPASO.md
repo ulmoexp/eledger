@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.12.0.** Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.12.1** (en curso). Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          93 casos, 365 comprobaciones, ~2 min
+python pruebas/probar.py          97 casos, 378 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```

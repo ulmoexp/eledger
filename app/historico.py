@@ -198,6 +198,23 @@ def cargar(ruta: str) -> pd.DataFrame:
     return df
 
 
+def quitar_duplicados(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Las filas del propio histórico que ahora comparten clave. Solo pasa al
+    rellenar la cuenta de un histórico que se había duplicado por declarar
+    cuentas.json tarde (ver asignar_cuentas_pendientes() en process.py).
+    De cada pareja se queda la que tenga categoria_manual escrita: es la
+    corrección del usuario, lo único del histórico que no se puede rehacer.
+    """
+    if df.empty:
+        return df
+    orden = df["categoria_manual"].eq("").sort_values(kind="stable").index
+    df = df.loc[orden]
+    k = _clave(df) + "#" + df["n_rep"].astype(str)
+    return (df[~k.duplicated(keep="first")]
+            .sort_values(["fecha", "descripcion"]).reset_index(drop=True))
+
+
 def fusionar(historico: pd.DataFrame, nuevos: list[pd.DataFrame]):
     """
     Añade al histórico lo que no estuviera ya. Devuelve (tabla, nuevos, repetidos).

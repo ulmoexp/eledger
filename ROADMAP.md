@@ -180,6 +180,9 @@ lista. Hasta ahora:
   los gráficos de RESUMEN (ya también en OnlyOffice). Cerrada con una
   revisión de coherencia de la guía, la web y la pantalla (importes en
   formato español, cabecera naranja de categoria_manual).
+- **2.12.1** — arreglos del piloto con usuarios simulados: declarar
+  cuentas.json tarde ya no duplica el histórico, lo que entra sin regla va a
+  Ingresos, y los ingresos van primero en la base de reglas.
 
 ## Lo que queda fuera a propósito
 

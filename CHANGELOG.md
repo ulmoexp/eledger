@@ -6,6 +6,24 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.12.1
+
+Arreglos que salieron de un piloto con usuarios simulados.
+
+- **Declarar `cuentas.json` después de la primera ejecución ya no duplica
+  el histórico.** Antes, todos los movimientos pasaban a contar dos veces y
+  la única salida era borrar el histórico. Ahora los que ya estaban reciben
+  su cuenta según el fichero del que salieron. Si tu histórico ya se había
+  duplicado así, se arregla solo en la próxima ejecución.
+- **Lo que entra sin ninguna regla va a Ingresos**, no a «Otros». Un cobro o
+  una recarga sin regla restaban de los gastos y dejaban meses con «gastos»
+  negativos. Siguen saliendo en «Sin clasificar» para que les pongas regla.
+- **Una nómina se reconoce aunque el pagador sea un colegio o un
+  supermercado.** «NOMINA COLEGIO…» caía en Hijos y «NOMINA MERCADONA» en
+  Comida, porque esas reglas iban delante en la base.
+
+---
+
 ## 2.12.0
 
 - **El Acumulado es ahora el saldo real de tu cuenta** al cerrar cada mes, el

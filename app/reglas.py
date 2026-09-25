@@ -163,8 +163,13 @@ class Clasificador:
     """
 
     def __init__(self, reglas: dict, por_defecto: str = "Otros", base: dict = None,
-                 categorias_validas=None):
+                 categorias_validas=None, por_defecto_positivo: str | None = None):
         self.por_defecto = por_defecto
+        # Lo que entra sin ninguna regla (un cobro, una recarga) no puede ir a
+        # «Otros», que es de gasto: restaba y dejaba el mes con gastos
+        # negativos. Va a la categoría de ingreso que diga el catálogo; sin
+        # ella (None), a por_defecto como siempre.
+        self.por_defecto_positivo = por_defecto_positivo
         self.reglas = []
         self.descartadas_de_base = []
         self.desactivadas = []
@@ -224,18 +229,21 @@ class Clasificador:
             if categoria is None:
                 continue          # la regla no aplica a este signo: sigue buscando
             return categoria, r.clave, r.origen
+        if importe is not None and importe > 0 and self.por_defecto_positivo:
+            return self.por_defecto_positivo, "", ""
         return self.por_defecto, "", ""
 
     @classmethod
     def desde_json(cls, ruta, por_defecto="Otros", ruta_base=None,
-                   categorias_validas=None):
+                   categorias_validas=None, por_defecto_positivo=None):
         with open(ruta, "r", encoding="utf-8") as f:
             propias = json.load(f)
         base = {}
         if ruta_base and os.path.exists(ruta_base):
             with open(ruta_base, "r", encoding="utf-8") as f:
                 base = json.load(f)
-        return cls(propias, por_defecto, base, categorias_validas)
+        return cls(propias, por_defecto, base, categorias_validas,
+                   por_defecto_positivo)
 
 
 class Catalogo:
@@ -293,6 +301,15 @@ class Catalogo:
         return self.gastos + self.ingresos + self.neutras
 
     @property
+    def ingreso_por_defecto(self) -> str | None:
+        """Adónde va lo que ENTRA sin ninguna regla: «Ingresos» si existe (la
+        de la plantilla y de la base), si no la primera de ingresos, y None
+        si no hay ninguna declarada. Siempre una categoría que suma."""
+        if "Ingresos" in self.ingresos:
+            return "Ingresos"
+        return self.ingresos[0] if self.ingresos else None
+
+    @property
     def columnas_ingreso(self) -> dict:
         """Categoría de ingreso -> nombre de su columna en RESUMEN, o vacío si
         no se desglosan. Ese nombre de columna es también el que se usa en
@@ -318,6 +335,8 @@ class Catalogo:
         for r in clasificador.reglas:
             producidas.update(r.categorias_posibles)
         producidas.add(clasificador.por_defecto)
+        if clasificador.por_defecto_positivo:
+            producidas.add(clasificador.por_defecto_positivo)
         declaradas = set(self.todas)
         avisos = []
 
@@ -456,7 +475,8 @@ if __name__ == "__main__":
 
     cat = Catalogo.desde_json(rutas.CATEGORIAS)
     clf = Clasificador.desde_json(rutas.REGLAS, ruta_base=rutas.REGLAS_BASE,
-                                  categorias_validas=set(cat.todas))
+                                  categorias_validas=set(cat.todas),
+                                  por_defecto_positivo=cat.ingreso_por_defecto)
     exc = Excluidor.desde_json(rutas.EXCLUSIONES)
 
     argumentos = sys.argv[1:]

@@ -276,7 +276,8 @@ def cargar_configuracion():
     # de la base que apunten a categorías que este usuario no tiene declaradas.
     clasificador = Clasificador.desde_json(
         rutas.REGLAS, ruta_base=rutas.REGLAS_BASE,
-        categorias_validas=set(catalogo.todas))
+        categorias_validas=set(catalogo.todas),
+        por_defecto_positivo=catalogo.ingreso_por_defecto)
     excluidor = Excluidor.desde_json(rutas.EXCLUSIONES)
     identificador_cuentas = IdentificadorCuentas.desde_json(rutas.CUENTAS)
     cfg_sync = sync.Config.desde_json(rutas.SINCRONIZAR, raiz=rutas.RAIZ)
@@ -653,6 +654,34 @@ def _saldo_inicial_una_cuenta(movimientos):
     return float(ancla["saldo"] - ancla["importe"] - anteriores)
 
 
+# ========= CUENTAS DEL HISTÓRICO =========
+def asignar_cuentas_pendientes(previo) -> int:
+    """
+    Rellena la cuenta de las filas del histórico que no la tienen, a partir
+    de su fichero de origen, con lo declarado HOY en cuentas.json. Devuelve
+    cuántas ha rellenado.
+
+    Sin esto, declarar las cuentas después de la primera ejecución duplicaba
+    el histórico entero: las filas viejas se quedaban con cuenta "" y las
+    mismas, releídas de entrada/, entraban con cuenta "negocio"; la clave de
+    duplicados las veía distintas y todo sumaba el doble, sin aviso y sin
+    arreglo (salvo borrar el histórico). Con la cuenta rellenada, las viejas
+    y las nuevas vuelven a ser la misma, y fusionar() se queda con una. Eso
+    también cura un histórico que ya se hubiera duplicado así.
+
+    Solo rellena, NUNCA pisa una cuenta ya puesta: si se cambia o se vacía
+    cuentas.json, dos movimientos idénticos de cuentas distintas no pueden
+    acabar fusionados en uno por reasignarlos.
+    """
+    if previo.empty or not identificador_cuentas.reglas:
+        return 0
+    sin_cuenta = previo["cuenta"].eq("")
+    nuevas = previo.loc[sin_cuenta, "origen"].fillna("").astype(str).map(
+        identificador_cuentas.identificar)
+    previo.loc[nuevas.index, "cuenta"] = nuevas
+    return int(nuevas.ne("").sum())
+
+
 # ========= CUADRE CON EL SALDO DEL BANCO =========
 # El Acumulado del resumen es saldo inicial + movimientos de cuenta. Si falta
 # alguno (un hueco entre dos extractos, una fila que el lector ha descartado,
@@ -842,7 +871,8 @@ def informe_sin_clasificar(df):
     """
     Hito A1 del roadmap: qué se ha quedado en Otros SIN que ninguna regla
     casara. `regla == ""` es justo eso (ver clasificar()): por construcción
-    implica categoria == por_defecto. Una regla que apunte a Otros a propósito
+    implica categoria == por_defecto (o, si entra dinero, la categoría de
+    ingreso por defecto del catálogo). Una regla que apunte a Otros a propósito
     deja «regla» rellena con su clave, así que no entra aquí: eso ya está
     clasificado, no es "esto no sé qué es".
     """
@@ -1225,6 +1255,16 @@ def main():
             f"No hay histórico y la carpeta '{rutas.relativa(rutas.ENTRADA)}/' está vacía.\n"
             f"   Suelta ahí los ficheros que te descargues del banco, con el nombre\n"
             f"   y la extensión que traigan, y vuelve a ejecutar.")
+
+    asignadas = asignar_cuentas_pendientes(previo)
+    if asignadas:
+        print(f"🏦 {asignadas} movimientos del histórico, asignados a su cuenta "
+              f"según {rutas.relativa(rutas.CUENTAS)}.")
+        antes = len(previo)
+        previo = hist.quitar_duplicados(previo)
+        if len(previo) < antes:
+            print(f"🧹 {antes - len(previo)} estaban repetidos (se habían "
+                  f"duplicado al declarar las cuentas): quitados.")
 
     crudos, anadidos, repetidos = hist.fusionar(previo, nuevos)
     if repetidos:

@@ -139,6 +139,13 @@ declarado en `cuentas.json`: un patrón contra el **nombre del fichero** asigna
 un identificador de cuenta. Sin declarar nada, todos los ficheros son de la
 misma "cuenta sin nombre", que es el comportamiento de siempre.
 
+Si se declara **después** de haber ejecutado, las filas del histórico que no
+tienen cuenta la reciben a partir de su fichero de origen (columna `origen`),
+y así no se duplican con las mismas releídas de `entrada/`. Solo se rellena,
+nunca se cambia una cuenta ya puesta. Si el histórico ya se había duplicado
+por esto (versión 2.12.0), las parejas repetidas se quitan, quedándose con la
+que tenga una corrección manual, y se dice por pantalla.
+
 ### 3.3 Cargar el histórico
 
 - **Antes que nada** (de hecho, antes incluso de leer los extractos), mira si
@@ -397,7 +404,10 @@ espera.
 - **La base** (`app/rules_base.json`): comercios y conceptos conocidos en toda
   España. Viene con el programa y se reemplaza entera con cada versión.
 
-Se miran primero las del usuario y luego las de la base. De la base solo
+Se miran primero las del usuario y luego las de la base. En la base, los
+**ingresos van primero** y solo para el lado positivo (nómina, pensión,
+paro...): así una «NOMINA COLEGIO…» o una «NOMINA MERCADONA» no se la lleva
+la regla de gasto de «colegio» o «mercadona», que antes iba delante. De la base solo
 entran las claves que el usuario no haya escrito ya, así que para cambiar
 cualquier regla de la base basta con repetirla en la propia. Para
 **apagarla** sin sustituirla, se repite con valor `null`.
@@ -437,8 +447,12 @@ colapsados. "NÓMINA" y "nomina" son lo mismo.
 
 **Gana la primera regla que casa**, en el orden del fichero. El orden importa.
 
-Si ninguna casa, el movimiento va a **Otros** y queda marcado como "sin
-regla" (distinto de un movimiento que una regla manda a Otros a propósito).
+Si ninguna casa, un **gasto** va a **Otros** y lo que **entra** va a la
+categoría de ingreso del catálogo («Ingresos», o la primera declarada). En
+los dos casos queda marcado como "sin regla" (distinto de un movimiento que
+una regla manda a Otros a propósito) y sale en el informe de sin clasificar.
+Hasta la 2.12.0 lo que entraba también iba a Otros: al ser de gasto, restaba,
+y un cobro sin regla dejaba el mes con gastos negativos.
 
 ### Según el signo
 

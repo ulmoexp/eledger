@@ -772,6 +772,103 @@ def prueba_cuadre_intermedio(e):
               "pero avisa de las fechas en que se separa", salida)
 
 
+@caso("nomina-antes-que-gasto", "Una nómina de un colegio o de Mercadona es ingreso, no gasto")
+def prueba_nomina_antes_que_gasto(e):
+    # regresión del piloto de usuarios (2.12.0): los ingresos iban al final
+    # de la base, y «colegio» (Hijos) o «mercadona» (Comida) se llevaban la
+    # nómina antes. Resultado: Ingresos 0 y un gasto en negativo, sin aviso.
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("01/04/2026", "NOMINA COLEGIO SAN JOSE", 1650.00),
+                      ("02/04/2026", "NOMINA MERCADONA SA", 1200.00),
+                      ("10/04/2026", "RECIBO COLEGIO SAN JOSE", -90.00),
+                      ("12/04/2026", "COMPRA MERCADONA MADRID", -60.00)])
+    e.ejecutar()
+    df = e.historico().set_index("descripcion")
+
+    comprobar(df.at["NOMINA COLEGIO SAN JOSE", "categoria"] == "Ingresos"
+              and df.at["NOMINA MERCADONA SA", "categoria"] == "Ingresos",
+              "las dos nóminas son ingresos", str(df["categoria"].to_dict()))
+    comprobar(df.at["RECIBO COLEGIO SAN JOSE", "categoria"] == "Hijos"
+              and df.at["COMPRA MERCADONA MADRID", "categoria"] == "Comida",
+              "y los gastos de esos mismos sitios siguen donde estaban",
+              str(df["categoria"].to_dict()))
+
+
+@caso("ingreso-sin-regla", "Lo que entra sin regla va a Ingresos, no resta de los gastos")
+def prueba_ingreso_sin_regla(e):
+    # regresión del piloto: un cobro sin regla caía en «Otros», que es de
+    # gasto, y dejaba el mes con gastos negativos
+    fx.escribir_html(e.entrada / "cuenta.xls",
+                     [("03/04/2026", "TRANSF DE ESTUDIO NORTE FACTURA 12", 1210.00),
+                      ("05/04/2026", "COMPRA MERCADONA MADRID", -60.00),
+                      ("07/04/2026", "TIENDA DESCONOCIDA SL", -40.00)])
+    salida = e.ejecutar()
+    f = e.resumen().iloc[0]
+    df = e.historico().set_index("descripcion")
+
+    comprobar(df.at["TRANSF DE ESTUDIO NORTE FACTURA 12", "categoria"] == "Ingresos",
+              "el cobro sin regla es un ingreso", str(df["categoria"].to_dict()))
+    comprobar(df.at["TIENDA DESCONOCIDA SL", "categoria"] == "Otros",
+              "un gasto sin regla sigue yendo a Otros", str(df["categoria"].to_dict()))
+    comprobar(abs(f["Total Gastos"] - 100) < 0.005 and abs(f["Ingresos"] - 1210) < 0.005,
+              "gastos 100 e ingresos 1210, nada en negativo",
+              f"{f['Total Gastos']} / {f['Ingresos']}")
+    comprobar("Sin clasificar" in salida and "ESTUDIO" in salida,
+              "y sigue saliendo en «Sin clasificar», para ponerle regla", salida)
+
+
+@caso("cuentas-declaradas-tarde", "Declarar cuentas.json después no duplica el histórico")
+def prueba_cuentas_declaradas_tarde(e):
+    # regresión del piloto: las filas viejas se quedaban sin cuenta y las
+    # mismas, releídas, entraban con cuenta: todo sumaba el doble
+    fx.escribir_html(e.entrada / "negocio_2026.xls",
+                     [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+    fx.escribir_html(e.entrada / "personal_2026.xls",
+                     [("06/04/2026", "COMPRA MERCADONA MADRID", -30.00)])
+    e.ejecutar()
+    antes = len(e.historico())
+
+    e.escribir_config("cuentas.json", {"negocio": "negocio", "personal": "personal"})
+    salida = e.ejecutar()
+    df = e.historico()
+
+    comprobar(len(df) == antes, "los mismos movimientos, no el doble",
+              f"{len(df)} en vez de {antes}")
+    comprobar(set(df["cuenta"].fillna("")) == {"negocio", "personal"},
+              "y cada uno con su cuenta", str(set(df["cuenta"])))
+    comprobar("asignados a su cuenta" in salida, "lo dice por pantalla", salida)
+    comprobar(abs(e.resumen().iloc[0]["Total Gastos"] - 130) < 0.005,
+              "los gastos no se duplican", str(e.resumen().iloc[0]["Total Gastos"]))
+
+
+@caso("cuentas-cura-duplicados", "Un histórico ya duplicado así se arregla solo")
+def prueba_cuentas_cura_duplicados(e):
+    # el estado que dejaba la 2.12.0: cada fila dos veces, una sin cuenta y
+    # otra con ella. Se fabrica a mano sobre el histórico.
+    fx.escribir_html(e.entrada / "negocio_2026.xls",
+                     [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                      ("08/04/2026", "COMPRA LIDL", -20.00)])
+    e.ejecutar()
+    import pandas as pd
+    mov = pd.read_excel(e.ruta_historico, sheet_name="MOVIMIENTOS")
+    copia = mov.copy()
+    copia["cuenta"] = "negocio"
+    # la corrección manual está en la copia VIEJA: es la que debe quedarse
+    mov["categoria_manual"] = mov["categoria_manual"].astype(object)
+    mov.loc[0, "categoria_manual"] = "Otros"
+    with pd.ExcelWriter(e.ruta_historico, engine="openpyxl") as w:
+        pd.concat([mov, copia]).to_excel(w, sheet_name="MOVIMIENTOS", index=False)
+
+    e.escribir_config("cuentas.json", {"negocio": "negocio"})
+    salida = e.ejecutar()
+    df = e.historico()
+
+    comprobar(len(df) == 2, "vuelven a ser dos movimientos", f"{len(df)} filas")
+    comprobar("repetidos" in salida, "y dice que ha quitado los repetidos", salida)
+    comprobar((df["categoria_manual"].fillna("") == "Otros").sum() == 1,
+              "sin perder la corrección manual", str(df["categoria_manual"].tolist()))
+
+
 @caso("importes-formato", "Los importes de la pantalla van en formato español")
 def prueba_importes_formato(e):
     # 5000 € de saldo inicial (lo fija fixtures.py) y una nómina de 2000 €:

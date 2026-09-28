@@ -1710,7 +1710,8 @@ def prueba_reglas_cli_pares(e):
     proc = subprocess.run(
         [sys.executable, os.path.join(DIR_APP, "reglas.py"),
          "BIZUM DE ALGUIEN", "25", "BIZUM A ALGUIEN", "-18,50"],
-        cwd=e.dir, capture_output=True, text=True, encoding="utf-8")
+        cwd=e.dir, capture_output=True, text=True, encoding="utf-8",
+        errors="replace")
     lineas = [l for l in proc.stdout.splitlines() if "BIZUM" in l]
     comprobar(len(lineas) == 2 and "25,00" in lineas[0] and "-18,50" in lineas[1]
               and "Ingresos" in lineas[0] and "Ocio" in lineas[1],

@@ -639,6 +639,14 @@ class IdentificadorCuentas:
 if __name__ == "__main__":
     import sys
 
+    # Como en process.py: la salida por defecto de Windows (cp1252) no es la
+    # que espera quien la lee por una tubería, y «€» o «·» llegaban rotos (lo
+    # destapó la prueba reglas-cli-pares al compilar en Windows).
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
     # Se leen de ajustes/ y app/, no del directorio actual: así funciona igual
     # desde la raíz del proyecto que desde dentro de app/.
     import rutas

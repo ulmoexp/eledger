@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.12.1** (en curso). Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.14.0** (en borrador en GitHub). Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -217,7 +217,7 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### En curso: 2.14.0 (sesión del 25/09/2026), sin release
+### En curso: 2.14.0 (sesiones del 25 al 28/09/2026), en borrador
 
 Salió de un **piloto con usuarios simulados** (subagentes que prueban la
 release como alguien que la descarga, sin ver el código), en tres rondas. Todo
@@ -246,7 +246,10 @@ en la ronda 3 (solo los tres perfiles que encontraron fallos graves), 8,3.
    - Los `.bat`: en la 2.12.1 cambió el aviso de carpeta incompleta de
      `ejecutar.bat` e `instalar.bat` (solo un `echo`, pero la regla es
      probarlo).
-2. `/release` de la 2.14.0.
+2. Compilar `eledger.exe` con `compilar.bat`, adjuntarlo al borrador de la
+   v2.14.0 (creado el 28/09/2026) y publicarlo. Es la primera versión que
+   se hace totalmente pública: después, hacer público el repo y activar
+   Pages en `eledger-web` (lo hace el usuario).
 3. La web (`eledger-web`: guía y portada, con la tarjeta «¿Vienes de otra
    app?») está al día con la 2.14.0 y comiteada, sin push.
 
@@ -293,13 +296,14 @@ llaman los ficheros de las releases: hasta la 2.11.0 salía
 El nombre en pantalla no cambia: sigue siendo «Movimientos bancarios», con
 «eledger» como referencia secundaria.
 
-### Estado de la publicación (24/09/2026)
+### Estado de la publicación (28/09/2026)
 
-- **2.12.0 en borrador** (24/09/2026), con el ZIP de `exportar.py` y las
-  notas. Falta que el usuario compile `eledger.exe`, lo adjunte y publique.
-  La web ya describe la 2.12.0: conviene publicar la release **antes** de
-  subir la web, para que «Descargar» dé esa versión.
-- **2.11.1 publicada** (es la «Latest» en GitHub).
+- **2.14.0 en borrador** (28/09/2026), con el ZIP de `exportar.py` y las
+  notas. Incluye lo de la 2.12.1 y la 2.13.0, que no se publicaron. Falta
+  que el usuario compile `eledger.exe`, lo adjunte y publique. La web ya
+  describe la 2.14.0: conviene publicar la release **antes** de subir la
+  web, para que «Descargar» dé esa versión.
+- **2.12.0 publicada** (es la «Latest» en GitHub hasta publicar la 2.14.0).
 
 - Release **v2.11.0** publicada con sus dos ficheros:
   `eledger_v2.11.0_20260923.zip` y `eledger_v2.11.0_20260923.windows.zip`

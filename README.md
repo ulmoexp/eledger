@@ -60,6 +60,14 @@ pasos de arriba.
 - Si vienes de otra app de finanzas, su export entra como un extracto más y
   puede conservar las categorías que ya tenías.
 
+## Apoya el proyecto
+
+Es gratis y lo seguirá siendo. Si te resulta útil, puedes enviar lo que
+quieras por Lightning (bitcoin) a
+**`victoriouscookie143740@getalby.com`**, o escanear el código QR de la
+[web](https://ulmoexp.github.io/eledger-web/#apoya). ¿No usas bitcoin? Una
+estrella en el repositorio también ayuda.
+
 ## Estructura del repositorio
 
 ```

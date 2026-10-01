@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.14.0** (en borrador en GitHub). Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.15.0** (comiteada, sin release; la 2.14.0 está publicada). Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          123 casos, 444 comprobaciones, ~2 min
+python pruebas/probar.py          128 casos, 464 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -217,7 +217,33 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### En curso: 2.14.0 (sesiones del 25 al 28/09/2026), en borrador
+### En curso: 2.15.0 (sesión del 01/10/2026)
+
+El asistente del menú final (ver FUNCIONAMIENTO 3.9): «Clasificar lo que
+falta» y «Excluir el recibo de la tarjeta» escriben `rules.json` y
+`exclude_patterns.json` por la persona. Decisión del usuario, frente a una
+ventana (tkinter, fuera del `.exe` a propósito) o un editor web local: un
+asistente en la propia terminal.
+
+- `reglas.anadir_regla` / `anadir_exclusion` **insertan una línea** con la
+  coma que falte, no reescriben el JSON (respetan comentarios, orden, BOM y
+  `\r\n`). Vuelven a leer el resultado antes de guardar, no pisan una
+  clave existente, copian el fichero a `datos/copias/` y escriben en un
+  temporal.
+- `informe_sin_clasificar()` devuelve las propuestas que imprime y
+  `detectar_recibo_tarjeta()` la clave segura; `main()` devuelve
+  `(histórico, Pendientes)`.
+- Las pruebas contestan por stdin con `ELEDGER_FORZAR_INTERACTIVO=1` (solo
+  para eso; ver `Entorno.ejecutar(respuestas=...)`). Casos `asistente-*`.
+- Sin ese entorno la salida no cambia ni un carácter: comprobado con una
+  ejecución completa antes y después.
+
+**Lo siguiente:** el usuario lo prueba en Windows. Un `rules.json` guardado
+con el Bloc de notas, el asistente desde `ejecutar.bat` y desde el `.exe`,
+y volver a abrir el fichero con el Bloc de notas. Luego, release 2.15.0
+(`/release`) y la guía web publicada en Surge.
+
+### Hecho: 2.14.0 (sesiones del 25 al 28/09/2026), publicada
 
 Salió de un **piloto con usuarios simulados** (subagentes que prueban la
 release como alguien que la descarga, sin ver el código), en tres rondas. Todo

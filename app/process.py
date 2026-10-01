@@ -17,6 +17,7 @@ import re
 import subprocess
 import sys
 import textwrap
+from typing import NamedTuple
 
 # Antes que nada, comprobar que están las librerías. Un ModuleNotFoundError con
 # su traceback no le dice nada a quien no ha usado una terminal en su vida, y
@@ -47,7 +48,8 @@ import sincronizar as sync
 from bank_io import detectar_tipo, leer_tabla_bancaria
 import rutas
 from reglas import (Catalogo, Clasificador, Excluidor, IdentificadorCuentas,
-                    compilar, euros, leer_json, normalizar)
+                    anadir_exclusion, anadir_regla, compilar, euros, leer_json,
+                    normalizar)
 
 # La consola de Windows usa cp1252 por defecto y revienta con acentos y símbolos.
 try:
@@ -164,7 +166,12 @@ def mostrar_avisos():
 def _interactiva() -> bool:
     """Hay una persona delante: se ha abierto con doble clic o desde una
     consola. Con la salida redirigida (las pruebas, un script) no se pregunta
-    nada, o se quedaría esperando para siempre."""
+    nada, o se quedaría esperando para siempre.
+
+    ELEDGER_FORZAR_INTERACTIVO=1 hace como si la hubiera. Es SOLO para las
+    pruebas, que así pueden contestar al asistente por la entrada estándar."""
+    if os.environ.get("ELEDGER_FORZAR_INTERACTIVO") == "1":
+        return True
     try:
         return sys.stdin.isatty() and sys.stdout.isatty()
     except (AttributeError, ValueError):
@@ -193,7 +200,116 @@ def _abrir(ruta):
 OTRA_VEZ = "otra vez"
 
 
-def menu_final(historico=None):
+class Propuesta(NamedTuple):
+    """Un grupo de lo sin clasificar con su regla ya validada, tal cual la
+    imprime informe_sin_clasificar() como «añade a rules.json»."""
+    clave: str            # la que ha dado por segura _sugerir_regla()
+    entra: bool           # dinero que entra: la regla es solo para el lado +
+    palabra: str          # la que formó el grupo, la que se ve en el informe
+    movimientos: int
+    importe: float        # lo que suma el grupo, en positivo
+    ejemplo: str
+
+
+class Pendientes(NamedTuple):
+    """Lo que el asistente del menú final puede escribir por la persona."""
+    reglas: list          # de Propuesta
+    exclusion: str | None     # la clave segura del recibo de la tarjeta
+    recibo: str | None        # una descripción de ese recibo, para enseñarla
+
+
+def _categorias_para(entra) -> list:
+    """Las que se ofrecen en el asistente: solo las declaradas en
+    categorias.json. Es el cerrojo de esta vía: eligiendo por número no hay
+    forma de escribir una regla a una categoría que no suma en ningún sitio.
+    A lo que sale, gastos; a lo que entra, ingresos; a los dos, las neutras
+    (un traspaso a tu propia cuenta de ahorro puede ir en cualquier sentido)."""
+    base = catalogo.ingresos if entra else catalogo.gastos
+    return list(dict.fromkeys(base + catalogo.neutras))
+
+
+def _imprimir_en_columnas(textos, ancho_total=76):
+    ancho = max(len(t) for t in textos) + 3
+    por_fila = max(1, ancho_total // ancho)
+    for i in range(0, len(textos), por_fila):
+        print("   " + "".join(t.ljust(ancho) for t in textos[i:i + por_fila]).rstrip())
+
+
+def asistente_exclusion(clave, recibo) -> bool:
+    """Ofrece añadir el recibo de la tarjeta a exclude_patterns.json.
+    Devuelve si lo ha escrito. Hay que decir que sí con todas las letras:
+    Intro, que es lo que se pulsa por costumbre para cerrar, no escribe."""
+    ruta = rutas.relativa(rutas.EXCLUSIONES)
+    seccion("El recibo de la tarjeta")
+    print("Este cargo de tu cuenta parece el recibo con que pagas la tarjeta:")
+    if recibo:
+        print(gris(f"   ej: {recibo}"))
+    print("Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES.\n")
+    respuesta = _esperar(f"   ¿Añado «{clave}» a {ruta}? (S = sí, Intro = no) ").lower()
+    if respuesta not in ("s", "si", "sí"):
+        print(gris("   No he tocado nada."))
+        return False
+    motivo = anadir_exclusion(rutas.EXCLUSIONES, clave, rutas.COPIAS)
+    if motivo is None:
+        print(verde(f'   ✓ Añadido a {ruta}:  "{clave}"'))
+        return True
+    print(rojo(f"   No lo he escrito: {ruta} {motivo}."))
+    print(f'   Añádelo a mano:  "{clave}"')
+    return False
+
+
+def asistente_reglas(propuestas) -> tuple[int, list]:
+    """
+    Recorre los grupos de lo sin clasificar y, para cada uno, deja elegir la
+    categoría por número y escribe la regla en rules.json. Devuelve (cuántas
+    ha escrito, las propuestas a las que no se ha llegado por terminar antes).
+    """
+    ruta = rutas.relativa(rutas.REGLAS)
+    seccion("Clasificar lo que falta")
+    escritas = 0
+    for n, p in enumerate(propuestas, 1):
+        entra = "  ·  entra" if p.entra else ""
+        print(f"{titular(f'{n}/{len(propuestas)}')}  «{p.palabra}»  ·  "
+              f"{p.movimientos} mov.  ·  {euros(p.importe)}{entra}")
+        print(gris(f"     ej: {p.ejemplo}"))
+        categorias = _categorias_para(p.entra)
+        if not categorias:
+            print(gris("     (no hay ninguna categoría declarada para esto en "
+                       "categorias.json)\n"))
+            continue
+        print("¿En qué categoría va?")
+        _imprimir_en_columnas([f"{i:>2} {c}" for i, c in enumerate(categorias, 1)])
+        print(gris("   Intro = saltar este grupo  ·  0 = terminar"))
+        while True:
+            eleccion = _esperar("   > ")
+            if eleccion == "" or eleccion == "0":
+                break
+            if eleccion.isdigit() and 1 <= int(eleccion) <= len(categorias):
+                break
+            print(f"   Escribe un número del 1 al {len(categorias)}, Intro para "
+                  f"saltar o 0 para terminar.")
+        if eleccion == "0":
+            print()
+            return escritas, list(propuestas[n - 1:])
+        if eleccion == "":
+            print(gris("   Saltado.\n"))
+            continue
+        categoria = categorias[int(eleccion) - 1]
+        # lo que entra, solo para el lado +: es la misma regla que propone el
+        # informe, para no arrastrar cargos que se llamen igual
+        valor = {"+": categoria} if p.entra else categoria
+        linea = f'"{p.clave}": {json.dumps(valor, ensure_ascii=False)}'
+        motivo = anadir_regla(rutas.REGLAS, p.clave, valor, rutas.COPIAS)
+        if motivo is None:
+            escritas += 1
+            print(verde(f"   ✓ Añadido a {ruta}:  {linea}\n"))
+        else:
+            print(rojo(f"   No lo he escrito: {ruta} {motivo}."))
+            print(f"   Añádelo a mano:  {linea}\n")
+    return escritas, []
+
+
+def menu_final(historico=None, pendientes=None):
     """
     Al terminar bien, la ventana se queda abierta hasta que se decida qué
     hacer. Con el .exe no hay lanzador que haga una pausa, y la ventana se
@@ -201,45 +317,81 @@ def menu_final(historico=None):
 
     historico es el fichero que se ha escrito de verdad: si el original
     estaba abierto, la copia, que es lo que tiene sentido abrir ahora.
+    pendientes (Pendientes) añade las opciones del asistente: excluir el
+    recibo de la tarjeta y clasificar lo que falta, escribiendo los JSON por
+    la persona. Solo salen si hay algo que ofrecer.
     Devuelve OTRA_VEZ si se ha pedido ejecutar de nuevo.
     """
     if not _interactiva():
         return None
     historico = historico or rutas.HISTORICO
-    opciones = {}
-    if historico.exists():
-        opciones["1"] = (f"Abrir el histórico  ({rutas.relativa(historico)})",
-                         historico)
-        opciones["2"] = (f"Abrir la carpeta  {rutas.relativa(rutas.DATOS)}/",
-                         rutas.DATOS)
-    # lo normal tras abrir el histórico es corregir algo (categoria_manual,
-    # una regla) y querer ver el efecto: sin esto había que cerrar la
-    # ventana y volver a hacer doble clic
-    tecla_otra = str(len(opciones) + 1)
-    opciones[tecla_otra] = ("Ejecutar de nuevo", None)
+    exclusion = pendientes.exclusion if pendientes else None
+    recibo = pendientes.recibo if pendientes else None
+    por_clasificar = list(pendientes.reglas) if pendientes else []
+    cambios = 0
 
-    seccion("¿Y ahora?")
-    for tecla, (texto, _) in opciones.items():
-        print(f"   {titular(tecla)}      {texto}")
-    print(f"   {titular('Intro')}  Cerrar")
-    teclas = list(opciones)
     while True:
-        eleccion = _esperar("\n   > ")
-        if not eleccion:
-            return None
-        if eleccion not in opciones:
-            validas = (teclas[0] if len(teclas) == 1
-                       else f"{', '.join(teclas[:-1])} o {teclas[-1]}")
-            print(f"   Escribe {validas}, o pulsa Intro para cerrar.")
-            continue
-        if eleccion == tecla_otra:
+        opciones = {}
+
+        def opcion(texto, accion, objetivo=None):
+            opciones[str(len(opciones) + 1)] = (texto, accion, objetivo)
+
+        if historico.exists():
+            opcion(f"Abrir el histórico  ({rutas.relativa(historico)})",
+                   "abrir", historico)
+            opcion(f"Abrir la carpeta  {rutas.relativa(rutas.DATOS)}/",
+                   "abrir", rutas.DATOS)
+        if exclusion:
+            opcion(f"Excluir el recibo de la tarjeta  («{exclusion}»)", "excluir")
+        if por_clasificar:
+            grupos = "1 grupo" if len(por_clasificar) == 1 else f"{len(por_clasificar)} grupos"
+            opcion(f"Clasificar lo que falta  ({grupos})", "clasificar")
+        # lo normal tras abrir el histórico es corregir algo (categoria_manual,
+        # una regla) y querer ver el efecto: sin esto había que cerrar la
+        # ventana y volver a hacer doble clic
+        opcion("Ejecutar de nuevo" + ("  (para aplicar lo que has añadido)"
+                                      if cambios else ""), "otra")
+
+        seccion("¿Y ahora?")
+        for tecla, (texto, _, _) in opciones.items():
+            print(f"   {titular(tecla)}      {texto}")
+        print(f"   {titular('Intro')}  Cerrar")
+        teclas = list(opciones)
+        while True:
+            eleccion = _esperar("\n   > ")
+            if not eleccion:
+                return None
+            if eleccion not in opciones:
+                validas = (teclas[0] if len(teclas) == 1
+                           else f"{', '.join(teclas[:-1])} o {teclas[-1]}")
+                print(f"   Escribe {validas}, o pulsa Intro para cerrar.")
+                continue
+            _, accion, objetivo = opciones[eleccion]
+            if accion != "abrir":
+                break
+            try:
+                _abrir(objetivo)
+                print("   Abierto. Puedes elegir otra opción, o Intro para cerrar.")
+            except Exception as e:
+                print(rojo(f"   No he podido abrirlo ({e}). Está en {objetivo}"))
+
+        if accion == "otra":
             return OTRA_VEZ
-        try:
-            _abrir(opciones[eleccion][1])
-            print("   Abierto. Puedes elegir otra opción, o Intro para cerrar.")
-        except Exception as e:
-            print(rojo(f"   No he podido abrirlo ({e}). Está en "
-                       f"{opciones[eleccion][1]}"))
+        if accion == "excluir":
+            cambios += asistente_exclusion(exclusion, recibo)
+            exclusion = None
+        elif accion == "clasificar":
+            escritas, por_clasificar = asistente_reglas(por_clasificar)
+            cambios += escritas
+        # Una regla o una exclusión nuevas solo se notan al volver a
+        # ejecutar (el histórico se recalcula entero, así que también
+        # reclasifica lo antiguo). Si ya no queda nada que ofrecer, se
+        # pregunta directamente; si queda, se vuelve al menú.
+        if cambios and not exclusion and not por_clasificar:
+            respuesta = _esperar("\n   Se aplica al ejecutar de nuevo. "
+                                 "¿Lo hago ya? (Intro = sí, N = no) ").lower()
+            if respuesta not in ("n", "no"):
+                return OTRA_VEZ
 
 
 def _preparar_otra_vuelta():
@@ -1054,10 +1206,14 @@ def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
     tarjeta_sin_excluir: hay tarjeta y nada excluido, pero el detector no ha
     dado con el recibo. Un grupo que lo parezca no recibe sugerencia de
     categoría, que era el consejo contrario al del aviso de la tarjeta.
+
+    Devuelve las propuestas que ha impreso como «añade a rules.json» (las
+    mismas, ni una más), para que el asistente del menú final las ofrezca.
     """
+    propuestas = []
     sin_regla = df[(df["regla"] == "") & ~df["descripcion"].isin(ignorar)]
     if sin_regla.empty:
-        return
+        return propuestas
 
     # lo que sale y lo que entra, cada uno por su lado: una palabra común a
     # un cobro y a un cargo no hace de ellos un grupo, y la regla que se
@@ -1075,7 +1231,7 @@ def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
             entra = entra.drop(index=suyas)
     grupos += _agrupar_sin_clasificar(entra)
     if not grupos:
-        return
+        return propuestas
 
     # de más a menos importe, con el mismo criterio que el resto del resumen:
     # en positivo (-suma), sin ABS() que disfrace un grupo que acabe a favor.
@@ -1121,6 +1277,11 @@ def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
             print(gris("      (ninguna palabra de este grupo es segura de sugerir "
                        "sin pisar otra regla; revísalo a mano)"))
         print()
+        if sugerida and not (tarjeta_sin_excluir and _parece_recibo_tarjeta(filas)):
+            propuestas.append(Propuesta(sugerida, entra, palabra, len(filas),
+                                        -total if entra else total, ejemplo))
+
+    return propuestas
 
 
 # ========= DETECCIÓN DEL RECIBO DE LA TARJETA (hito A2 del roadmap) =========
@@ -1213,22 +1374,24 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
     excluir el recibo, que es justo lo que se está pidiendo).
 
     No imprime nada: deja el aviso para el final, con los demás. Devuelve
-    (si lo ha dejado, descripciones de los recibos encontrados): lo primero
-    para señalarlo junto a los totales; lo segundo para que el informe de
-    sin clasificar no proponga ponerle categoría a un cargo al que este
-    aviso ya dice que hay que excluir (salían los dos consejos a la vez)."""
+    (si lo ha dejado, descripciones de los recibos encontrados, clave segura
+    o None): lo primero para señalarlo junto a los totales; lo segundo para
+    que el informe de sin clasificar no proponga ponerle categoría a un
+    cargo al que este aviso ya dice que hay que excluir (salían los dos
+    consejos a la vez); lo tercero para que el asistente del menú final
+    pueda añadirla por la persona."""
     if excluidor.patrones:
-        return False, set()
+        return False, set(), None
     tarjeta_por_mes = _meses_tarjeta(todo)
     if tarjeta_por_mes.empty:
-        return False, set()
+        return False, set(), None
 
     # Sin ningún extracto de cuenta no hay recibo que pueda contarse dos
     # veces: quien solo tiene tarjetas (una de débito, un neobanco) recibía
     # el aviso en cada ejecución sin poder hacer nada con él.
     cuenta = todo[todo["tipo"] == "cuenta"]
     if cuenta.empty:
-        return False, set()
+        return False, set(), None
     # Con dos tarjetas, cada una se liquida con su propio recibo y la suma de
     # las dos no cuadra con ninguno: se prueba primero el total del mes y,
     # si no, cada tarjeta por separado (por su cuenta declarada o, sin
@@ -1269,7 +1432,7 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
             "Si tu cuenta paga la tarjeta con un recibo, cada gasto se está "
             "contando DOS VECES y no lo he sabido encontrar solo.",
             "Revísalo a mano: LEEME.txt explica cómo excluirlo."] + pista)
-        return True, set()
+        return True, set(), None
 
     lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
               "Esto parece el recibo:"]
@@ -1298,7 +1461,8 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
                       "excluir algún otro movimiento tuyo); añádelo tú a mano "
                       "con lo que ves arriba.")
     avisar(titulo, lineas + pista)
-    return True, {f["descripcion"] for f in candidatos.values()}
+    return (True, {f["descripcion"] for f in candidatos.values()},
+            clave if segura else None)
 
 
 # ========= CARGOS QUE SE REPITEN (suscripciones, cuotas, seguros) =========
@@ -1548,7 +1712,7 @@ def main():
 
     if crudos.empty:
         print("\n" + rojo("❌ No hay ningún movimiento que procesar."))
-        return
+        return None, None
 
     validas = set(catalogo.todas) | {hist.MARCA_EXCLUIDO}
     todo = clasificar(crudos, validas)
@@ -1708,7 +1872,8 @@ def main():
 
     # si se están contando dos veces los gastos de la tarjeta, que se sepa
     # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
-    doble_tarjeta, recibos_tarjeta = detectar_recibo_tarjeta(todo, sin_declarar)
+    doble_tarjeta, recibos_tarjeta, exclusion_segura = detectar_recibo_tarjeta(
+        todo, sin_declarar)
 
     # orden_resumen puede haber quitado cualquiera de estas columnas del
     # resumen: se enseña solo lo que haya. Pedirlas a pelo rompía aquí,
@@ -1745,19 +1910,23 @@ def main():
     informar_cuadre(comprobar_cuadre(todo))
 
     informe_recurrentes(df, catalogo.gastos)
-    informe_sin_clasificar(df, ignorar=recibos_tarjeta,
-                           tarjeta_sin_excluir=doble_tarjeta and not recibos_tarjeta)
+    propuestas = informe_sin_clasificar(
+        df, ignorar=recibos_tarjeta,
+        tarjeta_sin_excluir=doble_tarjeta and not recibos_tarjeta)
     # los avisos, lo último antes de salir: juntos, contados y separados de
     # lo demás, que es lo que se lee cuando la ejecución termina
     mostrar_avisos()
-    return historico_escrito
+    # lo que el asistente del menú final puede escribir por la persona
+    pendientes = Pendientes(propuestas, exclusion_segura,
+                            min(recibos_tarjeta) if recibos_tarjeta else None)
+    return historico_escrito, pendientes
 
 
 # ========= RUN =========
 if __name__ == "__main__":
     while True:
         try:
-            escrito = main()
+            escrito, pendientes = main()
         except Exception as e:
             # los avisos que ya hubiera pueden explicar el error: van antes,
             # para que el ❌ sea lo último que se ve
@@ -1771,6 +1940,6 @@ if __name__ == "__main__":
                 _preparar_otra_vuelta()
                 continue
             sys.exit(CODIGO_ERROR_EXPLICADO)
-        if menu_final(escrito) != OTRA_VEZ:
+        if menu_final(escrito, pendientes) != OTRA_VEZ:
             break
         _preparar_otra_vuelta()

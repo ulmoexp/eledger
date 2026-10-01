@@ -424,9 +424,14 @@ puede, también sale sin color, nunca con códigos raros a la vista.
 ```
    1      Abrir el histórico  (datos/historico.xlsx)
    2      Abrir la carpeta  datos/
-   3      Ejecutar de nuevo
+   3      Excluir el recibo de la tarjeta  («pago tarjeta credito»)
+   4      Clasificar lo que falta  (2 grupos)
+   5      Ejecutar de nuevo
    Intro  Cerrar
 ```
+
+Las opciones 3 y 4 solo salen cuando hay algo que ofrecer, y los números se
+corren si no están.
 
 Se pueden elegir varias opciones seguidas; Intro cierra. Abre el fichero o la
 carpeta con el programa que tenga asignado el sistema (Excel, el
@@ -434,6 +439,41 @@ explorador...). Si el resultado ha ido a una copia (3.8), la opción 1 abre la
 copia. **Ejecutar de nuevo** vuelve a hacerlo todo desde el principio en la
 misma ventana, releyendo también `ajustes/`: sirve para ver al momento el
 efecto de una corrección en `categoria_manual` o en las reglas.
+
+**El asistente** (desde la 2.15.0) escribe por la persona lo que los informes
+le dicen que pegue en `ajustes/`. Era lo que más costaba a quien no se
+maneja con ficheros: añadir una línea a un JSON sin dejarse la coma de la de
+antes.
+- **Excluir el recibo de la tarjeta**: solo si 5.1 ha encontrado el recibo
+  y una clave segura. Enseña el cargo y pregunta si la añade a
+  `exclude_patterns.json`. Hay que contestar **S**: Intro, que es lo que se
+  pulsa por costumbre para cerrar, no escribe nada.
+- **Clasificar lo que falta**: recorre los grupos de 5.3 que tienen una
+  regla segura, los mismos que el informe propone pegar. En cada uno enseña
+  las categorías numeradas:
+  - lo que sale: las de gastos y las neutras;
+  - lo que entra: las de ingresos y las neutras.
+  
+  Con el número se escribe la regla (`{"+": ...}` si entra, como en el
+  informe). Intro salta el grupo y 0 termina; lo que no se ha llegado a
+  ver sigue en el menú.
+
+Cómo escribe (`anadir_regla` y `anadir_exclusion`, en `reglas.py`):
+- **Inserta una línea al final** del objeto o la lista, con la coma que le
+  falte a la anterior. No reescribe el fichero: comentarios, orden, líneas
+  en blanco, el BOM y los saltos de línea de Windows del Bloc de notas se
+  quedan como estaban.
+- **Comprueba antes de guardar.** Vuelve a leer el resultado y comprueba
+  que solo ha cambiado eso. Si no cuadra, o la clave ya existía (aunque sea
+  un `null` que apaga una regla de la base), no escribe: lo dice y enseña
+  la línea para pegarla a mano.
+- **Antes, una copia.** Deja el fichero tal como estaba en `datos/copias/`
+  (`rules_AAAAMMDD_HHMMSS.json`), y escribe en un temporal que luego
+  sustituye al de verdad.
+
+Lo nuevo se nota al ejecutar de nuevo. Como el histórico se reclasifica
+entero, la regla vale también para lo antiguo. Por eso, cuando ya no queda
+nada que ofrecer, pregunta «¿Lo hago ya?» (Intro = sí).
 
 **Si algo falla**, primero salen los avisos que ya hubiera (pueden explicar
 el error), luego un mensaje con ❌ en lenguaje llano, y la ventana espera:
@@ -638,6 +678,9 @@ reglas: **solo se propone si no casaría con ningún movimiento que ya tiene
 categoría por otra regla**. Si ninguna palabra del grupo es segura, lo dice y
 pide revisarlo a mano.
 
+Los grupos con línea propuesta son los que el asistente del menú final
+(3.9) ofrece clasificar con un número, sin tocar el JSON.
+
 ---
 
 ## 6. El Excel que genera
@@ -809,6 +852,9 @@ traicionero, porque el Excel cuadra por dentro y nadie se entera):
   no se parecen → aviso.
 - Corrección manual con una categoría que no existe → ignorada y avisada.
 - Nombre desconocido en `orden_resumen` → ignorado y avisado.
+- El asistente del menú final (3.9) solo deja elegir, por número, categorías
+  declaradas en `categorias.json` → no puede escribir una regla a una
+  categoría que no suma.
 
 **Contra perder datos:**
 - Copia de seguridad del histórico antes de cada escritura, que además se
@@ -818,6 +864,9 @@ traicionero, porque el Excel cuadra por dentro y nadie se entera):
 - La migración desde la versión antigua copia todo antes de mover y nunca
   pisa un fichero existente.
 - La sincronización se niega ante cualquier duda (apartado 7).
+- El asistente copia `rules.json` / `exclude_patterns.json` en
+  `datos/copias/` antes de escribir, solo añade una línea, no pisa una clave
+  que ya exista y no guarda nada que no haya comprobado (3.9).
 
 **Contra filtrar datos personales:** ver el apartado 9, "exportar".
 

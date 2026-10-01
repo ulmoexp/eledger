@@ -203,6 +203,14 @@ lista. Hasta ahora:
   con fallos graves, notas 8,5, 8 y 8,5): `equivalencias` para juntar
   categorías de fábrica sin perder sus reglas, copia del histórico solo si
   cambia, y una tanda de avisos más precisos.
+- **2.15.0** — asistente en el menú final que escribe los ajustes por la
+  persona: «Clasificar lo que falta» (la regla de cada grupo sin clasificar,
+  eligiendo la categoría por número) y «Excluir el recibo de la tarjeta».
+  Era la petición de Lucía en la ronda 1 del piloto («¿añado esta línea por
+  ti?»), que no se había resuelto. Se eligió un asistente en la terminal y
+  no una interfaz gráfica: sin dependencias nuevas, igual en el `.exe`, Mac
+  y Linux, y los JSON siguen siendo editables a mano. Más una sección «Cómo
+  editar los ajustes» en la guía.
 
 ## Lo que queda fuera a propósito
 

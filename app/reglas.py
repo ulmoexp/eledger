@@ -120,6 +120,111 @@ def leer_json(ruta):
             "cerrar.\n   Corrígelo y vuelve a ejecutar.") from None
 
 
+# ========= ESCRIBIR EN AJUSTES (el asistente del final) =========
+# Lo que más le costaba a quien no es técnico era pegar una línea en un JSON
+# sin romperlo (la coma de la línea de antes). El asistente del menú final
+# escribe esas líneas por él, con estas dos funciones.
+#
+# Se INSERTA una línea en el texto; no se reescribe el fichero con
+# json.dumps, que se llevaría por delante las líneas en blanco, el orden en
+# que la persona tiene sus reglas y la forma de su fichero. Y nada se da por
+# bueno sin volver a leerlo: si el resultado no es el JSON esperado, no se
+# escribe nada y se devuelve el motivo, para enseñar la línea y que la pegue
+# a mano (mejor avisar que romper).
+
+def _insertar_al_final(texto: str, cierre: str, linea: str) -> str | None:
+    """Mete `linea` como último elemento del objeto (cierre «}») o la lista
+    («]») que forma el fichero entero. Pone la coma que le falta al elemento
+    anterior y copia su sangría. None si el texto no acaba en `cierre`."""
+    recortado = texto.rstrip()
+    if not recortado.endswith(cierre):
+        return None
+    i = len(recortado) - 1                  # la llave/corchete final
+    antes = texto[:i]
+    j = len(antes.rstrip()) - 1             # último carácter de verdad antes
+    if j < 0:
+        return None
+    nl = "\r\n" if "\r\n" in texto else "\n"
+    vacio = antes[j] in "{["
+    if vacio:
+        sangria = "  "
+    else:
+        inicio_linea = antes.rfind("\n", 0, j) + 1
+        fila = antes[inicio_linea:j + 1]
+        sangria = fila[:len(fila) - len(fila.lstrip())] or "  "
+    if vacio:
+        return antes[:j + 1] + nl + sangria + linea + nl + texto[i:]
+    return antes[:j + 1] + "," + nl + sangria + linea + antes[j + 1:] + texto[i:]
+
+
+def _anadir(ruta, cierre, tipo, linea, ya_esta, comprobar, carpeta_copias):
+    with open(ruta, "rb") as f:
+        crudo = f.read()
+    bom = crudo.startswith(b"\xef\xbb\xbf")
+    texto = crudo.decode("utf-8-sig")
+    try:
+        datos = json.loads(texto)
+    except json.JSONDecodeError:
+        return "tiene un error de formato: corrígelo primero"
+    if not isinstance(datos, tipo):
+        return "no tiene la forma esperada"
+    motivo = ya_esta(datos)
+    if motivo:
+        return motivo
+    nuevo = _insertar_al_final(texto, cierre, linea)
+    try:
+        if nuevo is None or not comprobar(datos, json.loads(nuevo)):
+            return "no he sabido dónde ponerlo sin cambiar nada más"
+    except json.JSONDecodeError:
+        return "no he sabido dónde ponerlo sin cambiar nada más"
+
+    # la copia de cómo estaba, con el mismo sello que las del histórico
+    if carpeta_copias:
+        import datetime as dt
+        import shutil
+        os.makedirs(carpeta_copias, exist_ok=True)
+        base, ext = os.path.splitext(os.path.basename(str(ruta)))
+        sello = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+        destino = os.path.join(str(carpeta_copias), f"{base}_{sello}{ext}")
+        # dos reglas en el mismo segundo: la copia que vale es la primera, la
+        # de cómo estaba ANTES de tocarlo
+        if not os.path.exists(destino):
+            shutil.copy2(ruta, destino)
+    # a un temporal y luego encima: un corte a medias no deja el fichero roto.
+    # En binario, para respetar tal cual el BOM y los saltos de línea de
+    # Windows que deja el Bloc de notas.
+    temporal = str(ruta) + ".tmp"
+    with open(temporal, "wb") as f:
+        f.write((b"\xef\xbb\xbf" if bom else b"") + nuevo.encode("utf-8"))
+    os.replace(temporal, ruta)
+    return None
+
+
+def anadir_regla(ruta, clave: str, valor, carpeta_copias=None) -> str | None:
+    """Añade "clave": valor al final de rules.json. Devuelve None si se ha
+    escrito, o el motivo por el que no (y entonces el fichero no se toca).
+    Una clave que ya existe no se pisa, aunque sea un null que apaga una
+    regla de la base: cambiar eso es decisión de la persona."""
+    linea = f"{json.dumps(clave, ensure_ascii=False)}: {json.dumps(valor, ensure_ascii=False)}"
+    return _anadir(
+        ruta, "}", dict, linea,
+        lambda d: f'ya tiene una regla «{clave}»' if clave in d else None,
+        lambda antes, despues: (despues.get(clave) == valor
+                                and len(despues) == len(antes) + 1),
+        carpeta_copias)
+
+
+def anadir_exclusion(ruta, patron: str, carpeta_copias=None) -> str | None:
+    """Añade "patron" al final de exclude_patterns.json (una lista). Mismo
+    contrato que anadir_regla()."""
+    return _anadir(
+        ruta, "]", list, json.dumps(patron, ensure_ascii=False),
+        lambda d: f'ya excluye «{patron}»' if patron in d else None,
+        lambda antes, despues: (despues[:len(antes)] == antes
+                                and despues[len(antes):] == [patron]),
+        carpeta_copias)
+
+
 def euros(valor, signo=False, ancho=0) -> str:
     """
     5000 -> '5.000,00 €'; con signo, '+800,00 €'. El formato de Python es el

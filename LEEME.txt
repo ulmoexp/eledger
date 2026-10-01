@@ -26,6 +26,8 @@ Cómo se usa
 3. Al terminar, pulsa 1 para abrir  datos/historico.xlsx  (o ábrelo tú con
    Microsoft Excel, OnlyOffice o LibreOffice).
    Los avisos, si hay alguno, salen juntos justo antes de esa pregunta.
+   Si ha quedado algo sin clasificar, el mismo menú ofrece "Clasificar lo
+   que falta": eliges la categoría con un número y escribe la regla por ti.
 
 Puedes volver a ejecutarlo tantas veces como quieras. Los movimientos que ya
 estuvieran no se duplican, así que da igual si dos descargas se solapan.
@@ -55,7 +57,8 @@ Lo primero que deberías configurar
 El recibo con que tu cuenta paga la tarjeta, en  ajustes/exclude_patterns.json
 Si no lo excluyes, cada gasto de la tarjeta se cuenta DOS veces: una en el
 extracto de la tarjeta y otra en el recibo de la cuenta. El fichero viene con
-instrucciones dentro.
+instrucciones dentro. Si la herramienta encuentra el recibo, al terminar el
+menú ofrece "Excluir el recibo de la tarjeta" y lo añade por ti.
 
 Si le pasas esto a alguien
 --------------------------

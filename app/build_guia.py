@@ -246,8 +246,9 @@ story += [pasos([
     "<font face='Body' color='#5C6672'>(Linux)</font>",
     "Revisa el resumen en pantalla: qué ha leído de cada fichero, el resultado, "
     "lo que se repite y lo que falta por clasificar; los avisos, juntos al final",
-    "Pulsa <b>1</b> para abrir el histórico, <b>2</b> para abrir su carpeta o "
-    "<b>3</b> para ejecutar de nuevo tras corregir algo "
+    "Elige en el menú: abrir el histórico o su carpeta, <b>clasificar lo que "
+    "falta</b> o <b>excluir el recibo de la tarjeta</b> (si hay algo; te pregunta "
+    "y escribe los ajustes por ti) o ejecutar de nuevo "
     "<font face='Body' color='#5C6672'>(Intro cierra la ventana)</font>",
     "Abre tu fichero de contabilidad: los movimientos ya están dentro "
     "<font face='Body' color='#5C6672'>(si tienes la sincronización activada)</font>",
@@ -463,6 +464,52 @@ story += [aviso(
     "F (mes_ajustado) y G (categoria). De H en adelante son de diagnóstico y van al "
     "final justamente para no desplazarlas.")]
 
+story += [h1("Cómo editar los ajustes"), E]
+story += [p(
+    "Los ficheros de <font face='Mono' size='8.6'>ajustes/</font> son texto. Se abren "
+    "con el <b>Bloc de notas</b> en Windows, <b>TextEdit</b> en Mac o cualquier editor "
+    "de texto (clic derecho → Abrir con). Con Word no: cambia las comillas y añade "
+    "cosas que el programa no entiende.")]
+story += [aviso(
+    "Lo más habitual no hace falta hacerlo a mano",
+    "Al terminar, el menú ofrece <b>Clasificar lo que falta</b> y <b>Excluir el "
+    "recibo de la tarjeta</b> cuando hay algo. Te pregunta, eliges con un número y "
+    "escribe la línea por ti en rules.json o exclude_patterns.json, sin tocar nada "
+    "más del fichero. Antes deja una copia de cómo estaba en "
+    "<font face='Mono' size='8.2'>datos/copias/</font>. Solo ofrece las categorías "
+    "que tienes en categorias.json, así que no puede crear una que no sume.",
+    ACENTO, ACENTO_CL)]
+story += [Spacer(1, 6)]
+story += [p("Para todo lo demás, cuatro cosas que conviene saber:")]
+story += [tabla(
+    ["Regla", "Por qué"],
+    [["<b>Cada línea acaba en coma</b>, salvo la última antes de la llave de cierre",
+      "Es el error más común: al añadir una línea al final, la de antes se queda "
+      "sin su coma."],
+     ["<b>Comillas dobles rectas</b>: <font face='Mono'>\"texto\"</font>",
+      "Nunca « » ni “ ”. Los procesadores de texto las cambian solas: por eso, con "
+      "el Bloc de notas."],
+     ["<b>Las categorías, igual que en categorias.json</b>",
+      "Letra a letra y sin tildes: «Luz/Agua», no «Luz/agua»."],
+     ["<b>Las líneas que empiezan por _ son comentarios</b>",
+      "Se pueden dejar tal cual: explican el fichero y no cuentan."]],
+    [ANCHO * 0.42, ANCHO * 0.58])]
+story += [Spacer(1, 6)]
+story += [codigo([
+    '{',
+    '  "_sintaxis": "...",',
+    '  "casero pepe": "Piso",       ← con coma',
+    '  "academia baile": "Hijos"    ← la última, sin coma',
+    '}',
+])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
+    "Si algo no cuadra, al ejecutar se dice qué fichero y qué línea («tiene un "
+    "error de formato en la línea 7»). Casi siempre es la coma de la línea de "
+    "antes. Corrígelo, guarda y escribe <b>R</b> para volver a probar sin cerrar la "
+    "ventana.", S["pmini"])]
+story += [EE]
+
 story += [h1("rules.json · cómo se clasifica"), E]
 story += [p(
     "Es un diccionario de <b>texto a buscar → categoría</b>. Gana la <b>primera</b> "
@@ -601,7 +648,8 @@ story += [Spacer(1, 4)]
 story += [Paragraph(
     "No hace falta buscarlo a ojo: si el fichero está vacío y hay movimientos de "
     "tarjeta, al terminar el script busca en la cuenta un cargo que cuadre con lo "
-    "que suma la tarjeta ese mes y propone la línea lista para pegar aquí. Con "
+    "que suma la tarjeta ese mes y propone la línea lista para pegar aquí (o, "
+    "desde el menú, «Excluir el recibo de la tarjeta» la añade por ti). Con "
     "cualquier patrón ya puesto, no dice nada más. Con varias tarjetas, busca el "
     "recibo de cada una. Y si solo tienes tarjetas, sin extracto de la cuenta, no "
     "hay recibo que pueda contarse dos veces: ni avisa.", S["pmini"])]
@@ -1134,11 +1182,15 @@ story += [tabla(
       "<font face='Mono'>bank_io.py</font>."],
      ["<i>«tiene un error de formato en la línea…»</i>",
       "Al editar un JSON de <font face='Mono'>ajustes/</font> falta o sobra una coma, "
-      "o hay unas comillas sin cerrar. El mensaje dice qué fichero y qué línea."],
+      "o hay unas comillas sin cerrar. El mensaje dice qué fichero y qué línea. "
+      "Corrígelo y escribe <b>R</b> para volver a probar (ver «Cómo editar los "
+      "ajustes»)."],
      ["Demasiadas filas en «Otros»",
       "El script agrupa al final los conceptos sin regla por palabra común, de "
       "mayor a menor importe, con una línea lista para pegar en "
-      "<font face='Mono'>rules.json</font>."],
+      "<font face='Mono'>rules.json</font>. Más fácil: en el menú del final, "
+      "<b>Clasificar lo que falta</b> te pregunta la categoría de cada grupo y "
+      "escribe la regla por ti."],
      ["Un movimiento cae en la categoría equivocada",
       "Mira la columna <b>K (regla)</b>: te dice exactamente qué clave lo clasificó. "
       "O bien la afinas con <font face='Mono'>=</font>, o la mueves de sitio en el "

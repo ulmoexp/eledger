@@ -178,15 +178,23 @@ class Entorno:
         shutil.copy2(AQUI / "xlrd_stub.py", self.dir / DIR_APP / "xlrd.py")
 
     # --- ejecución ---
-    def ejecutar(self, desde=None):
+    def ejecutar(self, desde=None, respuestas=None):
         """`desde` permite lanzarlo con el directorio actual en otro sitio, que
-        es justo lo que rutas.py tiene que hacer irrelevante."""
+        es justo lo que rutas.py tiene que hacer irrelevante.
+
+        `respuestas`: lo que teclearía una persona en el menú final y el
+        asistente, una respuesta por línea. Con ellas el programa se comporta
+        como si tuviera a alguien delante (ELEDGER_FORZAR_INTERACTIVO); al
+        acabarse, es como pulsar Intro: se cierra."""
         objetivo = (str(self.dir / LANZADOR) if desde
                     else LANZADOR.replace("/", os.sep))
+        entorno = None
+        if respuestas is not None:
+            entorno = dict(os.environ, ELEDGER_FORZAR_INTERACTIVO="1")
         proc = subprocess.run(
             [sys.executable, objetivo], cwd=(desde or self.dir),
             capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=180)
+            timeout=180, input=respuestas, env=entorno)
         salida = (proc.stdout or "") + (proc.stderr or "")
         self.salidas.append(salida)
         self.ultimo_codigo = proc.returncode
@@ -1213,6 +1221,129 @@ def prueba_tarjeta_varios_meses(e):
     comprobar('"adeudo tarjeta"' in salida,
               "la clave es lo que de verdad se repite, sin el número ni las "
               "palabras que solo aparecían en un mes", salida)
+
+
+# --- el asistente del menú final (2.15.0) ---------------------------------
+# Escribe en ajustes/ por la persona lo que el informe le decía que pegara.
+# Se le contesta por la entrada estándar (ver Entorno.ejecutar). Datos
+# inventados que no casan con ninguna regla de la base: un comercio del que
+# sale dinero (zafiro) y un cliente del que entra (yodo).
+SIN_CLASIFICAR = [("02/04/2026", "COMPRA ZAFIRO TIENDA", -40.00),
+                  ("09/04/2026", "COMPRA ZAFIRO TIENDA", -35.00),
+                  ("10/04/2026", "ABONO YODO CLIENTE", 120.00)]
+# en el menú: 1 histórico, 2 carpeta, 3 clasificar lo que falta, 4 de nuevo.
+# En «¿En qué categoría va?», con las categorías de la plantilla, lo que sale
+# ofrece los 12 gastos + la neutra (6 = Comida) y lo que entra, Ingresos +
+# la neutra (1 = Ingresos).
+
+
+@caso("asistente-regla", "El asistente escribe en rules.json la regla elegida y se aplica")
+def prueba_asistente_regla(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", SIN_CLASIFICAR)
+    antes = (e.ajustes / "rules.json").read_text(encoding="utf-8")
+    # 3: clasificar · 6: zafiro a Comida · 1: yodo a Ingresos · Intro: aplicarlo ya
+    salida = e.ejecutar(respuestas="3\n6\n1\n\n")
+
+    reglas = e.leer_config("rules.json")
+    comprobar(reglas.get("zafiro") == "Comida",
+              "lo que sale queda como regla fija", reglas)
+    comprobar(reglas.get("yodo") == {"+": "Ingresos"},
+              "lo que entra queda solo para el lado + (como la sugerencia)", reglas)
+    comprobar(list(reglas)[:len(json.loads(antes))] == list(json.loads(antes)),
+              "conserva los comentarios y el orden de lo que había, y añade al final",
+              list(reglas))
+    comprobar(salida.count("── Sin clasificar") == 1,
+              "tras «¿Lo hago ya?» vuelve a ejecutar y ya no queda nada sin clasificar",
+              salida)
+    df = e.historico()
+    zafiro = set(df.loc[df["descripcion"].str.contains("ZAFIRO"), "categoria"])
+    comprobar(zafiro == {"Comida"},
+              "y el histórico ya los clasifica con la regla nueva", zafiro)
+    copias = list((e.datos / "copias").glob("rules_*.json"))
+    comprobar(len(copias) == 1 and copias[0].read_text(encoding="utf-8") == antes,
+              "deja en datos/copias/ el rules.json tal como estaba",
+              [c.name for c in copias])
+
+
+@caso("asistente-solo-declaradas", "El asistente solo deja elegir categorías declaradas")
+def prueba_asistente_solo_declaradas(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", SIN_CLASIFICAR)
+    antes = (e.ajustes / "rules.json").read_bytes()
+    # 3: clasificar · 99 y «Comida» escrito a mano no valen · 0: terminar
+    salida = e.ejecutar(respuestas="3\n99\nComida\n0\n")
+
+    comprobar("13 Transferencias internas" in salida and " 14 " not in salida,
+              "ofrece justo las categorías de categorias.json, numeradas", salida)
+    comprobar(salida.count("Escribe un número del 1 al 13") == 2,
+              "un número fuera de rango o un nombre escrito vuelven a preguntar", salida)
+    comprobar((e.ajustes / "rules.json").read_bytes() == antes,
+              "sin una elección válida no se escribe nada")
+
+
+@caso("asistente-saltar", "Intro salta un grupo y 0 termina, sin escribir nada")
+def prueba_asistente_saltar(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", SIN_CLASIFICAR)
+    antes = (e.ajustes / "rules.json").read_bytes()
+    salida = e.ejecutar(respuestas="3\n\n0\n")
+
+    comprobar("Saltado." in salida, "Intro salta el grupo", salida)
+    comprobar((e.ajustes / "rules.json").read_bytes() == antes,
+              "saltar y terminar no escriben nada")
+    comprobar("¿Lo hago ya?" not in salida,
+              "sin cambios, no ofrece volver a ejecutar para aplicarlos", salida)
+    comprobar("Clasificar lo que falta  (1 grupo)" in salida,
+              "el grupo al que no se ha llegado sigue en el menú", salida)
+
+
+@caso("asistente-exclusion", "El asistente añade el recibo de la tarjeta a exclude_patterns.json")
+def prueba_asistente_exclusion(e):
+    e.escribir_config("exclude_patterns.json", [])
+    tarjeta = [("05/04/2026", "COMPRA A", -50.00),
+              ("12/04/2026", "COMPRA B", -30.25),
+              ("20/04/2026", "COMPRA C", -15.05)]     # total -95.30
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+    cuenta = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+             ("05/05/2026", "LIQUIDACION TARJETA VISA 778899", -95.30)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    # menú: 1 histórico, 2 carpeta, 3 excluir el recibo, 4 de nuevo.
+    # Intro en la pregunta es NO: es lo que se pulsa por costumbre para cerrar
+    e.ejecutar(respuestas="3\n\n")
+    comprobar(e.leer_config("exclude_patterns.json") == [],
+              "Intro no escribe: hay que decir que sí")
+
+    salida = e.ejecutar(respuestas="3\ns\n\n")
+    comprobar(e.leer_config("exclude_patterns.json") == ["liquidacion tarjeta visa"],
+              "con «s» añade la clave segura que proponía el aviso",
+              e.leer_config("exclude_patterns.json"))
+    comprobar(salida.count("ningún patrón en") == 1,
+              "y al volver a ejecutar ya no avisa de la tarjeta", salida)
+    comprobar(bool(campo_de(e.historico(), "LIQUIDACION", "excluido")),
+              "el recibo queda excluido de los totales")
+
+
+@caso("asistente-formato", "El asistente respeta el fichero de la persona y no pisa sus reglas")
+def prueba_asistente_formato(e):
+    fx.escribir_html(e.entrada / "cuenta.xls", SIN_CLASIFICAR)
+    # como lo deja el Bloc de notas: BOM y saltos de Windows, con líneas en
+    # blanco y una regla suya que apaga «yodo» (null)
+    original = ('{\r\n  "_sintaxis": "mi fichero",\r\n\r\n'
+                '  "casero pepe": "Piso",\r\n  "yodo": null\r\n}\r\n')
+    (e.ajustes / "rules.json").write_bytes(b"\xef\xbb\xbf" + original.encode("utf-8"))
+    # 3: clasificar · 6: zafiro a Comida · 1: yodo a Ingresos · N: no aplicar
+    salida = e.ejecutar(respuestas="3\n6\n1\nn\n")
+
+    crudo = (e.ajustes / "rules.json").read_bytes()
+    texto = crudo[3:].decode("utf-8")
+    comprobar(crudo.startswith(b"\xef\xbb\xbf"), "conserva el BOM")
+    comprobar(texto == original.replace('"yodo": null\r\n',
+                                        '"yodo": null,\r\n  "zafiro": "Comida"\r\n'),
+              "solo cambia la coma de la línea de antes y la línea nueva, "
+              "con los saltos de Windows", repr(texto))
+    comprobar("ya tiene una regla «yodo»" in salida
+              and 'Añádelo a mano:  "yodo": {"+": "Ingresos"}' in salida,
+              "una clave que ya existe (aunque sea null) no se pisa: lo dice "
+              "y enseña la línea", salida)
 
 
 @caso("iso", "Las fechas aaaa-mm-dd no se invierten")

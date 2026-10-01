@@ -6,6 +6,28 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.15.0
+
+- **Un asistente que escribe los ajustes por ti.** Era lo que más costaba
+  a quien no se maneja con ficheros: pegar una línea en un JSON sin
+  olvidarse la coma de la de antes. Ahora el menú del final ofrece dos
+  opciones cuando hay algo:
+  - **Clasificar lo que falta**: recorre los grupos de lo sin clasificar,
+    eliges la categoría con un número y escribe la regla en `rules.json`.
+    Solo ofrece las categorías de `categorias.json`, así que no puede
+    crear una que no sume en ninguna parte.
+  - **Excluir el recibo de la tarjeta**, cuando lo ha encontrado: lo añade
+    a `exclude_patterns.json` si dices que sí (Intro no escribe nada).
+
+  Al terminar, ofrece volver a ejecutar para que se aplique. Solo añade la
+  línea nueva: tus comentarios, tus reglas, su orden y el formato del
+  fichero se quedan como estaban, y antes deja una copia en
+  `datos/copias/`. Si una regla ya existe, no la pisa: te lo dice y te
+  enseña la línea para que decidas tú. Los JSON se pueden seguir editando
+  a mano igual que siempre.
+- **La guía explica cómo editar los ajustes a mano**: con qué se abren,
+  las comas, las comillas y qué hacer si sale «error de formato».
+
 ## 2.14.0
 
 Lo que quedaba pendiente de la segunda ronda del piloto.

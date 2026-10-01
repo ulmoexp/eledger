@@ -25,6 +25,13 @@ momento: **publicar** la release (se queda en borrador hasta que él le dé al
 botón), compilar y adjuntar el `.exe` (necesita Windows), hacer público el
 repo y activar Pages. Fuera de `/release`, para pushear hay que pedírselo.
 
+**La web (`/root/proyectos/eledger-web`) se publica aparte, en Surge**
+(https://eledger.surge.sh, desde el 01/10/2026). Ni el push de ese repo ni
+una release de este la actualizan: hace falta `./publicar.sh` allí. Si un
+cambio aquí afecta a lo que cuenta la web (funciones, instalación,
+descargas), recuérdale al usuario que la web también hay que actualizarla
+y publicarla en Surge.
+
 ## Antes y después de cada cambio
 
 ```

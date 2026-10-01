@@ -16,8 +16,12 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
     eliges la categoría con un número y escribe la regla en `rules.json`.
     Solo ofrece las categorías de `categorias.json`, así que no puede
     crear una que no sume en ninguna parte.
-  - **Excluir el recibo de la tarjeta**, cuando lo ha encontrado: lo añade
-    a `exclude_patterns.json` si dices que sí (Intro no escribe nada).
+  - **Excluir el recibo de la tarjeta**, siempre que avise de que la
+    tarjeta puede contar doble. Si ha encontrado el recibo, propone la
+    clave; si no (los importes no cuadran mes a mes, algo habitual), deja
+    escribir un trozo del concepto tal como sale en el extracto. Antes de
+    añadir nada enseña qué movimientos de tu cuenta excluiría, y avisa si
+    la clave no es segura. Hay que decir que sí: Intro no escribe nada.
 
   Al terminar, ofrece volver a ejecutar para que se aplique. Solo añade la
   línea nueva: tus comentarios, tus reglas, su orden y el formato del

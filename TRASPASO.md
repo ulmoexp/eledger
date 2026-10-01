@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          128 casos, 464 comprobaciones, ~2 min
+python pruebas/probar.py          130 casos, 473 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -233,6 +233,11 @@ asistente en la propia terminal.
 - `informe_sin_clasificar()` devuelve las propuestas que imprime y
   `detectar_recibo_tarjeta()` la clave segura; `main()` devuelve
   `(histórico, Pendientes)`.
+- «Excluir el recibo» sale siempre que haya aviso de la tarjeta, con la
+  clave de 5.1 (segura o no), la de un grupo de «Sin clasificar» que parezca
+  el recibo, o la que escriba la persona. Siempre enseña antes qué
+  excluiría (`_excluiria`). Al principio solo salía con clave segura, y el
+  usuario vio que en la práctica casi nunca aparecía.
 - Las pruebas contestan por stdin con `ELEDGER_FORZAR_INTERACTIVO=1` (solo
   para eso; ver `Entorno.ejecutar(respuestas=...)`). Casos `asistente-*`.
 - Sin ese entorno la salida no cambia ni un carácter: comprobado con una

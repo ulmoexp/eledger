@@ -444,10 +444,17 @@ efecto de una corrección en `categoria_manual` o en las reglas.
 le dicen que pegue en `ajustes/`. Era lo que más costaba a quien no se
 maneja con ficheros: añadir una línea a un JSON sin dejarse la coma de la de
 antes.
-- **Excluir el recibo de la tarjeta**: solo si 5.1 ha encontrado el recibo
-  y una clave segura. Enseña el cargo y pregunta si la añade a
-  `exclude_patterns.json`. Hay que contestar **S**: Intro, que es lo que se
-  pulsa por costumbre para cerrar, no escribe nada.
+- **Excluir el recibo de la tarjeta**: sale siempre que 5.1 haya dejado el
+  aviso de que la tarjeta puede contar doble. La clave que propone sale de
+  5.1, segura o no; si 5.1 no dio con el recibo, de un grupo de 5.3 que lo
+  parezca; y si no hay ninguna, se escribe un trozo del concepto (se guarda
+  en minúsculas y sin tildes, como lo compara el motor).
+  - **Antes de añadir nada**, enseña qué movimientos de la cuenta excluiría,
+    con el mismo motor que `Excluidor`. Si la clave no es la segura de 5.1,
+    pide comprobar que todos son el recibo.
+  - No acepta un texto de menos de 4 letras ni uno que no case con nada.
+  - **O** prueba otro texto. Hay que contestar **S** para escribir: Intro,
+    que es lo que se pulsa por costumbre para cerrar, no escribe nada.
 - **Clasificar lo que falta**: recorre los grupos de 5.3 que tienen una
   regla segura, los mismos que el informe propone pegar. En cada uno enseña
   las categorías numeradas:

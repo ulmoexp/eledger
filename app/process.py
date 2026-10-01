@@ -214,8 +214,12 @@ class Propuesta(NamedTuple):
 class Pendientes(NamedTuple):
     """Lo que el asistente del menú final puede escribir por la persona."""
     reglas: list          # de Propuesta
-    exclusion: str | None     # la clave segura del recibo de la tarjeta
-    recibo: str | None        # una descripción de ese recibo, para enseñarla
+    tarjeta: bool         # ha salido el aviso de que la tarjeta cuenta doble
+    exclusion: str | None     # la clave que se propone para el recibo, o None
+    segura: bool          # esa clave no casa con ningún otro cargo de la cuenta
+    recibos: list         # descripciones de lo que parece el recibo
+    cuenta: list          # (fecha, descripcion, importe) de la cuenta, para
+                          # enseñar con qué casaría una clave antes de añadirla
 
 
 def _categorias_para(entra) -> list:
@@ -235,27 +239,76 @@ def _imprimir_en_columnas(textos, ancho_total=76):
         print("   " + "".join(t.ljust(ancho) for t in textos[i:i + por_fila]).rstrip())
 
 
-def asistente_exclusion(clave, recibo) -> bool:
-    """Ofrece añadir el recibo de la tarjeta a exclude_patterns.json.
-    Devuelve si lo ha escrito. Hay que decir que sí con todas las letras:
-    Intro, que es lo que se pulsa por costumbre para cerrar, no escribe."""
+def _excluiria(clave, cuenta) -> list:
+    """Los movimientos de la cuenta que esa clave excluiría: el mismo motor
+    (compilar sobre el texto normalizado) que usa Excluidor de verdad."""
+    patron, _ = compilar(clave)
+    return [m for m in cuenta if patron.search(normalizar(m[1]))]
+
+
+def asistente_exclusion(p) -> bool:
+    """
+    Ayuda a excluir el recibo con que la cuenta paga la tarjeta. Sale siempre
+    que haya salido el aviso de la tarjeta, con clave propuesta o sin ella:
+    el detector a menudo no da con el recibo (los importes no cuadran mes a
+    mes) o no encuentra una clave segura, y era justo ahí donde había que
+    editar el JSON a mano. Antes de añadir nada enseña qué movimientos de la
+    cuenta excluiría, porque lo excluido no cuenta en ningún total.
+    Hay que decir que sí con todas las letras: Intro, que es lo que se pulsa
+    por costumbre para cerrar, no escribe. Devuelve si lo ha escrito.
+    """
     ruta = rutas.relativa(rutas.EXCLUSIONES)
     seccion("El recibo de la tarjeta")
-    print("Este cargo de tu cuenta parece el recibo con que pagas la tarjeta:")
-    if recibo:
-        print(gris(f"   ej: {recibo}"))
-    print("Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES.\n")
-    respuesta = _esperar(f"   ¿Añado «{clave}» a {ruta}? (S = sí, Intro = no) ").lower()
-    if respuesta not in ("s", "si", "sí"):
-        print(gris("   No he tocado nada."))
+    print("Si tu cuenta paga la tarjeta con un recibo, cada gasto de la tarjeta\n"
+          "cuenta DOS VECES hasta que lo excluyas.")
+    if p.recibos:
+        print("Esto parece el recibo:")
+        for descripcion in p.recibos:
+            print(gris(f"   {descripcion}"))
+    print()
+    clave = p.exclusion
+    while True:
+        if not clave:
+            texto = _esperar("   Escribe un trozo del concepto del recibo, tal como "
+                             "sale en tu extracto\n   (Intro = dejarlo): ")
+            if not texto:
+                print(gris("   No he tocado nada."))
+                return False
+            clave = normalizar(texto)
+            if len(clave) < 4:
+                print("   Es demasiado corto: excluiría de más. Prueba con algo más largo.")
+                clave = None
+                continue
+        casan = _excluiria(clave, p.cuenta)
+        if not casan:
+            print(f"   «{clave}» no coincide con ningún movimiento de tu cuenta. "
+                  f"Prueba con otro trozo.")
+            clave = None
+            continue
+        plural = "s" if len(casan) != 1 else ""
+        print(f"   «{clave}» excluiría {len(casan)} movimiento{plural} de tu cuenta:")
+        for fecha, descripcion, importe in sorted(casan, key=lambda m: m[0])[:5]:
+            print(gris(f"      {fecha:%d/%m/%Y}  {euros(importe, ancho=10)}  {descripcion}"))
+        if len(casan) > 5:
+            print(gris(f"      … y {len(casan) - 5} más"))
+        if not (clave == p.exclusion and p.segura):
+            print(amarillo("   Comprueba que todos son el recibo de la tarjeta: lo "
+                           "excluido no cuenta en ningún total."))
+        respuesta = _esperar(f"   ¿Lo añado a {ruta}? (S = sí, O = probar otro "
+                             f"texto, Intro = no) ").lower()
+        if respuesta in ("o", "otro"):
+            clave = None
+            continue
+        if respuesta not in ("s", "si", "sí"):
+            print(gris("   No he tocado nada."))
+            return False
+        motivo = anadir_exclusion(rutas.EXCLUSIONES, clave, rutas.COPIAS)
+        if motivo is None:
+            print(verde(f'   ✓ Añadido a {ruta}:  "{clave}"'))
+            return True
+        print(rojo(f"   No lo he escrito: {ruta} {motivo}."))
+        print(f'   Añádelo a mano:  "{clave}"')
         return False
-    motivo = anadir_exclusion(rutas.EXCLUSIONES, clave, rutas.COPIAS)
-    if motivo is None:
-        print(verde(f'   ✓ Añadido a {ruta}:  "{clave}"'))
-        return True
-    print(rojo(f"   No lo he escrito: {ruta} {motivo}."))
-    print(f'   Añádelo a mano:  "{clave}"')
-    return False
 
 
 def asistente_reglas(propuestas) -> tuple[int, list]:
@@ -325,8 +378,7 @@ def menu_final(historico=None, pendientes=None):
     if not _interactiva():
         return None
     historico = historico or rutas.HISTORICO
-    exclusion = pendientes.exclusion if pendientes else None
-    recibo = pendientes.recibo if pendientes else None
+    tarjeta = bool(pendientes and pendientes.tarjeta)
     por_clasificar = list(pendientes.reglas) if pendientes else []
     cambios = 0
 
@@ -341,8 +393,10 @@ def menu_final(historico=None, pendientes=None):
                    "abrir", historico)
             opcion(f"Abrir la carpeta  {rutas.relativa(rutas.DATOS)}/",
                    "abrir", rutas.DATOS)
-        if exclusion:
-            opcion(f"Excluir el recibo de la tarjeta  («{exclusion}»)", "excluir")
+        if tarjeta:
+            opcion("Excluir el recibo de la tarjeta" + (f"  («{pendientes.exclusion}»)"
+                                                      if pendientes.exclusion else ""),
+                   "excluir")
         if por_clasificar:
             grupos = "1 grupo" if len(por_clasificar) == 1 else f"{len(por_clasificar)} grupos"
             opcion(f"Clasificar lo que falta  ({grupos})", "clasificar")
@@ -378,8 +432,8 @@ def menu_final(historico=None, pendientes=None):
         if accion == "otra":
             return OTRA_VEZ
         if accion == "excluir":
-            cambios += asistente_exclusion(exclusion, recibo)
-            exclusion = None
+            cambios += asistente_exclusion(pendientes)
+            tarjeta = False
         elif accion == "clasificar":
             escritas, por_clasificar = asistente_reglas(por_clasificar)
             cambios += escritas
@@ -387,7 +441,7 @@ def menu_final(historico=None, pendientes=None):
         # ejecutar (el histórico se recalcula entero, así que también
         # reclasifica lo antiguo). Si ya no queda nada que ofrecer, se
         # pregunta directamente; si queda, se vuelve al menú.
-        if cambios and not exclusion and not por_clasificar:
+        if cambios and not tarjeta and not por_clasificar:
             respuesta = _esperar("\n   Se aplica al ejecutar de nuevo. "
                                  "¿Lo hago ya? (Intro = sí, N = no) ").lower()
             if respuesta not in ("n", "no"):
@@ -1207,13 +1261,16 @@ def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
     dado con el recibo. Un grupo que lo parezca no recibe sugerencia de
     categoría, que era el consejo contrario al del aviso de la tarjeta.
 
-    Devuelve las propuestas que ha impreso como «añade a rules.json» (las
-    mismas, ni una más), para que el asistente del menú final las ofrezca.
+    Devuelve (las propuestas que ha impreso como «añade a rules.json», las
+    mismas y ni una más; y (clave, ejemplo) del primer grupo que parece el
+    recibo de la tarjeta, o None), para que el asistente del menú final
+    ofrezca las reglas y, si el detector no lo encontró, ese recibo.
     """
     propuestas = []
+    recibo_en_grupo = None
     sin_regla = df[(df["regla"] == "") & ~df["descripcion"].isin(ignorar)]
     if sin_regla.empty:
-        return propuestas
+        return propuestas, recibo_en_grupo
 
     # lo que sale y lo que entra, cada uno por su lado: una palabra común a
     # un cobro y a un cargo no hace de ellos un grupo, y la regla que se
@@ -1231,7 +1288,7 @@ def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
             entra = entra.drop(index=suyas)
     grupos += _agrupar_sin_clasificar(entra)
     if not grupos:
-        return propuestas
+        return propuestas, recibo_en_grupo
 
     # de más a menos importe, con el mismo criterio que el resto del resumen:
     # en positivo (-suma), sin ABS() que disfrace un grupo que acabe a favor.
@@ -1277,11 +1334,14 @@ def informe_sin_clasificar(df, ignorar=frozenset(), tarjeta_sin_excluir=False):
             print(gris("      (ninguna palabra de este grupo es segura de sugerir "
                        "sin pisar otra regla; revísalo a mano)"))
         print()
-        if sugerida and not (tarjeta_sin_excluir and _parece_recibo_tarjeta(filas)):
+        if tarjeta_sin_excluir and _parece_recibo_tarjeta(filas):
+            if sugerida and recibo_en_grupo is None:
+                recibo_en_grupo = (sugerida, ejemplo)
+        elif sugerida:
             propuestas.append(Propuesta(sugerida, entra, palabra, len(filas),
                                         -total if entra else total, ejemplo))
 
-    return propuestas
+    return propuestas, recibo_en_grupo
 
 
 # ========= DETECCIÓN DEL RECIBO DE LA TARJETA (hito A2 del roadmap) =========
@@ -1374,24 +1434,25 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
     excluir el recibo, que es justo lo que se está pidiendo).
 
     No imprime nada: deja el aviso para el final, con los demás. Devuelve
-    (si lo ha dejado, descripciones de los recibos encontrados, clave segura
-    o None): lo primero para señalarlo junto a los totales; lo segundo para
-    que el informe de sin clasificar no proponga ponerle categoría a un
-    cargo al que este aviso ya dice que hay que excluir (salían los dos
-    consejos a la vez); lo tercero para que el asistente del menú final
-    pueda añadirla por la persona."""
+    (si lo ha dejado, descripciones de los recibos encontrados, clave
+    propuesta o None, si esa clave es segura): lo primero para señalarlo
+    junto a los totales; lo segundo para que el informe de sin clasificar no
+    proponga ponerle categoría a un cargo al que este aviso ya dice que hay
+    que excluir (salían los dos consejos a la vez); lo demás para que el
+    asistente del menú final la ofrezca. Una clave que no es segura también
+    se le pasa: allí se enseña con qué casaría antes de añadirla."""
     if excluidor.patrones:
-        return False, set(), None
+        return False, set(), None, False
     tarjeta_por_mes = _meses_tarjeta(todo)
     if tarjeta_por_mes.empty:
-        return False, set(), None
+        return False, set(), None, False
 
     # Sin ningún extracto de cuenta no hay recibo que pueda contarse dos
     # veces: quien solo tiene tarjetas (una de débito, un neobanco) recibía
     # el aviso en cada ejecución sin poder hacer nada con él.
     cuenta = todo[todo["tipo"] == "cuenta"]
     if cuenta.empty:
-        return False, set(), None
+        return False, set(), None, False
     # Con dos tarjetas, cada una se liquida con su propio recibo y la suma de
     # las dos no cuadra con ninguno: se prueba primero el total del mes y,
     # si no, cada tarjeta por separado (por su cuenta declarada o, sin
@@ -1432,7 +1493,7 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
             "Si tu cuenta paga la tarjeta con un recibo, cada gasto se está "
             "contando DOS VECES y no lo he sabido encontrar solo.",
             "Revísalo a mano: LEEME.txt explica cómo excluirlo."] + pista)
-        return True, set(), None
+        return True, set(), None, False
 
     lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
               "Esto parece el recibo:"]
@@ -1462,7 +1523,7 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
                       "con lo que ves arriba.")
     avisar(titulo, lineas + pista)
     return (True, {f["descripcion"] for f in candidatos.values()},
-            clave if segura else None)
+            clave if len(clave) >= _LONGITUD_MINIMA_CLAVE_RECIBO else None, segura)
 
 
 # ========= CARGOS QUE SE REPITEN (suscripciones, cuotas, seguros) =========
@@ -1872,7 +1933,7 @@ def main():
 
     # si se están contando dos veces los gastos de la tarjeta, que se sepa
     # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
-    doble_tarjeta, recibos_tarjeta, exclusion_segura = detectar_recibo_tarjeta(
+    doble_tarjeta, recibos_tarjeta, clave_recibo, recibo_seguro = detectar_recibo_tarjeta(
         todo, sin_declarar)
 
     # orden_resumen puede haber quitado cualquiera de estas columnas del
@@ -1910,15 +1971,22 @@ def main():
     informar_cuadre(comprobar_cuadre(todo))
 
     informe_recurrentes(df, catalogo.gastos)
-    propuestas = informe_sin_clasificar(
+    propuestas, recibo_en_grupo = informe_sin_clasificar(
         df, ignorar=recibos_tarjeta,
         tarjeta_sin_excluir=doble_tarjeta and not recibos_tarjeta)
     # los avisos, lo último antes de salir: juntos, contados y separados de
     # lo demás, que es lo que se lee cuando la ejecución termina
     mostrar_avisos()
     # lo que el asistente del menú final puede escribir por la persona
-    pendientes = Pendientes(propuestas, exclusion_segura,
-                            min(recibos_tarjeta) if recibos_tarjeta else None)
+    # si el detector no lo encontró, pero un grupo de lo sin clasificar
+    # lo parece, su clave es la mejor pista que hay
+    recibos = sorted(recibos_tarjeta)[:3]
+    if not clave_recibo and recibo_en_grupo:
+        clave_recibo, ejemplo = recibo_en_grupo
+        recibos = [ejemplo]
+    cuenta = todo.loc[todo["tipo"] == "cuenta", ["fecha", "descripcion", "importe"]]
+    pendientes = Pendientes(propuestas, doble_tarjeta, clave_recibo, recibo_seguro,
+                            recibos, list(cuenta.itertuples(index=False, name=None)))
     return historico_escrito, pendientes
 
 

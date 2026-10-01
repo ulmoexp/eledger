@@ -473,9 +473,9 @@ story += [p(
 story += [aviso(
     "Lo más habitual no hace falta hacerlo a mano",
     "Al terminar, el menú ofrece <b>Clasificar lo que falta</b> y <b>Excluir el "
-    "recibo de la tarjeta</b> cuando hay algo. Te pregunta, eliges con un número y "
-    "escribe la línea por ti en rules.json o exclude_patterns.json, sin tocar nada "
-    "más del fichero. Antes deja una copia de cómo estaba en "
+    "recibo de la tarjeta</b> cuando hay algo. Te pregunta (eliges la categoría con "
+    "un número; del recibo, te enseña antes qué excluiría) y escribe la línea por "
+    "ti en rules.json o exclude_patterns.json, sin tocar nada más del fichero. Antes deja una copia de cómo estaba en "
     "<font face='Mono' size='8.2'>datos/copias/</font>. Solo ofrece las categorías "
     "que tienes en categorias.json, así que no puede crear una que no sume.",
     ACENTO, ACENTO_CL)]
@@ -648,8 +648,10 @@ story += [Spacer(1, 4)]
 story += [Paragraph(
     "No hace falta buscarlo a ojo: si el fichero está vacío y hay movimientos de "
     "tarjeta, al terminar el script busca en la cuenta un cargo que cuadre con lo "
-    "que suma la tarjeta ese mes y propone la línea lista para pegar aquí (o, "
-    "desde el menú, «Excluir el recibo de la tarjeta» la añade por ti). Con "
+    "que suma la tarjeta ese mes y propone la línea lista para pegar aquí. Más "
+    "fácil: en el menú del final, «Excluir el recibo de la tarjeta» la añade por "
+    "ti; si no lo ha encontrado, escribes un trozo del concepto y te enseña qué "
+    "excluiría antes de guardarlo. Con "
     "cualquier patrón ya puesto, no dice nada más. Con varias tarjetas, busca el "
     "recibo de cada una. Y si solo tienes tarjetas, sin extracto de la cuenta, no "
     "hay recibo que pueda contarse dos veces: ni avisa.", S["pmini"])]

@@ -35,7 +35,7 @@ y publicarla en Surge.
 ## Antes y después de cada cambio
 
 ```
-python pruebas/probar.py        128 casos, 464 comprobaciones, ~2 min
+python pruebas/probar.py        130 casos, 473 comprobaciones, ~2 min
 ```
 
 Ejecútalas **antes** para tener la línea base y **después** para saber qué se

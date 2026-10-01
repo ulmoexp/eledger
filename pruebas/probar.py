@@ -1322,6 +1322,67 @@ def prueba_asistente_exclusion(e):
               "el recibo queda excluido de los totales")
 
 
+@caso("asistente-exclusion-sin-clave", "Sin clave segura, el asistente deja escribirla y enseña qué excluiría")
+def prueba_asistente_exclusion_sin_clave(e):
+    # El caso de la vida real: lo que paga la cuenta no cuadra con lo que suma la
+    # tarjeta (comisiones, otro periodo), así que el detector no lo
+    # encuentra. Antes solo quedaba editar el JSON a mano.
+    e.escribir_config("exclude_patterns.json", [])
+    tarjeta = [("05/04/2026", "COMPRA A", -50.00),
+              ("12/04/2026", "COMPRA B", -30.25),
+              ("20/04/2026", "COMPRA C", -15.05)]     # total -95.30
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+    cuenta = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+             ("05/05/2026", "PAGO TARJETA CREDITO 4567", -100.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    # menú: 1 histórico, 2 carpeta, 3 excluir el recibo, 4 de nuevo.
+    # «zz» es demasiado corto; «nada parecido» no casa con nada; Intro: dejarlo
+    salida = e.ejecutar(respuestas="3\no\nzz\nnada parecido\n\n")
+    comprobar("Excluir el recibo de la tarjeta" in salida,
+              "la opción sale aunque el detector no haya dado con el recibo", salida)
+    comprobar("PAGO TARJETA CREDITO 4567" in salida.split("El recibo de la tarjeta")[-1],
+              "enseña lo que parece el recibo (la pista de «Sin clasificar»)", salida)
+    comprobar("demasiado corto" in salida and "no coincide con ningún movimiento" in salida,
+              "un texto muy corto o que no casa con nada no se acepta", salida)
+    comprobar(e.leer_config("exclude_patterns.json") == [],
+              "dejarlo no escribe nada")
+
+    # O: probar otro texto · lo escribe la persona · S: añadirlo · Intro: aplicarlo
+    salida = e.ejecutar(respuestas="3\no\nPago tarjeta crédito\ns\n\n")
+    comprobar("excluiría 1 movimiento de tu cuenta" in salida
+              and "Comprueba que todos son el recibo" in salida,
+              "antes de añadirlo enseña qué excluiría y pide comprobarlo", salida)
+    comprobar(e.leer_config("exclude_patterns.json") == ["pago tarjeta credito"],
+              "escribe lo tecleado, en minúsculas y sin tildes",
+              e.leer_config("exclude_patterns.json"))
+    comprobar(bool(campo_de(e.historico(), "PAGO TARJETA", "excluido")),
+              "y al volver a ejecutar el recibo queda excluido")
+
+
+@caso("asistente-exclusion-insegura", "Con una clave que excluiría de más, la enseña y avisa antes de nada")
+def prueba_asistente_exclusion_insegura(e):
+    e.escribir_config("exclude_patterns.json", [])
+    tarjeta = [("05/04/2026", "COMPRA A", -50.00),
+              ("12/04/2026", "COMPRA B", -30.25)]     # total -80.25
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+    # el recibo y otro cargo que comparten la parte fija del concepto
+    cuenta = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+             ("05/05/2026", "LIQUIDACION TARJETA VISA 778899", -80.25),
+             ("09/05/2026", "LIQUIDACION TARJETA VISA CUOTA ANUAL", -30.00)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+
+    # 3: excluir · Intro: no (es la clave que no es segura)
+    salida = e.ejecutar(respuestas="3\n\n")
+    tramo = salida.split("── El recibo de la tarjeta")[-1]
+    comprobar("excluiría 2 movimientos de tu cuenta" in tramo
+              and "CUOTA ANUAL" in tramo and "Comprueba que todos son" in tramo,
+              "enseña los dos que excluiría, incluido el que no es el recibo, y avisa",
+              tramo)
+    comprobar(e.leer_config("exclude_patterns.json") == [],
+              "sin un sí, no escribe nada")
+
+
 @caso("asistente-formato", "El asistente respeta el fichero de la persona y no pisa sus reglas")
 def prueba_asistente_formato(e):
     fx.escribir_html(e.entrada / "cuenta.xls", SIN_CLASIFICAR)

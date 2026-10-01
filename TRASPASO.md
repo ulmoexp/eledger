@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.15.0** (comiteada, sin release; la 2.14.0 está publicada). Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.15.0** (en borrador en GitHub; la 2.14.0 es la publicada). Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -217,7 +217,7 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### En curso: 2.15.0 (sesión del 01/10/2026)
+### En curso: 2.15.0 (sesión del 01/10/2026), en borrador
 
 El asistente del menú final (ver FUNCIONAMIENTO 3.9): «Clasificar lo que
 falta» y «Excluir el recibo de la tarjeta» escriben `rules.json` y
@@ -243,10 +243,12 @@ asistente en la propia terminal.
 - Sin ese entorno la salida no cambia ni un carácter: comprobado con una
   ejecución completa antes y después.
 
-**Lo siguiente:** el usuario lo prueba en Windows. Un `rules.json` guardado
-con el Bloc de notas, el asistente desde `ejecutar.bat` y desde el `.exe`,
-y volver a abrir el fichero con el Bloc de notas. Luego, release 2.15.0
-(`/release`) y la guía web publicada en Surge.
+**Lo siguiente:** borrador de la v2.15.0 creado el 01/10/2026 con el ZIP
+de `exportar.py`. Falta que el usuario compile `eledger.exe`, lo adjunte y
+publique. Con el `.exe` nuevo conviene probar en Windows un `rules.json`
+guardado con el Bloc de notas: usar el asistente y volver a abrir el fichero
+con el Bloc de notas. Al publicar, la guía web (ya comiteada, con «Cómo
+editar los ajustes») hay que publicarla en Surge con `./publicar.sh`.
 
 ### Hecho: 2.14.0 (sesiones del 25 al 28/09/2026), publicada
 

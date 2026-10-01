@@ -65,7 +65,7 @@ pasos de arriba.
 Es gratis y lo seguirá siendo. Si te resulta útil, puedes enviar lo que
 quieras por Lightning (bitcoin) a
 **`victoriouscookie143740@getalby.com`**, o escanear el código QR de la
-[web](https://ulmoexp.github.io/eledger-web/#apoya). ¿No usas bitcoin? Una
+[web](https://eledger.surge.sh/#apoya). ¿No usas bitcoin? Una
 estrella en el repositorio también ayuda.
 
 ## Estructura del repositorio

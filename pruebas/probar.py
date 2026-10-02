@@ -1341,7 +1341,7 @@ def prueba_asistente_exclusion_sin_clave(e):
     salida = e.ejecutar(respuestas="3\no\nzz\nnada parecido\n\n")
     comprobar("Excluir el recibo de la tarjeta" in salida,
               "la opción sale aunque el detector no haya dado con el recibo", salida)
-    comprobar("PAGO TARJETA CREDITO 4567" in salida.split("El recibo de la tarjeta")[-1],
+    comprobar("PAGO TARJETA CREDITO 4567" in salida.split("El pago de la tarjeta")[-1],
               "enseña lo que parece el recibo (la pista de «Sin clasificar»)", salida)
     comprobar("demasiado corto" in salida and "no coincide con ningún movimiento" in salida,
               "un texto muy corto o que no casa con nada no se acepta", salida)
@@ -1350,8 +1350,8 @@ def prueba_asistente_exclusion_sin_clave(e):
 
     # O: probar otro texto · lo escribe la persona · S: añadirlo · Intro: aplicarlo
     salida = e.ejecutar(respuestas="3\no\nPago tarjeta crédito\ns\n\n")
-    comprobar("excluiría 1 movimiento de tu cuenta" in salida
-              and "Comprueba que todos son el recibo" in salida,
+    comprobar("excluiría 1 movimiento:" in salida
+              and "Comprueba que todos son ese pago" in salida,
               "antes de añadirlo enseña qué excluiría y pide comprobarlo", salida)
     comprobar(e.leer_config("exclude_patterns.json") == ["pago tarjeta credito"],
               "escribe lo tecleado, en minúsculas y sin tildes",
@@ -1374,8 +1374,8 @@ def prueba_asistente_exclusion_insegura(e):
 
     # 3: excluir · Intro: no (es la clave que no es segura)
     salida = e.ejecutar(respuestas="3\n\n")
-    tramo = salida.split("── El recibo de la tarjeta")[-1]
-    comprobar("excluiría 2 movimientos de tu cuenta" in tramo
+    tramo = salida.split("── El pago de la tarjeta")[-1]
+    comprobar("excluiría 2 movimientos:" in tramo
               and "CUOTA ANUAL" in tramo and "Comprueba que todos son" in tramo,
               "enseña los dos que excluiría, incluido el que no es el recibo, y avisa",
               tramo)
@@ -1405,6 +1405,124 @@ def prueba_asistente_formato(e):
               and 'Añádelo a mano:  "yodo": {"+": "Ingresos"}' in salida,
               "una clave que ya existe (aunque sea null) no se pisa: lo dice "
               "y enseña la línea", salida)
+
+
+# --- el pago de la tarjeta visto desde la tarjeta (2.15.0) -----------------
+# Algunos bancos apuntan la liquidación en los DOS extractos: el cargo en la
+# cuenta y el mismo importe como abono en la tarjeta. Sin excluir el abono,
+# contaba como un ingreso. Datos inventados: dos meses de compras, cada uno
+# pagado a primeros del siguiente; el abono cae en el mes de compras
+# siguiente, que es justo lo que descuadraba la suma neta del mes.
+ESPEJO_TARJETA = [("10/04/2026", "COMPRA MERCADONA MADRID", -50.00),
+                  ("20/04/2026", "COMPRA MERCADONA MADRID", -30.25),   # abril -80,25
+                  ("05/05/2026", "PAGO RECIBO 4321", 80.25),
+                  ("12/05/2026", "COMPRA MERCADONA MADRID", -60.00),   # mayo  -60,00
+                  ("05/06/2026", "PAGO RECIBO 4321", 60.00)]
+ESPEJO_CUENTA = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+                 ("05/05/2026", "TARJ.CRDTO 4321 ABRIL", -80.25),
+                 ("05/06/2026", "TARJ.CRDTO 4321 MAYO", -60.00)]
+
+
+def _espejo(e, patrones):
+    e.escribir_config("exclude_patterns.json", patrones)
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", ESPEJO_TARJETA, tarjeta=True)
+    fx.escribir_html(e.entrada / "cuenta.xls", ESPEJO_CUENTA, cabecera_saldo=True)
+
+
+@caso("tarjeta-espejo", "Detecta el pago en los dos extractos: el cargo y su abono en la tarjeta")
+def prueba_tarjeta_espejo(e):
+    _espejo(e, [])
+    salida = e.ejecutar()
+
+    comprobar('Añade esto a exclude_patterns.json:  "tarj.crdto"' in salida,
+              "propone excluir el recibo de la cuenta", salida)
+    comprobar("2026-04" in salida and "2026-05" in salida,
+              "lo encuentra los dos meses, aunque el abono reste en el mes de "
+              "compras siguiente", salida)
+    comprobar("El mismo pago aparece también en el extracto de la tarjeta" in salida
+              and 'Añade también:  "pago recibo"' in salida,
+              "y propone excluir también el abono en la tarjeta", salida)
+
+
+@caso("tarjeta-espejo-tras-cuenta", "Con solo el recibo de la cuenta excluido, avisa del abono en la tarjeta")
+def prueba_tarjeta_espejo_tras_cuenta(e):
+    # antes, con cualquier patrón puesto, el detector callaba
+    _espejo(e, ["tarj.crdto"])
+    salida = e.ejecutar()
+
+    comprobar("El pago de la tarjeta está contando como un ingreso" in salida
+              and 'Añade esto a exclude_patterns.json:  "pago recibo"' in salida,
+              "avisa del abono aunque ya haya un patrón puesto", salida)
+    comprobar("Esto parece el recibo" not in salida,
+              "no vuelve a pedir lo que ya está excluido", salida)
+    comprobar("el pago de la tarjeta está contando como un ingreso" in salida,
+              "junto a los totales dice que lo inflado son los ingresos", salida)
+    ingresos = e.resumen()["Ingresos"].sum()
+    comprobar(abs(ingresos - (2000 + 80.25 + 60)) < 0.01,
+              "(y es verdad: sin excluir, el abono suma a Ingresos)", ingresos)
+
+
+@caso("tarjeta-espejo-resuelto", "Con los dos lados excluidos no avisa y los Ingresos no se inflan")
+def prueba_tarjeta_espejo_resuelto(e):
+    _espejo(e, ["tarj.crdto", "pago recibo"])
+    salida = e.ejecutar()
+
+    comprobar("contando dos veces" not in salida and "ningún patrón en" not in salida,
+              "no avisa de nada", salida)
+    ingresos = e.resumen()["Ingresos"].sum()
+    comprobar(abs(ingresos - 2000) < 0.01,
+              "Ingresos es solo la nómina", ingresos)
+
+
+@caso("tarjeta-espejo-neutro", "El abono con regla a una categoría neutra se da por resuelto")
+def prueba_tarjeta_espejo_neutro(e):
+    # p. ej. «abono en tarjeta de credito» -> Transferencias internas, en la base
+    _espejo(e, ["tarj.crdto"])
+    e.regla_al_principio("pago recibo", "Transferencias internas")
+    salida = e.ejecutar()
+
+    comprobar("contando dos veces" not in salida,
+              "una neutra no suma en ningún sitio: no hace falta excluirlo", salida)
+
+
+@caso("tarjeta-espejo-casualidad", "Una devolución que coincide con un cargo cualquiera no es el recibo")
+def prueba_tarjeta_espejo_casualidad(e):
+    e.escribir_config("exclude_patterns.json", [])
+    tarjeta = [("05/04/2026", "COMPRA MERCADONA MADRID", -50.00),
+               ("10/04/2026", "DEVOLUCION LIBRERIA", 35.00),     # devolución de verdad
+               ("15/04/2026", "COMPRA MERCADONA MADRID", -30.25)]  # neto -45,25
+    fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
+    cuenta = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
+              ("12/04/2026", "RECIBO GIMNASIO PUEBLO", -35.00),   # mismo importe, por casualidad
+              ("05/05/2026", "LIQUIDACION TARJETA VISA 778899", -45.25)]
+    fx.escribir_html(e.entrada / "cuenta.xls", cuenta, cabecera_saldo=True)
+    salida = e.ejecutar()
+
+    comprobar('"liquidacion tarjeta visa"' in salida,
+              "el recibo de verdad (con la devolución descontada) se sigue encontrando",
+              salida)
+    comprobar("El mismo pago aparece también" not in salida
+              and "GIMNASIO" not in salida.split("── Avisos")[-1],
+              "un solo mes y sin cuadre: no toma la devolución y el gimnasio por "
+              "el pago de la tarjeta", salida)
+
+
+@caso("asistente-exclusion-dos-lados", "El asistente excluye el recibo de la cuenta y su abono en la tarjeta")
+def prueba_asistente_exclusion_dos_lados(e):
+    _espejo(e, [])
+    # menú: 1 histórico, 2 carpeta, 3 excluir (2 líneas), 4 de nuevo.
+    # S al recibo de la cuenta · S al abono en la tarjeta · Intro: aplicarlo
+    salida = e.ejecutar(respuestas="3\ns\ns\n\n")
+
+    comprobar("Excluir el recibo de la tarjeta  (2 líneas)" in salida,
+              "el menú dice que son dos líneas", salida)
+    comprobar("PAGO RECIBO 4321  (tarjeta)" in salida,
+              "la vista previa del abono enseña que es de la tarjeta", salida)
+    comprobar(e.leer_config("exclude_patterns.json") == ["tarj.crdto", "pago recibo"],
+              "escribe las dos claves", e.leer_config("exclude_patterns.json"))
+    ingresos = e.resumen()["Ingresos"].sum()
+    comprobar(abs(ingresos - 2000) < 0.01,
+              "y al volver a ejecutar los Ingresos ya son solo la nómina", ingresos)
 
 
 @caso("iso", "Las fechas aaaa-mm-dd no se invierten")

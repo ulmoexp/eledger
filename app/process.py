@@ -211,14 +211,30 @@ class Propuesta(NamedTuple):
     ejemplo: str
 
 
+class ExclusionPropuesta(NamedTuple):
+    """Una línea que conviene excluir para que la tarjeta no cuente doble."""
+    lado: str             # "cuenta": el recibo con que la cuenta paga la
+                          # tarjeta; "tarjeta": el mismo pago, visto desde el
+                          # extracto de la tarjeta (sale como un ingreso)
+    clave: str | None     # la que se propone, o None si no hay ninguna
+    segura: bool          # no casa con ningún otro movimiento
+    ejemplos: list        # descripciones, para enseñarlas
+
+
+class RecibosTarjeta(NamedTuple):
+    """Lo que deja detectar_recibo_tarjeta()."""
+    aviso: bool           # ha dejado el aviso: algún lado está sin excluir
+    descripciones: set    # las de los dos lados, para que el informe de sin
+                          # clasificar no les proponga una categoría
+    propuestas: list      # de ExclusionPropuesta, solo de lo que falta
+
+
 class Pendientes(NamedTuple):
     """Lo que el asistente del menú final puede escribir por la persona."""
     reglas: list          # de Propuesta
     tarjeta: bool         # ha salido el aviso de que la tarjeta cuenta doble
-    exclusion: str | None     # la clave que se propone para el recibo, o None
-    segura: bool          # esa clave no casa con ningún otro cargo de la cuenta
-    recibos: list         # descripciones de lo que parece el recibo
-    cuenta: list          # (fecha, descripcion, importe) de la cuenta, para
+    exclusiones: list     # de ExclusionPropuesta
+    movimientos: list     # (fecha, descripcion, importe, tipo) de todo, para
                           # enseñar con qué casaría una clave antes de añadirla
 
 
@@ -239,38 +255,31 @@ def _imprimir_en_columnas(textos, ancho_total=76):
         print("   " + "".join(t.ljust(ancho) for t in textos[i:i + por_fila]).rstrip())
 
 
-def _excluiria(clave, cuenta) -> list:
-    """Los movimientos de la cuenta que esa clave excluiría: el mismo motor
-    (compilar sobre el texto normalizado) que usa Excluidor de verdad."""
+def _excluiria(clave, movimientos) -> list:
+    """Los movimientos que esa clave excluiría, de la cuenta Y de la
+    tarjeta: Excluidor no mira el tipo. Mismo motor (compilar sobre el texto
+    normalizado) que el de verdad."""
     patron, _ = compilar(clave)
-    return [m for m in cuenta if patron.search(normalizar(m[1]))]
+    return [m for m in movimientos if patron.search(normalizar(m[1]))]
 
 
-def asistente_exclusion(p) -> bool:
-    """
-    Ayuda a excluir el recibo con que la cuenta paga la tarjeta. Sale siempre
-    que haya salido el aviso de la tarjeta, con clave propuesta o sin ella:
-    el detector a menudo no da con el recibo (los importes no cuadran mes a
-    mes) o no encuentra una clave segura, y era justo ahí donde había que
-    editar el JSON a mano. Antes de añadir nada enseña qué movimientos de la
-    cuenta excluiría, porque lo excluido no cuenta en ningún total.
-    Hay que decir que sí con todas las letras: Intro, que es lo que se pulsa
-    por costumbre para cerrar, no escribe. Devuelve si lo ha escrito.
-    """
+_PRESENTACION_EXCLUSION = {
+    "cuenta": "Este cargo de tu cuenta parece el recibo con que pagas la tarjeta.\n"
+              "Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES:",
+    "tarjeta": "Y esto, en el extracto de la tarjeta, es el mismo pago visto desde la\n"
+               "tarjeta. Si no se excluye, cuenta como un INGRESO que no lo es:",
+}
+
+
+def _una_exclusion(propuesta, movimientos) -> bool:
+    """Pregunta por una línea: enseña qué excluiría la clave antes de
+    añadirla, y deja probar otro texto. Devuelve si la ha escrito."""
     ruta = rutas.relativa(rutas.EXCLUSIONES)
-    seccion("El recibo de la tarjeta")
-    print("Si tu cuenta paga la tarjeta con un recibo, cada gasto de la tarjeta\n"
-          "cuenta DOS VECES hasta que lo excluyas.")
-    if p.recibos:
-        print("Esto parece el recibo:")
-        for descripcion in p.recibos:
-            print(gris(f"   {descripcion}"))
-    print()
-    clave = p.exclusion
+    clave = propuesta.clave
     while True:
         if not clave:
-            texto = _esperar("   Escribe un trozo del concepto del recibo, tal como "
-                             "sale en tu extracto\n   (Intro = dejarlo): ")
+            texto = _esperar("   Escribe un trozo del concepto, tal como sale en tu "
+                             "extracto\n   (Intro = dejarlo): ")
             if not texto:
                 print(gris("   No he tocado nada."))
                 return False
@@ -279,21 +288,23 @@ def asistente_exclusion(p) -> bool:
                 print("   Es demasiado corto: excluiría de más. Prueba con algo más largo.")
                 clave = None
                 continue
-        casan = _excluiria(clave, p.cuenta)
+        casan = _excluiria(clave, movimientos)
         if not casan:
-            print(f"   «{clave}» no coincide con ningún movimiento de tu cuenta. "
+            print(f"   «{clave}» no coincide con ningún movimiento de tus extractos. "
                   f"Prueba con otro trozo.")
             clave = None
             continue
         plural = "s" if len(casan) != 1 else ""
-        print(f"   «{clave}» excluiría {len(casan)} movimiento{plural} de tu cuenta:")
-        for fecha, descripcion, importe in sorted(casan, key=lambda m: m[0])[:5]:
-            print(gris(f"      {fecha:%d/%m/%Y}  {euros(importe, ancho=10)}  {descripcion}"))
+        print(f"   «{clave}» excluiría {len(casan)} movimiento{plural}:")
+        for fecha, descripcion, importe, tipo in sorted(casan, key=lambda m: m[0])[:5]:
+            de = "  (tarjeta)" if tipo == "tarjeta" else ""
+            print(gris(f"      {fecha:%d/%m/%Y}  {euros(importe, ancho=10)}  "
+                       f"{descripcion}{de}"))
         if len(casan) > 5:
             print(gris(f"      … y {len(casan) - 5} más"))
-        if not (clave == p.exclusion and p.segura):
-            print(amarillo("   Comprueba que todos son el recibo de la tarjeta: lo "
-                           "excluido no cuenta en ningún total."))
+        if not (clave == propuesta.clave and propuesta.segura):
+            print(amarillo("   Comprueba que todos son ese pago: lo excluido no "
+                           "cuenta en ningún total."))
         respuesta = _esperar(f"   ¿Lo añado a {ruta}? (S = sí, O = probar otro "
                              f"texto, Intro = no) ").lower()
         if respuesta in ("o", "otro"):
@@ -309,6 +320,30 @@ def asistente_exclusion(p) -> bool:
         print(rojo(f"   No lo he escrito: {ruta} {motivo}."))
         print(f'   Añádelo a mano:  "{clave}"')
         return False
+
+
+def asistente_exclusion(p) -> int:
+    """
+    Ayuda a excluir el pago de la tarjeta, que según el banco sale en uno o
+    en los dos extractos: el recibo en la cuenta (los gastos de la tarjeta
+    contarían DOS VECES) y, en algunos, el mismo pago como abono en el de la
+    tarjeta (contaría como un ingreso). Sale siempre que haya salido el
+    aviso de la tarjeta, con clave propuesta o sin ella: si no la hay, se
+    escribe un trozo del concepto. Antes de añadir nada enseña qué excluiría.
+    Hay que decir que sí con todas las letras: Intro, que es lo que se pulsa
+    por costumbre para cerrar, no escribe. Devuelve cuántas ha escrito.
+    """
+    seccion("El pago de la tarjeta")
+    propuestas = p.exclusiones or [ExclusionPropuesta("cuenta", None, False, [])]
+    escritas = 0
+    for propuesta in propuestas:
+        print(_PRESENTACION_EXCLUSION[propuesta.lado])
+        for descripcion in propuesta.ejemplos:
+            print(gris(f"   {descripcion}"))
+        print()
+        escritas += _una_exclusion(propuesta, p.movimientos)
+        print()
+    return escritas
 
 
 def asistente_reglas(propuestas) -> tuple[int, list]:
@@ -394,9 +429,11 @@ def menu_final(historico=None, pendientes=None):
             opcion(f"Abrir la carpeta  {rutas.relativa(rutas.DATOS)}/",
                    "abrir", rutas.DATOS)
         if tarjeta:
-            opcion("Excluir el recibo de la tarjeta" + (f"  («{pendientes.exclusion}»)"
-                                                      if pendientes.exclusion else ""),
-                   "excluir")
+            exclusiones = pendientes.exclusiones
+            detalle = (f"  ({len(exclusiones)} líneas)" if len(exclusiones) > 1
+                       else f"  («{exclusiones[0].clave}»)"
+                       if exclusiones and exclusiones[0].clave else "")
+            opcion("Excluir el recibo de la tarjeta" + detalle, "excluir")
         if por_clasificar:
             grupos = "1 grupo" if len(por_clasificar) == 1 else f"{len(por_clasificar)} grupos"
             opcion(f"Clasificar lo que falta  ({grupos})", "clasificar")
@@ -1367,14 +1404,32 @@ _MARGEN_DIAS_LIQUIDACION = 45       # del día 1 del mes de la tarjeta a 45 día
 _LONGITUD_MINIMA_CLAVE_RECIBO = 5   # por debajo de esto no hay frase de
                                     # verdad que proponer, solo una letra o
                                     # dos sueltas.
+_MARGEN_DIAS_ESPEJO = 10            # entre el cargo en la cuenta y el mismo
+                                    # pago abonado en la tarjeta: los bancos
+                                    # lo apuntan el mismo día o casi.
 
 
-def _meses_tarjeta(todo):
-    """(mes -> importe neto) de cada mes con movimientos de tarjeta. Neto y
-    con signo: lo que de verdad debe la tarjeta ese mes, ya restadas las
-    devoluciones que haya habido dentro del propio mes de tarjeta."""
-    tarjeta = todo[todo["tipo"] == "tarjeta"]
-    return tarjeta.groupby("mes")["importe"].sum()
+def _espejos(tarjeta, cuenta) -> dict:
+    """
+    {fila de tarjeta: fila de cuenta} de cada abono en la tarjeta con el
+    MISMO importe, de signo contrario, que un cargo de la cuenta a pocos
+    días, y solo si ese cargo es el único que encaja. Es el pago de la
+    tarjeta visto desde los dos lados: lo que sale de la cuenta entra en la
+    tarjeta. Algunos bancos (Kutxabank: «TARJ.CRDTO …» en la cuenta y «PAGO
+    RECIBO …» en la tarjeta) lo apuntan en los dos extractos, y el abono, sin
+    excluir, contaba como un ingreso. Se busca por importe y no por el
+    nombre, que cambia de un banco a otro.
+    """
+    pares = {}
+    cargos = cuenta[cuenta["importe"] < 0]
+    for i, fila in tarjeta[tarjeta["importe"] > 0].iterrows():
+        cerca = cargos[
+            ((cargos["fecha"] - fila["fecha"]).abs() <= pd.Timedelta(days=_MARGEN_DIAS_ESPEJO))
+            & ((cargos["importe"] + fila["importe"]).abs() <= _TOLERANCIA_RECIBO + 1e-9)
+            & ~cargos.index.isin(list(pares.values()))]
+        if len(cerca) == 1:
+            pares[i] = cerca.index[0]
+    return pares
 
 
 def _candidato_liquidacion(cuenta, mes, importe_tarjeta):
@@ -1427,44 +1482,63 @@ def _clave_liquidacion(descripciones):
     return max(trozos, key=len).strip()
 
 
-def detectar_recibo_tarjeta(todo, sin_declarar=False):
-    """Hito A2 del roadmap. Solo actúa si exclude_patterns.json está vacío:
-    con cualquier patrón ya puesto se asume resuelto, sea o no el de la
-    tarjeta (así lo pide el roadmap, y evitar el aviso es tan fácil como
-    excluir el recibo, que es justo lo que se está pidiendo).
+def detectar_recibo_tarjeta(todo, sin_declarar=False) -> RecibosTarjeta:
+    """
+    Hito A2 del roadmap: el pago con que la cuenta liquida la tarjeta, que
+    sin excluir hace contar dos veces sus gastos. Se busca de dos maneras,
+    las dos por importe (el nombre cambia de un banco a otro):
 
-    No imprime nada: deja el aviso para el final, con los demás. Devuelve
-    (si lo ha dejado, descripciones de los recibos encontrados, clave
-    propuesta o None, si esa clave es segura): lo primero para señalarlo
-    junto a los totales; lo segundo para que el informe de sin clasificar no
-    proponga ponerle categoría a un cargo al que este aviso ya dice que hay
-    que excluir (salían los dos consejos a la vez); lo demás para que el
-    asistente del menú final la ofrezca. Una clave que no es segura también
-    se le pasa: allí se enseña con qué casaría antes de añadirla."""
-    if excluidor.patrones:
-        return False, set(), None, False
-    tarjeta_por_mes = _meses_tarjeta(todo)
-    if tarjeta_por_mes.empty:
-        return False, set(), None, False
+    - el cargo de la cuenta que cuadra con lo que suma la tarjeta en el mes
+      (_candidato_liquidacion);
+    - los espejos (_espejos): un abono en la tarjeta por el mismo importe que
+      un cargo de la cuenta. Dan los DOS lados del pago, y también el recibo
+      de las tarjetas de pago aplazado, que no cuadra con lo que suma el mes.
+      Para no tomar por el recibo una devolución que coincida por casualidad
+      con un cargo cualquiera, un espejo vale si su cargo es también el que
+      cuadra con el mes, o si los hay en dos meses distintos o más.
 
+    Cada lado se da por resuelto si sus filas ya están excluidas (o, el de
+    la tarjeta, si caen en una categoría neutra, que no suma en ningún
+    sitio). Antes, con cualquier patrón puesto se callaba todo: excluido el
+    recibo de la cuenta, nada avisaba del abono en la tarjeta, que seguía
+    inflando los Ingresos. Sin nada detectado y con patrones puestos sí se
+    sigue dando por resuelto, como pedía el roadmap.
+
+    No imprime nada: deja el aviso para el final, con los demás.
+    """
+    nada = RecibosTarjeta(False, set(), [])
+    tarjeta = todo[todo["tipo"] == "tarjeta"]
     # Sin ningún extracto de cuenta no hay recibo que pueda contarse dos
     # veces: quien solo tiene tarjetas (una de débito, un neobanco) recibía
     # el aviso en cada ejecución sin poder hacer nada con él.
     cuenta = todo[todo["tipo"] == "cuenta"]
-    if cuenta.empty:
-        return False, set(), None, False
+    if tarjeta.empty or cuenta.empty:
+        return nada
+
+    espejos = _espejos(tarjeta, cuenta)
+    # lo que suma la tarjeta, SIN los abonos del pago: si no, el del mes
+    # anterior resta de las compras de este y la suma ya no cuadra con su
+    # recibo (siguen contando las devoluciones de verdad). Y si así un mes
+    # no cuadra, se prueba con la suma entera: el «espejo» podía ser una
+    # devolución de verdad que coincidía por casualidad con otro cargo, y
+    # esa sí la descuenta el banco del recibo.
+    compras = tarjeta.drop(index=list(espejos))
+    tarjeta_por_mes = compras.groupby("mes")["importe"].sum()
+    neto_por_mes = tarjeta.groupby("mes")["importe"].sum()
     # Con dos tarjetas, cada una se liquida con su propio recibo y la suma de
     # las dos no cuadra con ninguno: se prueba primero el total del mes y,
     # si no, cada tarjeta por separado (por su cuenta declarada o, sin
     # cuentas.json, por el fichero del que sale).
-    tarjeta = todo[todo["tipo"] == "tarjeta"]
-    cual = tarjeta["cuenta"].where(tarjeta["cuenta"].ne(""), tarjeta["origen"])
-    por_tarjeta = tarjeta.groupby([cual, "mes"])["importe"].sum()
+    cual = compras["cuenta"].where(compras["cuenta"].ne(""), compras["origen"])
+    por_tarjeta = compras.groupby([cual, "mes"])["importe"].sum()
     varias = cual.nunique() > 1
     candidatos = {}
     usadas = set()
     for mes, importe in tarjeta_por_mes.items():
         fila = _candidato_liquidacion(cuenta, mes, importe)
+        if fila is None and abs(neto_por_mes[mes] - importe) > _TOLERANCIA_RECIBO:
+            importe = neto_por_mes[mes]
+            fila = _candidato_liquidacion(cuenta, mes, importe)
         if fila is not None:
             candidatos[("", mes)] = (fila, importe)
             usadas.add(fila.name)
@@ -1480,6 +1554,12 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
                 candidatos[(id_tarjeta, mes)] = (fila, importe_t)
                 usadas.add(fila.name)
 
+    meses_espejo = {tarjeta.at[i, "mes"] for i in espejos}
+    confirmados = {i: j for i, j in espejos.items()
+                   if j in usadas or len(meses_espejo) >= 2}
+    lado_cuenta = set(usadas) | set(confirmados.values())
+    lado_tarjeta = set(confirmados)
+
     titulo = ("Tienes movimientos de tarjeta y ningún patrón en "
               "exclude_patterns.json")
     # con tarjetas sin declarar fundidas, alguna deja de cuadrar con su
@@ -1488,42 +1568,91 @@ def detectar_recibo_tarjeta(todo, sin_declarar=False):
               f"(ver el aviso de las dos tarjetas): con cargos de las dos fundidos "
               f"en uno, la tarjeta ya no suma lo que paga su recibo y no lo "
               f"encuentro."] if sin_declarar else [])
-    if not candidatos:
+    if not lado_cuenta and not lado_tarjeta:
+        if excluidor.patrones:
+            return nada
         avisar(titulo, [
             "Si tu cuenta paga la tarjeta con un recibo, cada gasto se está "
             "contando DOS VECES y no lo he sabido encontrar solo.",
             "Revísalo a mano: LEEME.txt explica cómo excluirlo."] + pista)
-        return True, set(), None, False
+        return RecibosTarjeta(True, set(), [])
 
-    lineas = ["Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
-              "Esto parece el recibo:"]
-    for (id_tarjeta, mes), (fila, importe) in sorted(candidatos.items(),
-                                                     key=lambda x: (x[0][1], x[0][0])):
-        de = f" ({id_tarjeta})" if id_tarjeta else ""
-        lineas.append(f"· {mes}: la tarjeta{de} suma {euros(-importe)} y "
-                      f"tu cuenta tiene un cargo de {euros(-fila['importe'])} el "
-                      f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
-    candidatos = {k: f for k, (f, _) in candidatos.items()}
+    descripciones = {todo.at[i, "descripcion"] for i in lado_cuenta | lado_tarjeta}
+    neutras = set(catalogo.neutras)
+    falta_cuenta = sorted(i for i in lado_cuenta if not todo.at[i, "excluido"])
+    falta_tarjeta = sorted(i for i in lado_tarjeta if not todo.at[i, "excluido"]
+                           and todo.at[i, "categoria"] not in neutras)
+    if not falta_cuenta and not falta_tarjeta:
+        return RecibosTarjeta(False, descripciones, [])
 
-    ya_usadas = {f.name for f in candidatos.values()}
-    otras = [normalizar(d) for i, d in cuenta["descripcion"].items()
-            if i not in ya_usadas]
+    # la clave de cada lado, validada contra TODO lo demás (cuenta y
+    # tarjeta): Excluidor no mira el tipo, así que una clave que casara con
+    # una compra de la tarjeta se la llevaría por delante
+    otras = [normalizar(d) for i, d in todo["descripcion"].items()
+             if i not in lado_cuenta and i not in lado_tarjeta]
 
-    clave = _clave_liquidacion([f["descripcion"] for f in candidatos.values()])
-    segura = False
-    if len(clave) >= _LONGITUD_MINIMA_CLAVE_RECIBO:
+    def clave_de(filas):
+        clave = _clave_liquidacion([todo.at[i, "descripcion"] for i in filas])
+        if len(clave) < _LONGITUD_MINIMA_CLAVE_RECIBO:
+            return None, False
         patron, _ = compilar(clave)
-        segura = not any(patron.search(d) for d in otras)
+        return clave, not any(patron.search(d) for d in otras)
 
-    if segura:
-        lineas.append(f'Añade esto a exclude_patterns.json:  "{clave}"')
-    else:
-        lineas.append("No encuentro una clave segura que proponer (podría "
-                      "excluir algún otro movimiento tuyo); añádelo tú a mano "
-                      "con lo que ves arriba.")
+    lineas = []
+    propuestas = []
+    por_fila = {f.name: (k, imp) for k, (f, imp) in candidatos.items()}
+    if falta_cuenta:
+        lineas.append("Si no se excluye, cada gasto de la tarjeta cuenta DOS VECES. "
+                      "Esto parece el recibo:")
+        for i in sorted(falta_cuenta, key=lambda i: todo.at[i, "fecha"]):
+            fila = todo.loc[i]
+            if i in por_fila:
+                (id_tarjeta, mes), importe = por_fila[i]
+                de = f" ({id_tarjeta})" if id_tarjeta else ""
+                lineas.append(f"· {mes}: la tarjeta{de} suma {euros(-importe)} y "
+                              f"tu cuenta tiene un cargo de {euros(-fila['importe'])} el "
+                              f"{fila['fecha']:%d/%m/%Y}  («{fila['descripcion']}»)")
+            else:
+                lineas.append(f"· {fila['fecha']:%d/%m/%Y}: tu cuenta paga "
+                              f"{euros(-fila['importe'])} y ese mismo importe entra en "
+                              f"la tarjeta  («{fila['descripcion']}»)")
+        clave, segura = clave_de(lado_cuenta)
+        if segura:
+            lineas.append(f'Añade esto a exclude_patterns.json:  "{clave}"')
+        else:
+            lineas.append("No encuentro una clave segura que proponer (podría "
+                          "excluir algún otro movimiento tuyo); añádelo tú a mano "
+                          "con lo que ves arriba.")
+        propuestas.append(ExclusionPropuesta(
+            "cuenta", clave, segura,
+            sorted({todo.at[i, "descripcion"] for i in falta_cuenta})[:3]))
+    if falta_tarjeta:
+        suma = sum(todo.at[i, "importe"] for i in falta_tarjeta)
+        lineas.append(f"El mismo pago aparece también en el extracto de la tarjeta, "
+                      f"como un abono: sin excluirlo, cuenta como un ingreso que no "
+                      f"lo es ({euros(suma)} en total):")
+        for i in sorted(falta_tarjeta, key=lambda i: todo.at[i, "fecha"])[:3]:
+            fila = todo.loc[i]
+            lineas.append(f"· {fila['fecha']:%d/%m/%Y}: {euros(fila['importe'], signo=True)}"
+                          f"  («{fila['descripcion']}»)")
+        clave, segura = clave_de(lado_tarjeta)
+        if segura:
+            lineas.append(f'Añade también:  "{clave}"' if falta_cuenta else
+                          f'Añade esto a exclude_patterns.json:  "{clave}"')
+        else:
+            lineas.append("Para esta no encuentro una clave segura; añádela tú a "
+                          "mano con lo que ves arriba.")
+        propuestas.append(ExclusionPropuesta(
+            "tarjeta", clave, segura,
+            sorted({todo.at[i, "descripcion"] for i in falta_tarjeta})[:3]))
+
+    if not falta_cuenta:
+        titulo = "El pago de la tarjeta está contando como un ingreso"
+    elif excluidor.patrones:
+        # hay patrones, pero no cubren lo que se ha encontrado
+        titulo = "Puede que la tarjeta se esté contando dos veces"
     avisar(titulo, lineas + pista)
-    return (True, {f["descripcion"] for f in candidatos.values()},
-            clave if len(clave) >= _LONGITUD_MINIMA_CLAVE_RECIBO else None, segura)
+    return RecibosTarjeta(True, descripciones, propuestas)
 
 
 # ========= CARGOS QUE SE REPITEN (suscripciones, cuotas, seguros) =========
@@ -1933,8 +2062,12 @@ def main():
 
     # si se están contando dos veces los gastos de la tarjeta, que se sepa
     # ANTES de fiarse de las cifras de abajo (el detalle, con los avisos)
-    doble_tarjeta, recibos_tarjeta, clave_recibo, recibo_seguro = detectar_recibo_tarjeta(
-        todo, sin_declarar)
+    recibos = detectar_recibo_tarjeta(todo, sin_declarar)
+    doble_tarjeta = recibos.aviso
+    # si lo único que falta es el abono en la tarjeta, lo que se infla son
+    # los ingresos, no los gastos
+    solo_abono = bool(recibos.propuestas) and all(
+        p.lado == "tarjeta" for p in recibos.propuestas)
 
     # orden_resumen puede haber quitado cualquiera de estas columnas del
     # resumen: se enseña solo lo que haya. Pedirlas a pelo rompía aquí,
@@ -1963,7 +2096,10 @@ def main():
                         else "desde el primer movimiento")
             print(f"   Acumulado ({etiqueta}): "
                   f"{cifra(ult['Acumulado'], signo=True)}")
-        if doble_tarjeta:
+        if doble_tarjeta and solo_abono:
+            print("\n" + amarillo("   ⚠️  Ojo: el pago de la tarjeta está contando "
+                                  "como un ingreso. Mira los avisos del final."))
+        elif doble_tarjeta:
             print("\n" + amarillo("   ⚠️  Ojo: puede que los gastos de la tarjeta "
                                   "se estén contando dos veces. Mira los avisos "
                                   "del final."))
@@ -1972,21 +2108,22 @@ def main():
 
     informe_recurrentes(df, catalogo.gastos)
     propuestas, recibo_en_grupo = informe_sin_clasificar(
-        df, ignorar=recibos_tarjeta,
-        tarjeta_sin_excluir=doble_tarjeta and not recibos_tarjeta)
+        df, ignorar=recibos.descripciones,
+        tarjeta_sin_excluir=doble_tarjeta and not recibos.descripciones)
     # los avisos, lo último antes de salir: juntos, contados y separados de
     # lo demás, que es lo que se lee cuando la ejecución termina
     mostrar_avisos()
     # lo que el asistente del menú final puede escribir por la persona
     # si el detector no lo encontró, pero un grupo de lo sin clasificar
     # lo parece, su clave es la mejor pista que hay
-    recibos = sorted(recibos_tarjeta)[:3]
-    if not clave_recibo and recibo_en_grupo:
-        clave_recibo, ejemplo = recibo_en_grupo
-        recibos = [ejemplo]
-    cuenta = todo.loc[todo["tipo"] == "cuenta", ["fecha", "descripcion", "importe"]]
-    pendientes = Pendientes(propuestas, doble_tarjeta, clave_recibo, recibo_seguro,
-                            recibos, list(cuenta.itertuples(index=False, name=None)))
+    exclusiones = list(recibos.propuestas)
+    if (doble_tarjeta and recibo_en_grupo
+            and not any(p.lado == "cuenta" for p in exclusiones)):
+        clave, ejemplo = recibo_en_grupo
+        exclusiones.insert(0, ExclusionPropuesta("cuenta", clave, False, [ejemplo]))
+    movimientos = todo[["fecha", "descripcion", "importe", "tipo"]]
+    pendientes = Pendientes(propuestas, doble_tarjeta, exclusiones,
+                            list(movimientos.itertuples(index=False, name=None)))
     return historico_escrito, pendientes
 
 

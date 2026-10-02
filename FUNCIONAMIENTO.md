@@ -445,13 +445,16 @@ le dicen que pegue en `ajustes/`. Era lo que más costaba a quien no se
 maneja con ficheros: añadir una línea a un JSON sin dejarse la coma de la de
 antes.
 - **Excluir el recibo de la tarjeta**: sale siempre que 5.1 haya dejado el
-  aviso de que la tarjeta puede contar doble. La clave que propone sale de
-  5.1, segura o no; si 5.1 no dio con el recibo, de un grupo de 5.3 que lo
-  parezca; y si no hay ninguna, se escribe un trozo del concepto (se guarda
-  en minúsculas y sin tildes, como lo compara el motor).
-  - **Antes de añadir nada**, enseña qué movimientos de la cuenta excluiría,
-    con el mismo motor que `Excluidor`. Si la clave no es la segura de 5.1,
-    pide comprobar que todos son el recibo.
+  aviso. Pregunta por cada lado pendiente, primero el recibo de la cuenta y
+  después su abono en la tarjeta. El menú dice «(2 líneas)» cuando son dos.
+  - La clave de cada lado sale de 5.1, segura o no. Si 5.1 no dio con el
+    recibo, sale de un grupo de 5.3 que lo parezca. Si no hay ninguna, se
+    escribe un trozo del concepto, que se guarda en minúsculas y sin
+    tildes, como lo compara el motor.
+  - **Antes de añadir nada**, enseña qué movimientos excluiría, de la
+    cuenta y de la tarjeta (marcados «(tarjeta)»), con el mismo motor que
+    `Excluidor`. Si la clave no es la segura de 5.1, pide comprobar que
+    todos son ese pago.
   - No acepta un texto de menos de 4 letras ni uno que no case con nada.
   - **O** prueba otro texto. Hay que contestar **S** para escribir: Intro,
     que es lo que se pulsa por costumbre para cerrar, no escribe nada.
@@ -603,13 +606,41 @@ y quien decide es el usuario.
 
 ### 5.1 El recibo de la tarjeta
 
-Solo se activa si hay movimientos de tarjeta, **también de cuenta**, y
-`exclude_patterns.json` está vacío. Con cualquier patrón puesto, se da por
-resuelto. Sin ningún extracto de cuenta (solo tarjetas, una de débito, un
-neobanco) no hay recibo que pueda contarse dos veces, y no se dice nada.
+Solo se activa si hay movimientos de tarjeta **y también de cuenta**. Sin
+ningún extracto de cuenta (solo tarjetas, una de débito, un neobanco) no hay
+recibo que pueda contarse dos veces, y no se dice nada.
+
+**El pago tiene dos lados.** Algunos bancos (Kutxabank, por ejemplo)
+apuntan la liquidación en los dos extractos:
+- (a) el cargo en la cuenta («TARJ.CRDTO …»);
+- (b) el mismo importe como abono en la tarjeta («PAGO RECIBO …»).
+
+Sin excluir (a), los gastos de la tarjeta cuentan dos veces. Sin excluir
+(b), el abono cuenta como un **ingreso** (no tiene regla y es positivo).
+Infla Ingresos y Balance; el Acumulado no, porque solo suma la cuenta.
+
+**Espejos.** Un abono de tarjeta con el mismo importe, de signo contrario,
+que un cargo de la cuenta, a 10 días o menos, y con ese cargo como único
+candidato. Se busca por importe porque el nombre cambia de un banco a otro.
+- Un espejo vale si su cargo es también el que encuentra la búsqueda de
+  abajo, o si hay espejos en dos meses distintos o más. Así una devolución
+  que coincida por casualidad con un cargo cualquiera no se toma por el
+  pago.
+- Los espejos válidos aportan los dos lados. También dan el recibo de las
+  tarjetas de pago aplazado, que no cuadra con lo que suma el mes.
+
+**Cada lado se decide por separado.**
+- Un lado está resuelto si sus filas ya están excluidas. El de la tarjeta,
+  también si caen en una categoría neutra, que no suma en ningún sitio.
+- Antes, con cualquier patrón puesto se callaba todo: excluido (a), nada
+  avisaba de (b).
+- Si no se encuentra nada y ya hay patrones, se da por resuelto. Si no se
+  encuentra nada y no hay patrones, avisa de que no lo ha sabido encontrar.
 
 Para cada mes de tarjeta suma lo que debe la tarjeta ese mes (ya descontadas
-las devoluciones), y busca en la cuenta **un único cargo** por ese mismo
+las devoluciones, pero sin los espejos: el abono del mes anterior restaría
+de las compras de este; si así no cuadra, se prueba con la suma entera), y
+busca en la cuenta **un único cargo** por ese mismo
 importe, con 2 céntimos de margen, entre el día 1 de ese mes y 45 días después
 de que acabe. Si hay más de un candidato ese mes, no elige: descarta el mes.
 Si el total de todas las tarjetas no cuadra con ningún cargo y hay más de
@@ -617,11 +648,21 @@ una tarjeta (por su cuenta de `cuentas.json` o, sin ella, por el fichero del
 que sale cada movimiento), repite la búsqueda con lo de cada tarjeta por
 separado, sin usar dos veces el mismo cargo.
 
-Con los cargos encontrados, extrae la parte del concepto que **no cambia** de
-un mes a otro (quitando las referencias numéricas) y la propone como patrón de
-exclusión, **solo si** tiene al menos 5 caracteres y no casa con ningún otro
-movimiento de la cuenta. Si no es segura, enseña lo encontrado y pide
-añadirlo a mano.
+Para cada lado pendiente, extrae la parte del concepto que **no cambia** de
+un mes a otro (quitando las referencias numéricas) y la propone como patrón
+de exclusión, **solo si** tiene al menos 5 caracteres y no casa con ningún
+otro movimiento, ni de la cuenta ni de la tarjeta (`Excluidor` no mira el
+tipo). Si no es segura, enseña lo encontrado y pide añadirlo a mano.
+
+**El aviso:**
+- Título según lo que falte: «…ningún patrón en exclude_patterns.json» si no
+  hay patrones; «Puede que la tarjeta se esté contando dos veces» si los hay
+  pero no cubren lo encontrado; «El pago de la tarjeta está contando como un
+  ingreso» si solo falta (b).
+- Junto a los totales, «Ojo: …», que dice si lo inflado son los gastos o los
+  ingresos.
+- El informe de sin clasificar no propone categoría para las líneas de
+  ninguno de los dos lados.
 
 ### 5.2 Cargos que se repiten
 
@@ -858,6 +899,9 @@ traicionero, porque el Excel cuadra por dentro y nadie se entera):
   casa → no se lee (3.2). Sin declararlas, dos ficheros del mismo tipo que
   no se parecen → aviso.
 - Corrección manual con una categoría que no existe → ignorada y avisada.
+- El pago de la tarjeta apuntado también como abono en el extracto de la
+  tarjeta → se detecta por importe y se avisa (5.1). Sin excluir, contaría
+  como un ingreso.
 - Nombre desconocido en `orden_resumen` → ignorado y avisado.
 - El asistente del menú final (3.9) solo deja elegir, por número, categorías
   declaradas en `categorias.json` → no puede escribir una regla a una

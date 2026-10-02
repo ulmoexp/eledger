@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          130 casos, 473 comprobaciones, ~2 min
+python pruebas/probar.py          136 casos, 489 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -238,6 +238,14 @@ asistente en la propia terminal.
   el recibo, o la que escriba la persona. Siempre enseña antes qué
   excluiría (`_excluiria`). Al principio solo salía con clave segura, y el
   usuario vio que en la práctica casi nunca aparecía.
+- **El pago de la tarjeta, por los dos lados** (`_espejos`): un abono en la
+  tarjeta con el mismo importe que un cargo de la cuenta a ≤10 días. Salió
+  con extractos reales de Kutxabank, que lo apuntan en los dos sitios.
+  Sin excluir, el abono contaba como ingreso.
+  - Cada lado se decide por separado: ya no se calla con cualquier patrón.
+  - Devuelve `RecibosTarjeta` con `ExclusionPropuesta` por lado.
+  - El asistente pregunta por cada uno y previsualiza también la tarjeta.
+  - Casos `tarjeta-espejo*` y `asistente-exclusion-dos-lados`.
 - Las pruebas contestan por stdin con `ELEDGER_FORZAR_INTERACTIVO=1` (solo
   para eso; ver `Entorno.ejecutar(respuestas=...)`). Casos `asistente-*`.
 - Sin ese entorno la salida no cambia ni un carácter: comprobado con una

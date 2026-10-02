@@ -3,5 +3,7 @@
   "_El caso tipico: el recibo mensual con que la cuenta paga la tarjeta. Si no lo excluyes, cada gasto de la tarjeta cuenta DOS veces.",
   "_Mira tu extracto, busca esa linea y copia aqui un trozo que la identifique, incluidos los digitos con que tu banco identifica la tarjeta. Por ejemplo, si tu extracto dice PAGO RECIBO 77 TARJETA:",
   "_    pago recibo 77",
-  "_Cambia el 77 por lo que ponga el tuyo. Las lineas que empiezan por _ se ignoran: son estos comentarios."
+  "_Cambia el 77 por lo que ponga el tuyo. Las lineas que empiezan por _ se ignoran: son estos comentarios.",
+  "_Algunos bancos apuntan ese mismo pago tambien en el extracto de la TARJETA, como un abono por el mismo importe y con otro nombre. Excluye las dos lineas: si no, el abono cuenta como un ingreso.",
+  "_No hace falta buscarlas a ojo: al terminar, el programa las propone, y desde el menu del final las puede anadir por ti."
 ]

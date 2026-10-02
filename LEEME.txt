@@ -57,9 +57,11 @@ Lo primero que deberías configurar
 El recibo con que tu cuenta paga la tarjeta, en  ajustes/exclude_patterns.json
 Si no lo excluyes, cada gasto de la tarjeta se cuenta DOS veces: una en el
 extracto de la tarjeta y otra en el recibo de la cuenta. El fichero viene con
-instrucciones dentro. Mientras no lo hayas excluido, al terminar el menú
-ofrece "Excluir el recibo de la tarjeta": te enseña lo que excluiría y lo
-añade por ti.
+instrucciones dentro. Algunos bancos apuntan ese pago también en el
+extracto de la tarjeta, como un abono: hay que excluir las dos líneas, o
+ese abono contará como un ingreso. Mientras falte alguna, al terminar el
+menú ofrece "Excluir el recibo de la tarjeta": te enseña lo que excluiría
+y lo añade por ti.
 
 Si le pasas esto a alguien
 --------------------------

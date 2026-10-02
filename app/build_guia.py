@@ -640,21 +640,28 @@ story += [codigo([
 ])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
+    "Las dos líneas del ejemplo son el <b>mismo pago visto desde los dos lados</b>: "
+    "algunos bancos lo apuntan como cargo en la cuenta y también como abono, por "
+    "el mismo importe, en el extracto de la tarjeta. Hay que excluir las dos: sin "
+    "la primera, los gastos de la tarjeta cuentan dos veces; sin la segunda, el "
+    "abono cuenta como un ingreso que no lo es.", S["pmini"])]
+story += [Spacer(1, 4)]
+story += [Paragraph(
     "El <font face='Mono' size='8.2'>77</font> del ejemplo son los dígitos con que "
     "tu banco identifica la tarjeta en el concepto del recibo. Mira tu extracto y "
     "copia los tuyos. El fichero que viene con el programa trae estas instrucciones "
     "dentro y ningún patrón activo: es lo primero que hay que configurar.", S["pmini"])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
-    "No hace falta buscarlo a ojo: si el fichero está vacío y hay movimientos de "
-    "tarjeta, al terminar el script busca en la cuenta un cargo que cuadre con lo "
-    "que suma la tarjeta ese mes y propone la línea lista para pegar aquí. Más "
-    "fácil: en el menú del final, «Excluir el recibo de la tarjeta» la añade por "
-    "ti; si no lo ha encontrado, escribes un trozo del concepto y te enseña qué "
-    "excluiría antes de guardarlo. Con "
-    "cualquier patrón ya puesto, no dice nada más. Con varias tarjetas, busca el "
-    "recibo de cada una. Y si solo tienes tarjetas, sin extracto de la cuenta, no "
-    "hay recibo que pueda contarse dos veces: ni avisa.", S["pmini"])]
+    "No hace falta buscarlas a ojo: al terminar, el script busca en la cuenta un "
+    "cargo que cuadre con lo que suma la tarjeta ese mes y, en la tarjeta, un abono "
+    "por el mismo importe que ese cargo, y propone las líneas que falten, listas "
+    "para pegar aquí. Más fácil: en el menú del final, «Excluir el recibo de la "
+    "tarjeta» las añade por ti; si no lo ha encontrado, escribes un trozo del "
+    "concepto y te enseña qué excluiría antes de guardarlo. Lo que ya está "
+    "excluido no lo vuelve a pedir. Con varias tarjetas, busca el recibo de cada "
+    "una. Y si solo tienes tarjetas, sin extracto de la cuenta, no hay recibo que "
+    "pueda contarse dos veces: ni avisa.", S["pmini"])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
     "Lo descartado no se pierde: acaba en "

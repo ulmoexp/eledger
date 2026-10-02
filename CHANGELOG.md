@@ -29,6 +29,19 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
   `datos/copias/`. Si una regla ya existe, no la pisa: te lo dice y te
   enseña la línea para que decidas tú. Los JSON se pueden seguir editando
   a mano igual que siempre.
+- **El pago de la tarjeta, también desde la tarjeta.** Algunos bancos
+  (Kutxabank, por ejemplo) apuntan el pago de la tarjeta dos veces: el
+  cargo en la cuenta («TARJ.CRDTO …») y el mismo importe como abono en el
+  extracto de la tarjeta («PAGO RECIBO …»). Solo se detectaba el primero.
+  El segundo, sin excluir, contaba como un **ingreso** y te inflaba los
+  Ingresos y el Balance cada mes.
+  - Ahora se detecta por el importe (el mismo pago, con signo contrario y a
+    pocos días), así que no depende de cómo lo llame tu banco.
+  - El aviso propone excluir las dos líneas y el asistente las añade por
+    ti.
+  - Cada lado se revisa por separado: antes, con un solo patrón puesto se
+    callaba todo, y una vez excluido el cargo de la cuenta nada avisaba del
+    abono.
 - **La guía explica cómo editar los ajustes a mano**: con qué se abren,
   las comas, las comillas y qué hacer si sale «error de formato».
 

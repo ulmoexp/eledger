@@ -56,6 +56,14 @@ try:
     sys.stdout.reconfigure(encoding="utf-8")
 except Exception:
     pass
+# Y lo que se teclea en el asistente, igual: con la entrada por tubería (las
+# pruebas, al compilar en Windows) llegaba en cp1252 y «crédito» se leía
+# «crÃ©dito». Desde la consola de verdad Python ya lo lee bien; esto solo
+# hace que valga igual venga de donde venga.
+try:
+    sys.stdin.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
 # ========= PANTALLA =========
 # Lo que se cuenta por pantalla va en bloques, en este orden: lo que va

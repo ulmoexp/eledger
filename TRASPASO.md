@@ -246,6 +246,11 @@ asistente en la propia terminal.
   - Devuelve `RecibosTarjeta` con `ExclusionPropuesta` por lado.
   - El asistente pregunta por cada uno y previsualiza también la tarjeta.
   - Casos `tarjeta-espejo*` y `asistente-exclusion-dos-lados`.
+- Al compilar en Windows fallaron 2 comprobaciones de `asistente-exclusion-sin-clave`:
+  la entrada por tubería llegaba en cp1252 y «crédito» se leía mal. Arreglo:
+  `sys.stdin.reconfigure(encoding="utf-8")`, como ya se hacía con stdout.
+  **Para reproducir en Linux lo que pasa en Windows:**
+  `PYTHONIOENCODING=cp1252 python pruebas/probar.py` (tiene que salir todo en verde).
 - Las pruebas contestan por stdin con `ELEDGER_FORZAR_INTERACTIVO=1` (solo
   para eso; ver `Entorno.ejecutar(respuestas=...)`). Casos `asistente-*`.
 - Sin ese entorno la salida no cambia ni un carácter: comprobado con una

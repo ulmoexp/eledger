@@ -239,9 +239,9 @@ asistente en la propia terminal.
   excluiría (`_excluiria`). Al principio solo salía con clave segura, y el
   usuario vio que en la práctica casi nunca aparecía.
 - **El pago de la tarjeta, por los dos lados** (`_espejos`): un abono en la
-  tarjeta con el mismo importe que un cargo de la cuenta a ≤10 días. Salió
-  con extractos reales de Kutxabank, que lo apuntan en los dos sitios.
-  Sin excluir, el abono contaba como ingreso.
+  tarjeta con el mismo importe que un cargo de la cuenta a ≤10 días. Hay
+  bancos que lo apuntan en los dos sitios. Sin excluir, el abono contaba
+  como ingreso.
   - Cada lado se decide por separado: ya no se calla con cualquier patrón.
   - Devuelve `RecibosTarjeta` con `ExclusionPropuesta` por lado.
   - El asistente pregunta por cada uno y previsualiza también la tarjeta.
@@ -307,7 +307,8 @@ Decisiones del usuario: nada de cerrar la hoja de cálculo por su cuenta
 - **El Acumulado es el saldo real de la cuenta** (saldo inicial + todos los
   movimientos de cuenta, excluidos incluidos), con la columna **Fuera del
   balance** que explica la diferencia con el Balance. Fuera Extras y Deuda.
-  Lo pidió el usuario: con sus datos, el Acumulado se había despegado miles de euros del saldo del banco (traspasos neutros y excluidos que no restaban).
+  Antes, los traspasos neutros y los excluidos no restaban, y el Acumulado
+  podía despegarse mucho del saldo del banco.
 - **Cuadre día a día contra el saldo del extracto** (`comprobar_cuadre()`),
   que dice en qué fecha deja de coincidir y por cuánto.
 - **Histórico abierto**: se pide cerrarlo antes de leer; con C, o sin nadie

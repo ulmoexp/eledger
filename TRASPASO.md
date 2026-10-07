@@ -4,7 +4,7 @@ Herramienta local para clasificar movimientos bancarios. Lee los extractos que
 el usuario descarga, los acumula sin duplicar, los clasifica por reglas y
 produce un Excel con resumen mensual.
 
-**Versión actual: 2.15.0** (en borrador en GitHub; la 2.14.0 es la publicada). Estado: funcionando, con red de pruebas. Los totales
+**Versión actual: 2.16.0** (en borrador en GitHub; la 2.15.0 es la publicada). Estado: funcionando, con red de pruebas. Los totales
 del usuario se han verificado idénticos antes y después de cada cambio.
 
 ---
@@ -217,10 +217,9 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
 
-### Para la próxima versión (en master, sin release)
+### En curso: 2.16.0 (07/10/2026), en borrador
 
 - Docs: con el `.exe` no hay exportar; `bar` sí pilla BARCELONA (9d8fa62).
-- Entrada en UTF-8 también en Windows (e3fe811, ver más abajo).
 - **Ejemplos neutros y «Mascotas»** (07/10/2026, a petición del usuario:
   que nada de lo que se reparte deje intuir nada de su vida). La categoría
   de fábrica «Perros» pasa a «Mascotas» en la plantilla y en la base, con
@@ -230,10 +229,13 @@ contra `rules_base.json`; si falla, su docstring explica cómo decidir.
   (ahora «CENTRO»), «COLEGIO EJEMPLO», nombres en los Bizum («AMIGA»), el
   recibo «1234» de la plantilla de exclusiones, «Peques» como rótulo de
   ejemplo, y los importes de la guía redondeados.
-  Para el CHANGELOG: la categoría nueva «Mascotas» y que quien tenga
-  «Perros» no tiene que hacer nada.
 
-### En curso: 2.15.0 (sesión del 01/10/2026), en borrador
+**Lo siguiente:** el usuario compila el `.exe`, lo adjunta al borrador y lo
+publica. Después, en eledger-publicaciones, `pub.py release 2.16.0`; y se
+borran las releases anteriores (decidido el 07/10/2026: sus ZIP llevan los
+ejemplos de antes).
+
+### Hecho: 2.15.0 (sesión del 01/10/2026), publicada
 
 El asistente del menú final (ver FUNCIONAMIENTO 3.9): «Clasificar lo que
 falta» y «Excluir el recibo de la tarjeta» escriben `rules.json` y

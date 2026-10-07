@@ -6,6 +6,23 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
 
 ---
 
+## 2.16.0
+
+- **«Perros» pasa a llamarse «Mascotas».** Es la categoría de fábrica para
+  el veterinario y las tiendas de animales, y ahora vale para cualquier
+  animal. **Si ya usas eledger no tienes que hacer nada**: si tu
+  `categorias.json` sigue diciendo «Perros», esos movimientos siguen yendo a
+  tu columna «Perros» de siempre, con las mismas reglas. Solo quien empiece
+  de cero verá «Mascotas».
+- **Ejemplos más neutros** en las plantillas de `ajustes/`, la guía y las
+  ayudas: sin ciudades, centros, bancos ni nombres de persona concretos (el
+  recibo de la tarjeta de ejemplo es ahora «pago recibo 1234»). No cambia
+  nada de cómo funciona.
+- **La guía y el LEEME aclaran dos cosas**: con el `eledger.exe` no hay
+  exportar (pásale a quien quieras el ZIP que descargaste), y las reglas
+  casan por inicio de palabra, así que `bar` también pilla BARCELONA: por eso
+  la base usa `=bar`, la palabra exacta.
+
 ## 2.15.0
 
 - **Un asistente que escribe los ajustes por ti.** Era lo que más costaba

@@ -211,7 +211,7 @@ lista. Hasta ahora:
   no una interfaz gráfica: sin dependencias nuevas, igual en el `.exe`, Mac
   y Linux, y los JSON siguen siendo editables a mano. Más una sección «Cómo
   editar los ajustes» en la guía.
-- **Próxima versión** — la categoría de fábrica «Perros» pasa a «Mascotas»
+- **2.16.0** — la categoría de fábrica «Perros» pasa a «Mascotas»
   (quien tenga «Perros» sigue igual, sin tocar nada) y todos los ejemplos
   que se reparten pasan a ser neutros: ni ciudades, ni centros, ni nombres
   de persona. Lo pidieron el usuario y, de paso, tres usuarios del piloto

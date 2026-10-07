@@ -617,9 +617,9 @@ Solo se activa si hay movimientos de tarjeta **y también de cuenta**. Sin
 ningún extracto de cuenta (solo tarjetas, una de débito, un neobanco) no hay
 recibo que pueda contarse dos veces, y no se dice nada.
 
-**El pago tiene dos lados.** Algunos bancos (Kutxabank, por ejemplo)
+**El pago tiene dos lados.** Algunos bancos
 apuntan la liquidación en los dos extractos:
-- (a) el cargo en la cuenta («TARJ.CRDTO …»);
+- (a) el cargo en la cuenta («CARGO TARJETA …»);
 - (b) el mismo importe como abono en la tarjeta («PAGO RECIBO …»).
 
 Sin excluir (a), los gastos de la tarjeta cuentan dos veces. Sin excluir

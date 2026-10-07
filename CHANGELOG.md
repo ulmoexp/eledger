@@ -30,8 +30,8 @@ Sale al ejecutar, en la primera línea, y queda grabada en la hoja `_meta` de
   enseña la línea para que decidas tú. Los JSON se pueden seguir editando
   a mano igual que siempre.
 - **El pago de la tarjeta, también desde la tarjeta.** Algunos bancos
-  (Kutxabank, por ejemplo) apuntan el pago de la tarjeta dos veces: el
-  cargo en la cuenta («TARJ.CRDTO …») y el mismo importe como abono en el
+  apuntan el pago de la tarjeta dos veces: el cargo en la cuenta
+  («CARGO TARJETA …») y el mismo importe como abono en el
   extracto de la tarjeta («PAGO RECIBO …»). Solo se detectaba el primero.
   El segundo, sin excluir, contaba como un **ingreso** y te inflaba los
   Ingresos y el Balance cada mes.

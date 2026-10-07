@@ -635,7 +635,7 @@ story += [p(
 story += [codigo([
     '[',
     '  "pago recibo 1234",',
-    '  "tarj.crdto 77"',
+    '  "cargo tarjeta 1234"',
     ']',
 ])]
 story += [Spacer(1, 4)]

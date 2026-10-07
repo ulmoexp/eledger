@@ -1423,7 +1423,7 @@ def _espejos(tarjeta, cuenta) -> dict:
     MISMO importe, de signo contrario, que un cargo de la cuenta a pocos
     días, y solo si ese cargo es el único que encaja. Es el pago de la
     tarjeta visto desde los dos lados: lo que sale de la cuenta entra en la
-    tarjeta. Algunos bancos (Kutxabank: «TARJ.CRDTO …» en la cuenta y «PAGO
+    tarjeta. Algunos bancos («CARGO TARJETA …» en la cuenta y «PAGO
     RECIBO …» en la tarjeta) lo apuntan en los dos extractos, y el abono, sin
     excluir, contaba como un ingreso. Se busca por importe y no por el
     nombre, que cambia de un banco a otro.

@@ -1419,8 +1419,8 @@ ESPEJO_TARJETA = [("10/04/2026", "COMPRA MERCADONA CENTRO", -50.00),
                   ("12/05/2026", "COMPRA MERCADONA CENTRO", -60.00),   # mayo  -60,00
                   ("05/06/2026", "PAGO RECIBO 4321", 60.00)]
 ESPEJO_CUENTA = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
-                 ("05/05/2026", "TARJ.CRDTO 4321 ABRIL", -80.25),
-                 ("05/06/2026", "TARJ.CRDTO 4321 MAYO", -60.00)]
+                 ("05/05/2026", "LIQ.TARJ 4321 ABRIL", -80.25),
+                 ("05/06/2026", "LIQ.TARJ 4321 MAYO", -60.00)]
 
 
 def _espejo(e, patrones):
@@ -1434,7 +1434,7 @@ def prueba_tarjeta_espejo(e):
     _espejo(e, [])
     salida = e.ejecutar()
 
-    comprobar('Añade esto a exclude_patterns.json:  "tarj.crdto"' in salida,
+    comprobar('Añade esto a exclude_patterns.json:  "liq.tarj"' in salida,
               "propone excluir el recibo de la cuenta", salida)
     comprobar("2026-04" in salida and "2026-05" in salida,
               "lo encuentra los dos meses, aunque el abono reste en el mes de "
@@ -1447,7 +1447,7 @@ def prueba_tarjeta_espejo(e):
 @caso("tarjeta-espejo-tras-cuenta", "Con solo el recibo de la cuenta excluido, avisa del abono en la tarjeta")
 def prueba_tarjeta_espejo_tras_cuenta(e):
     # antes, con cualquier patrón puesto, el detector callaba
-    _espejo(e, ["tarj.crdto"])
+    _espejo(e, ["liq.tarj"])
     salida = e.ejecutar()
 
     comprobar("El pago de la tarjeta está contando como un ingreso" in salida
@@ -1464,7 +1464,7 @@ def prueba_tarjeta_espejo_tras_cuenta(e):
 
 @caso("tarjeta-espejo-resuelto", "Con los dos lados excluidos no avisa y los Ingresos no se inflan")
 def prueba_tarjeta_espejo_resuelto(e):
-    _espejo(e, ["tarj.crdto", "pago recibo"])
+    _espejo(e, ["liq.tarj", "pago recibo"])
     salida = e.ejecutar()
 
     comprobar("contando dos veces" not in salida and "ningún patrón en" not in salida,
@@ -1477,7 +1477,7 @@ def prueba_tarjeta_espejo_resuelto(e):
 @caso("tarjeta-espejo-neutro", "El abono con regla a una categoría neutra se da por resuelto")
 def prueba_tarjeta_espejo_neutro(e):
     # p. ej. «abono en tarjeta de credito» -> Transferencias internas, en la base
-    _espejo(e, ["tarj.crdto"])
+    _espejo(e, ["liq.tarj"])
     e.regla_al_principio("pago recibo", "Transferencias internas")
     salida = e.ejecutar()
 
@@ -1518,7 +1518,7 @@ def prueba_asistente_exclusion_dos_lados(e):
               "el menú dice que son dos líneas", salida)
     comprobar("PAGO RECIBO 4321  (tarjeta)" in salida,
               "la vista previa del abono enseña que es de la tarjeta", salida)
-    comprobar(e.leer_config("exclude_patterns.json") == ["tarj.crdto", "pago recibo"],
+    comprobar(e.leer_config("exclude_patterns.json") == ["liq.tarj", "pago recibo"],
               "escribe las dos claves", e.leer_config("exclude_patterns.json"))
     ingresos = e.resumen()["Ingresos"].sum()
     comprobar(abs(ingresos - 2000) < 0.01,

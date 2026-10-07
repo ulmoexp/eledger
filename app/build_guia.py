@@ -647,7 +647,7 @@ story += [Paragraph(
     "abono cuenta como un ingreso que no lo es.", S["pmini"])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
-    "El <font face='Mono' size='8.2'>77</font> del ejemplo son los dígitos con que "
+    "El <font face='Mono' size='8.2'>1234</font> del ejemplo son los dígitos con que "
     "tu banco identifica la tarjeta en el concepto del recibo. Mira tu extracto y "
     "copia los tuyos. El fichero que viene con el programa trae estas instrucciones "
     "dentro y ningún patrón activo: es lo primero que hay que configurar.", S["pmini"])]

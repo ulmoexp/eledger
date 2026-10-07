@@ -29,7 +29,7 @@ Configuración final que me puse (resumida):
   «regla» para descubrirlo (ver fallo 3.1). La guía sí dice que un negativo es «una categoría que acaba
   el mes a favor», pero yo lo que pensé es que estaba roto.
 - **Cómo separar las facturas cobradas.** El bloque «Sin clasificar» me propuso para las transferencias
-  `añade a rules.json:  "antonio": {"+": "PON_TU_CATEGORIA"}`. Antonio Ruiz es UN cliente; si le
+  `añade a rules.json:  "cliente": {"+": "PON_TU_CATEGORIA"}`. Cliente Tres es UN cliente; si le
   hago caso, cada cliente nuevo cae otra vez sin clasificar. Me lo tuve que inventar yo: `"transf. de"`.
   Además, esa sugerencia no incluía las transferencias de la Comunidad de Propietarios, porque esas ya
   «tenían regla» (la de Piso), así que ni siquiera aparecían como pendientes.
@@ -123,6 +123,6 @@ guía pude crear mis categorías de negocio en 10 minutos.
 
 Le quito puntos por: (1) el **fallo** de la Comunidad de Propietarios, que me metía más de 5.000 € de
 facturación como «Piso» en negativo sin avisar. Si no llego a mirar, le paso al gestor una cifra mal;
-(2) la sugerencia «antonio» para las transferencias, que no sirve para un negocio con varios clientes; y
+(2) la sugerencia «cliente» para las transferencias, que no sirve para un negocio con varios clientes; y
 (3) que no hay trimestres ni guía para autónomos (**preferencias**). Para mi caso de uso es muy
 aprovechable, pero hay que revisar la hoja MOVIMIENTOS la primera vez.

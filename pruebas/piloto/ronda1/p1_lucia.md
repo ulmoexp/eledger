@@ -32,8 +32,8 @@ Ni la guía ni la web dicen con qué se abre un `.json` (el Bloc de notas, por e
 ## 3. Errores o comportamientos raros
 
 **Fallo 1 (grave): mi nómina se clasifica como gasto de «Hijos».**
-- Cómo reproducirlo: con `ajustes/rules.json` vacío (tal como viene), ejecutar `./ejecutar.sh` con el extracto de cuenta. El movimiento `NOMINA COLEGIO SAN JOSE +1650` cae en «Hijos» por la regla de la base `colegio`. Comprobado con la herramienta de la guía:
-  `NOMINA COLEGIO SAN JOSE   1.650,00 €  ->  Hijos   [colegio · base]`
+- Cómo reproducirlo: con `ajustes/rules.json` vacío (tal como viene), ejecutar `./ejecutar.sh` con el extracto de cuenta. El movimiento `NOMINA COLEGIO EJEMPLO +1650` cae en «Hijos» por la regla de la base `colegio`. Comprobado con la herramienta de la guía:
+  `NOMINA COLEGIO EJEMPLO   1.650,00 €  ->  Hijos   [colegio · base]`
   En `app/rules_base.json`, `"colegio": "Hijos"` (línea 201) va antes que `"nomina": "Ingresos"` (línea 233), así que la regla del colegio casa primero. Y como no distingue el signo, captura también un ingreso.
 - Consecuencia en RESUMEN (primera ejecución):
   - `Hijos = -1650` en junio, julio y agosto.

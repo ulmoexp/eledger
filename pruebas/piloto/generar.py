@@ -100,10 +100,10 @@ def lucia(d):
     la tarjeta con un recibo que nadie ha excluido."""
     cuenta, tarjeta = [], []
     for m in (7, 8, 9):
-        cuenta += [(mes(m, 1) - timedelta(days=1) if m > 7 else mes(7, 1), "NOMINA COLEGIO SAN JOSE", 1650.00),
+        cuenta += [(mes(m, 1) - timedelta(days=1) if m > 7 else mes(7, 1), "NOMINA COLEGIO EJEMPLO", 1650.00),
                    (mes(m, 3), "RECIBO ALQUILER VIVIENDA", -620.00),
                    (mes(m, 5), "RECIBO IBERDROLA CLIENTES", -round(random.uniform(45, 80), 2)),
-                   (mes(m, 8), "RECIBO CANAL DE ISABEL II", -round(random.uniform(20, 35), 2)),
+                   (mes(m, 8), "RECIBO AGUAS MUNICIPALES", -round(random.uniform(20, 35), 2)),
                    (mes(m, 10), "RECIBO MOVISTAR", -42.90),
                    (mes(m, 14), "COMPRA MERCADONA", -round(random.uniform(60, 110), 2)),
                    (mes(m, 22), "RETIRADA CAJERO", -50.00)]
@@ -158,7 +158,7 @@ def marta(d):
     traspasos entre ellas y muchos Bizum."""
     negocio, personal = [], []
     for m in (7, 8, 9):
-        for dia, cli, imp in ((4, "ESTUDIO NORTE SL", 1210.00), (19, "LOPEZ Y ASOCIADOS", 847.00)):
+        for dia, cli, imp in ((4, "ESTUDIO EJEMPLO SL", 1210.00), (19, "ASESORIA EJEMPLO", 847.00)):
             negocio.append((mes(m, dia), f"TRANSFERENCIA DE {cli}", imp + random.choice((0, 121.0))))
         negocio += [(mes(m, 30 if m != 9 else 29), "SEG SOCIAL REGIMEN AUTONOMOS", -294.00),
                     (mes(m, 10), "ADOBE SYSTEMS SOFTWARE", -60.49),
@@ -168,9 +168,9 @@ def marta(d):
                      (mes(m, 7), "COMPRA LIDL", -round(random.uniform(40, 90), 2)),
                      (mes(m, 16), "RECIBO ENDESA ENERGIA", -round(random.uniform(40, 70), 2))]
         for dia in (3, 9, 13, 24):
-            personal.append((mes(m, dia), random.choice(("BIZUM DE ELENA CENA", "BIZUM DE PABLO REGALO")),
+            personal.append((mes(m, dia), random.choice(("BIZUM DE AMIGA CENA", "BIZUM DE AMIGO REGALO")),
                              round(random.uniform(10, 30), 2)))
-            personal.append((mes(m, dia + 1), random.choice(("BIZUM A ELENA CINE", "BIZUM A SARA BAR")),
+            personal.append((mes(m, dia + 1), random.choice(("BIZUM A AMIGA CINE", "BIZUM A AMIGO BAR")),
                              -round(random.uniform(8, 25), 2)))
     negocio.append((mes(7, 20), "AEAT MODELO 303 IVA 2T", -612.30))
     cab = ["Fecha", "Descripción", "Importe (€)", "Saldo (€)"]
@@ -317,14 +317,14 @@ def estudiante(d):
     movs = []
     for m in (7, 8, 9):
         movs.append(recibo(m, "Transferencia de PADRES GARCIA", 1, 300.00, 2))
-        movs += frecuentes(m, "CAFE BAR UNIVERSIDAD", 8, 1.2, 3.5)
+        movs += frecuentes(m, "CAFE BAR CAMPUS", 8, 1.2, 3.5)
         movs += frecuentes(m, "Mercadona", 3, 8, 35)
         movs += frecuentes(m, "Glovo", 2, 9, 22)
         movs += [(mes(m, 11), "Netflix", -5.49), recibo(m, "Tuenti Movil", 5, -10.00, 1),
                  recibo(m, "Bizum a MARIO piso gastos", 3, -120.00, 1)]
         for _ in range(3):
-            movs.append((mes(m, random.randint(1, 28)), "Bizum de LUCAS cena", round(random.uniform(5, 20), 2)))
-    movs += [(mes(9, 9), "CAFE BAR UNIVERSIDAD", -1.30)] * 2
+            movs.append((mes(m, random.randint(1, 28)), "Bizum de AMIGO cena", round(random.uniform(5, 20), 2)))
+    movs += [(mes(9, 9), "CAFE BAR CAMPUS", -1.30)] * 2
     movs.append((mes(9, 15), "Beca MEC MINISTERIO EDUCACION", 1500.00))
     movs.append((mes(8, 3), "Zalando", -39.95))
     movs.append((mes(8, 19), "Zalando Refund", 39.95))
@@ -343,8 +343,8 @@ def autonomo(d):
     for m in (7, 8, 9):
         for _ in range(random.randint(2, 4)):
             movs.append((mes(m, random.randint(1, 28)), random.choice(
-                ("TRANSF. DE REFORMAS GIL SL FRA", "TRANSF. DE COMUNIDAD PROP. SOL FRA",
-                 "TRANSF. DE PARTICULAR ANTONIO RUIZ")) + f" 2026-{random.randint(10, 99)}",
+                ("TRANSF. DE REFORMAS EJEMPLO SL FRA", "TRANSF. DE COMUNIDAD PROP. SOL FRA",
+                 "TRANSF. DE PARTICULAR CLIENTE TRES")) + f" 2026-{random.randint(10, 99)}",
                 round(random.uniform(300, 2400), 2)))
         movs += [recibo(m, "CUOTA AUTONOMOS TGSS", 28, -320.00, 0),
                  recibo(m, "RECIBO GESTORIA ASESORES DEL SUR", 5, -60.50, 1),

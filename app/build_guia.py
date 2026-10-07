@@ -612,9 +612,9 @@ story += [codigo([
     'MEDIA MARKT ONLINE  ->  Otros                    [media markt · base]',
     'BAR LA ESQUINA      ->  Ocio                     [=bar · base]',
     '',
-    'python app/reglas.py "BIZUM DE MARTA" 25',
+    'python app/reglas.py "BIZUM DE AMIGA" 25',
     '',
-    'BIZUM DE MARTA      25,00 €  ->  Ingresos                 [bizum · base]',
+    'BIZUM DE AMIGA      25,00 €  ->  Ingresos                 [bizum · base]',
 ])]
 story += [Spacer(1, 4)]
 story += [Paragraph(
@@ -634,7 +634,7 @@ story += [p(
     "contarías dos veces: una como recibo en la cuenta y otra como compras sueltas.")]
 story += [codigo([
     '[',
-    '  "pago recibo 77",',
+    '  "pago recibo 1234",',
     '  "tarj.crdto 77"',
     ']',
 ])]
@@ -750,7 +750,7 @@ story += [EE]
 story += [h1("Corregir un movimiento suelto"), E]
 story += [p(
     "Las reglas leen el texto del concepto, no la fecha, así que no pueden distinguir "
-    "el <font face='Mono' size='8.6'>BIZUM A MARTA</font> que un mes es la parte del "
+    "el <font face='Mono' size='8.6'>BIZUM A AMIGA</font> que un mes es la parte del "
     "alquiler y otro una cena. Para esos casos está la columna "
     "<b>categoria_manual</b> de la hoja MOVIMIENTOS.")]
 story += [pasos([
@@ -871,7 +871,7 @@ story += [Spacer(1, 5)]
 story += [Paragraph(
     "Por eso los nombres de categoría van <b>sin tildes</b>: así no hay dos maneras de "
     "escribir lo mismo. Y ojo, lo que se declara aquí es el <b>criterio</b> de la "
-    "fórmula, no el rótulo de la columna: en tu hoja puedes titularla «Gemeliers» "
+    "fórmula, no el rótulo de la columna: en tu hoja puedes titularla «Peques» "
     "mientras la fórmula siga buscando <font face='Mono' size='8.2'>Hijos</font>.",
     S["pmini"])]
 story += [EE]
@@ -923,10 +923,10 @@ story += [p(
     "real.")]
 story += [tabla(
     ["fecha", "descripcion", "importe", "mes", "mes_ajustado"],
-    [["02/04/2026", "NOMINA EMPRESA SL", "+2.450,00", "2026-04", "<b>2026-03</b>"],
-     ["01/05/2026", "MUTUA PRESTACION", "+1.180,45", "2026-05", "<b>2026-04</b>"],
+    [["02/04/2026", "NOMINA EMPRESA SL", "+2.000,00", "2026-04", "<b>2026-03</b>"],
+     ["01/05/2026", "MUTUA PRESTACION", "+1.100,00", "2026-05", "<b>2026-04</b>"],
      ["02/05/2026", "RECIBO MUTUA", "−95,00", "2026-05", "2026-05"],
-     ["05/04/2026", "COMPRA MERCADONA", "−62,35", "2026-04", "2026-04"]],
+     ["05/04/2026", "COMPRA MERCADONA", "−60,00", "2026-04", "2026-04"]],
     [ANCHO * 0.15, ANCHO * 0.31, ANCHO * 0.18, ANCHO * 0.18, ANCHO * 0.18],
     ["celdaM", "celda", "celdaM", "celdaM", "celdaM"])]
 story += [Spacer(1, 5)]

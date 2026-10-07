@@ -32,7 +32,7 @@ Casi en ningún sitio. La instalación y la primera ejecución fueron limpias. C
 - En contra: la guía dice otra cosa. Dice: «Si la categoría es nueva, declárala también en categorias.json […]: si no, las reglas que la usan **se descartan** y se avisa al ejecutar». Con las reglas de la base sí pasa («15 reglas de la base descartadas»), pero con las mías no. Yo esperaba que se descartara y que Adobe siguiera en «Otros».
 
 ### Rareza menor: el probador de reglas con varios conceptos
-- Comando: `app/.venv/bin/python app/reglas.py "BIZUM DE PABLO REGALO" 25 "BIZUM A SARA BAR" -8 "SEG SOCIAL REGIMEN AUTONOMOS" -294`
+- Comando: `app/.venv/bin/python app/reglas.py "BIZUM DE AMIGO REGALO" 25 "BIZUM A AMIGO BAR" -8 "SEG SOCIAL REGIMEN AUTONOMOS" -294`
 - Salida: usa −294 para todos los conceptos y trata «25» y «-8» como si fueran conceptos: «25  -294,00 €  ->  Otros [sin regla]». La guía solo enseña un concepto con un importe, así que es más una expectativa mía que un fallo, pero confunde.
 
 ### Cosas que funcionaron bien (comprobado)

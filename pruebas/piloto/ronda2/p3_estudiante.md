@@ -42,12 +42,12 @@ Pero el CSV estaba en `entrada/`. Lo que pasa es que no se ha podido leer. Con p
 
 - **La clasificación por defecto de los Bizum no encaja con un estudiante** (no es fallo: es la regla base de fábrica). Sin reglas mías:
   - `Bizum a MARIO piso gastos` (-120 €) → **Ocio**, por la regla `bizum` de la base. En «Cargos que se repiten» aparece como «1.440,00 €/año · Ocio». Es mi parte del piso.
-  - `Bizum de LUCAS cena` → **Ingresos**. En septiembre los ingresos salían en 1.834,08 € en vez de 1.800 €, y en julio en 327,68 € en vez de 300 €.
+  - `Bizum de AMIGO cena` → **Ingresos**. En septiembre los ingresos salían en 1.834,08 € en vez de 1.800 €, y en julio en 327,68 € en vez de 300 €.
   La guía lo avisa («Un Bizum que recibes es un ingreso»), así que funciona como está documentado. Pero para mi caso es justo lo contrario de lo que quiero.
-- **Ocio sale en negativo después de mi arreglo** (no es fallo, está documentado). Con `"=cena": "Ocio"`, los Bizum de Lucas restan de Ocio: julio -22,19 €, agosto -37,09 €, septiembre -28,59 €. Pasa porque las cenas las pagué con otra cosa y no están en este extracto. La guía explica que «una categoría que acabe a favor sale negativa». Aun así, ver «Ocio -37,09» la primera vez desconcierta.
+- **Ocio sale en negativo después de mi arreglo** (no es fallo, está documentado). Con `"=cena": "Ocio"`, los Bizum del amigo restan de Ocio: julio -22,19 €, agosto -37,09 €, septiembre -28,59 €. Pasa porque las cenas las pagué con otra cosa y no están en este extracto. La guía explica que «una categoría que acabe a favor sale negativa». Aun así, ver «Ocio -37,09» la primera vez desconcierta.
 - **Glovo cae en Ocio** en la base (`glovo`, `just eat` y `uber eats` → Ocio), igual que el café del bar (`=bar` → Ocio). Así que en el resumen de fábrica no se puede separar café de comida a domicilio. Es preferencia, no fallo.
 - **Movimientos con fecha futura**: el CSV trae el 26/09 y el 27/09, y hoy es 25/09. Entran sin ningún comentario. No sé si es un problema (a lo mejor son pendientes del banco). Lo apunto como curiosidad.
-- `python3 app/reglas.py "Bizum de LUCAS cena" 6.89 "CAFE BAR UNIVERSIDAD"` interpreta el `6.89` como otro texto («6.89 -> Otros [sin regla]»), porque el importe tiene que ir el último. Fue culpa mía, la guía lo dice («Si pones un número al final»). Y sin importe, un Bizum sale como «Ingresos», que puede confundir.
+- `python3 app/reglas.py "Bizum de AMIGO cena" 6.89 "CAFE BAR CAMPUS"` interpreta el `6.89` como otro texto («6.89 -> Otros [sin regla]»), porque el importe tiene que ir el último. Fue culpa mía, la guía lo dice («Si pones un número al final»). Y sin importe, un Bizum sale como «Ingresos», que puede confundir.
 
 ### Lo que fue bien (resultado de cada objetivo)
 - **(a) Leer el CSV sin tocar nada: NO.** Tuve que renombrar `Payee`. Después de eso lo detectó solo: «formato=texto, cabecera en fila 1, 65 movimientos (0 filas descartadas)».

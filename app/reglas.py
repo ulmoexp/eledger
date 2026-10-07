@@ -70,7 +70,7 @@ para cambiar cualquiera basta con repetirla en la tuya.
 
 Para ver qué hace una descripción concreta, y de qué capa sale:
 
-    python app/reglas.py "BIZUM DE MARTA" 25
+    python app/reglas.py "BIZUM DE AMIGA" 25
 """
 
 from __future__ import annotations
@@ -448,6 +448,12 @@ class Catalogo:
     # que entra y no tiene una categoría de ingreso más concreta.
     COLUMNA_OTROS_INGRESOS = "Otros ingresos"
 
+    # Categorías de fábrica que han cambiado de nombre: {nuevo: viejo}. Quien
+    # conserva el viejo en su categorias.json (lo copió de una plantilla
+    # anterior) no puede perder las reglas de la base que ahora apuntan al
+    # nuevo: se descartarían y esos movimientos caerían en Otros sin avisar.
+    RENOMBRADAS = {"Mascotas": "Perros"}
+
     def __init__(self, datos: dict):
         self.gastos = list(datos.get("gastos", []))
         self.ingresos = list(datos.get("ingresos", []))
@@ -471,6 +477,11 @@ class Catalogo:
                               if v in self.todas}
         self.equivalencias_malas += [(str(k), str(v)) for k, v in equivalencias.items()
                                      if v not in self.todas]
+        # el nombre viejo de una categoría renombrada vale como equivalencia
+        # implícita; si el usuario ya puso la suya, manda la suya
+        for nuevo, viejo in self.RENOMBRADAS.items():
+            if nuevo not in self.todas and viejo in self.todas:
+                self.equivalencias.setdefault(nuevo, viejo)
         # lo último: necesita saber ya qué columnas de ingreso hay
         self.etiquetas_ignoradas = self._quitar_etiquetas_que_chocan()
 
@@ -738,8 +749,8 @@ class IdentificadorCuentas:
 
 # ========= COMPROBACIÓN =========
 # python app/reglas.py                          los ejemplos de siempre
-# python app/reglas.py "BIZUM DE MARTA"         una descripción
-# python app/reglas.py "BIZUM DE MARTA" 25      con importe, para ver el signo
+# python app/reglas.py "BIZUM DE AMIGA"         una descripción
+# python app/reglas.py "BIZUM DE AMIGA" 25      con importe, para ver el signo
 # python app/reglas.py "A" 25 "B" -10           varios, cada uno con el suyo
 if __name__ == "__main__":
     import sys
@@ -783,13 +794,13 @@ if __name__ == "__main__":
 
     if not casos:
         casos = [
-            ("MEDIA MARKT ONLINE", -200.0), ("SUPERMERCADOS DIA MADRID", -50.0),
+            ("MEDIA MARKT ONLINE", -200.0), ("SUPERMERCADOS DIA CENTRO", -50.0),
             ("GUARDIA CIVIL", -30.0), ("BAR LA ESQUINA", -18.0),
             ("BARCELONA HOTEL", -300.0), ("CESTA DE NAVIDAD", -20.0),
             ("SEGURO DE VIDA MAPFRE", -40.0), ("BP OIL ESPANA", -55.0),
-            ("ABP CONSULTING", -10.0), ("NÓMINA EMPRESA SL", 2000.0),
-            ("CLÍNICA DENTAL", -90.0), ("REPSOL E.S. LAS ROZAS", -60.0),
-            ("BIZUM A MARTA CENA", -18.0), ("BIZUM DE MARTA CENA", 18.0),
+            ("QBP ASESORES", -10.0), ("NÓMINA EMPRESA SL", 2000.0),
+            ("CLÍNICA DENTAL", -90.0), ("REPSOL E.S. AVENIDA", -60.0),
+            ("BIZUM A AMIGA CENA", -18.0), ("BIZUM DE AMIGA CENA", 18.0),
             ("DEVOLUCION MERCADONA", 12.0),
         ]
 

@@ -12,7 +12,7 @@ del usuario se han verificado idénticos antes y después de cada cambio.
 ## 1. Lo primero: ejecuta las pruebas
 
 ```
-python pruebas/probar.py          136 casos, 489 comprobaciones, ~2 min
+python pruebas/probar.py          137 casos, 491 comprobaciones, ~2 min
 python pruebas/probar.py dedup    solo los que se llamen así
 python pruebas/probar.py -v       conserva las carpetas temporales
 ```
@@ -216,6 +216,22 @@ ni siquiera como ejemplo. El caso `sin-datos-personales` lo vigila comparando
 contra `rules_base.json`; si falla, su docstring explica cómo decidir.
 
 ## 5. Lo que queda pendiente
+
+### Para la próxima versión (en master, sin release)
+
+- Docs: con el `.exe` no hay exportar; `bar` sí pilla BARCELONA (9d8fa62).
+- Entrada en UTF-8 también en Windows (e3fe811, ver más abajo).
+- **Ejemplos neutros y «Mascotas»** (07/10/2026, a petición del usuario:
+  que nada de lo que se reparte deje intuir nada de su vida). La categoría
+  de fábrica «Perros» pasa a «Mascotas» en la plantilla y en la base, con
+  equivalencia implícita para quien conserve «Perros» (caso
+  `categoria-renombrada`). Fuera de los ejemplos de pruebas, ayudas, guía y
+  piloto todo lo que apuntaba a un sitio, un centro o una persona: ciudades
+  (ahora «CENTRO»), «COLEGIO EJEMPLO», nombres en los Bizum («AMIGA»), el
+  recibo «1234» de la plantilla de exclusiones, «Peques» como rótulo de
+  ejemplo, y los importes de la guía redondeados.
+  Para el CHANGELOG: la categoría nueva «Mascotas» y que quien tenga
+  «Perros» no tiene que hacer nada.
 
 ### En curso: 2.15.0 (sesión del 01/10/2026), en borrador
 

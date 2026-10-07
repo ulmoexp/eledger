@@ -1,7 +1,7 @@
 {
   "_comentario": "Categorías que espera tu hoja de resumen. Los nombres tienen que coincidir LETRA POR LETRA con los valores de rules.json. Van sin tildes a propósito, para que no haya dos formas de escribir lo mismo. Al ejecutar, el script compara ambos ficheros y avisa si algo no cuadra.",
 
-  "_rotulos": "El nombre de aquí es el CRITERIO de la fórmula, no el rótulo de la columna. En tu hoja puedes titular la columna como quieras (por ejemplo Gemeliers) mientras la fórmula siga buscando Hijos.",
+  "_rotulos": "El nombre de aquí es el CRITERIO de la fórmula, no el rótulo de la columna. En tu hoja puedes titular la columna como quieras (por ejemplo Peques) mientras la fórmula siga buscando Hijos.",
 
   "_gastos": "Cada una es una columna del resumen. Total Gastos es la suma de todas.",
   "gastos": [
@@ -14,7 +14,7 @@
     "Higiene",
     "Ocio",
     "Hijos",
-    "Perros",
+    "Mascotas",
     "Impuestos",
     "Otros"
   ],

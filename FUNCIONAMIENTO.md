@@ -535,6 +535,13 @@ quien junta dos categorías de fábrica en una suya no pierde las reglas de
 la base de ninguna de las dos. Solo cuentan las que apuntan a una categoría
 declarada; las demás se avisan.
 
+**Categorías de fábrica renombradas.** «Perros» pasó a llamarse «Mascotas»
+(`Catalogo.RENOMBRADAS`). Quien conserva el nombre viejo en su
+`categorias.json` y no el nuevo recibe una equivalencia implícita
+`{"Mascotas": "Perros"}`: las reglas de la base (veterinarios, tiendas de
+animales) siguen yendo a su columna de siempre. Si declara su propia
+equivalencia para «Mascotas», manda la suya.
+
 **Qué hay en la base.** Solo nombres y conceptos que significan lo mismo para
 cualquiera en España: cadenas de supermercados, gasolineras, operadores,
 comercializadoras, plataformas, cadenas de restauración, aseguradoras de

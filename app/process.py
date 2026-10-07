@@ -1839,7 +1839,7 @@ def main():
         print(f"   {len(descartadas)} reglas de la base descartadas: apuntan a "
               f"categorías que no tienes en categorias.json.")
         # sin los nombres no había forma de saber qué comercios se quedaban
-        # sin regla (p. ej. las tiendas de animales al renombrar «Perros»)
+        # sin regla (p. ej. las tiendas de animales al renombrar «Mascotas»)
         muestra = ", ".join(descartadas[:8])
         resto = f" y {len(descartadas) - 8} más" if len(descartadas) > 8 else ""
         print(gris(f"   ({muestra}{resto})"))

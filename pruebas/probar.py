@@ -261,16 +261,16 @@ def campo_de(df, texto, columna):
 # Y una línea excluida de 500 que NO debe entrar en ningún total.
 ABRIL = [
     ("05/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
-    ("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+    ("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
     ("09/04/2026", "MEDIA MARKT ONLINE", -200.00),
-    ("11/04/2026", "SUPERMERCADOS DIA MADRID", -50.00),
+    ("11/04/2026", "SUPERMERCADOS DIA CENTRO", -50.00),
     ("13/04/2026", "GUARDIA CIVIL MULTA", -30.00),
     ("15/04/2026", "CESTA DE NAVIDAD", -20.00),
     ("17/04/2026", "BARCELONA HOTEL", -300.00),
-    ("19/04/2026", "ABP CONSULTING", -10.00),
+    ("19/04/2026", "QBP ASESORES", -10.00),
     ("21/04/2026", "SEGURO DE VIDA MAPFRE", -40.00),
     ("23/04/2026", "LIQUIDACION TARJETA CREDITO", -500.00),
-    ("25/04/2026", "REPSOL E.S. LAS ROZAS", -60.00),
+    ("25/04/2026", "REPSOL E.S. AVENIDA", -60.00),
 ]
 
 TOTAL_GASTOS_ABRIL = 810.00
@@ -288,13 +288,13 @@ def prueba_formatos(e):
     # mismo movimiento descargado cuatro veces (que es su trabajo) y aquí
     # parecería que el lector ha fallado.
     fx.escribir_html(e.entrada / "cuenta_html.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00)])
     fx.escribir_xml_ss(e.entrada / "tarjeta_xml.xls",
-                       [("07/04/2026", "COMPRA CARREFOUR MADRID", -10.00)])
+                       [("07/04/2026", "COMPRA CARREFOUR CENTRO", -10.00)])
     fx.escribir_csv(e.entrada / "cuenta_csv.xls",
-                    [("07/04/2026", "COMPRA LIDL MADRID", -10.00)])
+                    [("07/04/2026", "COMPRA LIDL CENTRO", -10.00)])
     fx.escribir_xlsx(e.entrada / "cuenta_xlsx.xls",
-                     [("07/04/2026", "COMPRA AHORRAMAS MADRID", -10.00)])
+                     [("07/04/2026", "COMPRA AHORRAMAS CENTRO", -10.00)])
 
     salida = e.ejecutar()
     for fmt in ("formato=html", "formato=xml_ss", "formato=texto", "formato=xlsx"):
@@ -312,7 +312,7 @@ def prueba_formatos(e):
 
 @caso("tipo", "Cuenta y tarjeta se distinguen por el contenido")
 def prueba_tipo(e):
-    uno = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    uno = [("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00)]
     fx.escribir_html(e.entrada / "a.xls", uno, cabecera_saldo=True)
     fx.escribir_xml_ss(e.entrada / "b.xls", uno, tarjeta=True)
     e.ejecutar()
@@ -347,7 +347,7 @@ def prueba_trampas(e):
         "GUARDIA CIVIL": "Otros",      # contiene 'dia'
         "NAVIDAD": "Otros",            # contiene 'vida' -> NO es Piso
         "BARCELONA": "Otros",          # contiene 'bar'  -> NO es Ocio
-        "ABP CONSULTING": "Otros",     # contiene 'bp'   -> NO es Transporte
+        "QBP ASESORES": "Otros",     # contiene 'bp'   -> NO es Transporte
         "SUPERMERCADOS DIA": "Comida",  # '=dia' sí debe casar
         "SEGURO DE VIDA": "Piso",      # '=vida' sí debe casar
         "MERCADONA": "Comida",
@@ -532,7 +532,7 @@ def prueba_saldo_inicial_migracion(e):
 def prueba_dedup_cuenta(e):
     e.escribir_config("cuentas.json",
                       {"principal": "principal", "secundaria": "secundaria"})
-    igual = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    igual = [("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00)]
     fx.escribir_html(e.entrada / "principal_042026.xls", igual)
     fx.escribir_html(e.entrada / "secundaria_042026.xls", igual)
     salida = e.ejecutar()
@@ -553,7 +553,7 @@ def prueba_dedup_cuenta_sin_declarar(e):
     # mismo tipo con un cargo idéntico se fusionan) sigue igual si no se
     # configura ajustes/cuentas.json. Es a propósito: nadie nota un cambio de
     # comportamiento por no haber tocado un fichero que no sabía que existía.
-    igual = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    igual = [("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00)]
     fx.escribir_html(e.entrada / "cuenta_a.xls", igual)
     fx.escribir_html(e.entrada / "cuenta_b.xls", igual)
     salida = e.ejecutar()
@@ -596,7 +596,7 @@ def prueba_cuentas_migracion(e):
 def prueba_saldo_por_cuenta(e):
     e.escribir_config("cuentas.json", {"principal": "principal", "ahorro": "ahorro"})
     fx.escribir_html(e.entrada / "principal_042026.xls",
-                     [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+                     [("05/04/2026", "COMPRA MERCADONA CENTRO", -100.00)])
     fx.escribir_html(e.entrada / "ahorro_042026.xls",
                      [("05/04/2026", "TRASPASO DESDE PRINCIPAL", 200.00)])
     salida = e.ejecutar()
@@ -624,10 +624,10 @@ def prueba_acumulado_saldo_real(e):
     # compra cuenta el mes que se hace; el recibo, excluido, llega después).
     # Con estos datos daba 6470 € con 1550 € en la cuenta.
     cuenta = [("02/04/2026", "NOMINA EMPRESA SL", 2000.00),
-              ("10/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+              ("10/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
               ("15/04/2026", "TRASPASO A CUENTA AHORRO", -5000.00),
               ("05/05/2026", "LIQUIDACION TARJETA CREDITO", -300.00),
-              ("12/05/2026", "COMPRA MERCADONA MADRID", -50.00),
+              ("12/05/2026", "COMPRA MERCADONA CENTRO", -50.00),
               ("08/06/2026", "TRASPASO A CUENTA AHORRO", -100.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", cuenta)
     fx.escribir_xml_ss(e.entrada / "tarjeta.xls",
@@ -660,11 +660,11 @@ def prueba_acumulado_saldo_real(e):
 def prueba_cuadre_hueco(e):
     fx.escribir_html(e.entrada / "cuenta_abril.xls",
                      [("02/04/2026", "NOMINA EMPRESA SL", 2000.00),
-                      ("10/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+                      ("10/04/2026", "COMPRA MERCADONA CENTRO", -100.00)])
     # el extracto de junio trae el saldo REAL, que incluye 800 € de un mayo
     # que no se ha descargado: 5000 + 2000 - 100 + 800 - 50
     ruta = e.entrada / "cuenta_junio.xls"
-    fx.escribir_html(ruta, [("10/06/2026", "COMPRA MERCADONA MADRID", -50.00)])
+    fx.escribir_html(ruta, [("10/06/2026", "COMPRA MERCADONA CENTRO", -50.00)])
     html = ruta.read_bytes().decode("cp1252").replace("4.950,00", "7.650,00")
     ruta.write_bytes(html.encode("cp1252"))
     salida = e.ejecutar()
@@ -687,7 +687,7 @@ def prueba_orden_resumen_retiradas(e):
         "orden_resumen": ["Mes", "Comida", "Deuda", "Extras", "Balance", "Acumulado"]})
     e.escribir_config("rules.json", {"mercadona": "Comida", "nomina": "Ingresos"})
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00)])
     salida = e.ejecutar()
 
     comprobar("«Deuda» en orden_resumen ya no existe" in salida
@@ -708,7 +708,7 @@ def prueba_historico_abierto(e):
     # Aquí no hay nadie delante para contestar, así que va directo a copia.
     (e.datos / ".~lock.historico.xlsx#").write_text("bloqueo")
     fx.escribir_html(e.entrada / "cuenta2.xls",
-                     [("20/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+                     [("20/04/2026", "COMPRA MERCADONA CENTRO", -10.00)])
     salida = e.ejecutar()
 
     comprobar(e.ultimo_codigo == 0, "no falla", salida)
@@ -752,7 +752,7 @@ def prueba_limpios_abierto(e):
     e.ejecutar()
     (e.salida / ".~lock.movimientos_limpios.xlsx#").write_text("bloqueo")
     fx.escribir_html(e.entrada / "cuenta2.xls",
-                     [("20/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+                     [("20/04/2026", "COMPRA MERCADONA CENTRO", -10.00)])
     salida = e.ejecutar()
 
     comprobar(len(e.historico()) == 4, "el histórico se actualiza como siempre",
@@ -771,10 +771,10 @@ def prueba_cuadre_intermedio(e):
     # detrás del 20, el saldo del banco de esos dos días no casa con el
     # calculado, pero el del último día sí
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("10/04/2026", "COMPRA MERCADONA MADRID", -10.00),
-                      ("20/04/2026", "REPSOL E.S. LAS ROZAS", -20.00),
+                     [("10/04/2026", "COMPRA MERCADONA CENTRO", -10.00),
+                      ("20/04/2026", "REPSOL E.S. AVENIDA", -20.00),
                       ("15/04/2026", "CINE YELMO", -5.00),
-                      ("25/04/2026", "COMPRA MERCADONA MADRID", -7.00)])
+                      ("25/04/2026", "COMPRA MERCADONA CENTRO", -7.00)])
     salida = e.ejecutar()
 
     comprobar("Al final cuadra con el banco" in salida,
@@ -791,18 +791,18 @@ def prueba_nomina_antes_que_gasto(e):
     # de la base, y «colegio» (Hijos) o «mercadona» (Comida) se llevaban la
     # nómina antes. Resultado: Ingresos 0 y un gasto en negativo, sin aviso.
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("01/04/2026", "NOMINA COLEGIO SAN JOSE", 1650.00),
+                     [("01/04/2026", "NOMINA COLEGIO EJEMPLO", 1650.00),
                       ("02/04/2026", "NOMINA MERCADONA SA", 1200.00),
-                      ("10/04/2026", "RECIBO COLEGIO SAN JOSE", -90.00),
-                      ("12/04/2026", "COMPRA MERCADONA MADRID", -60.00)])
+                      ("10/04/2026", "RECIBO COLEGIO EJEMPLO", -90.00),
+                      ("12/04/2026", "COMPRA MERCADONA CENTRO", -60.00)])
     e.ejecutar()
     df = e.historico().set_index("descripcion")
 
-    comprobar(df.at["NOMINA COLEGIO SAN JOSE", "categoria"] == "Ingresos"
+    comprobar(df.at["NOMINA COLEGIO EJEMPLO", "categoria"] == "Ingresos"
               and df.at["NOMINA MERCADONA SA", "categoria"] == "Ingresos",
               "las dos nóminas son ingresos", str(df["categoria"].to_dict()))
-    comprobar(df.at["RECIBO COLEGIO SAN JOSE", "categoria"] == "Hijos"
-              and df.at["COMPRA MERCADONA MADRID", "categoria"] == "Comida",
+    comprobar(df.at["RECIBO COLEGIO EJEMPLO", "categoria"] == "Hijos"
+              and df.at["COMPRA MERCADONA CENTRO", "categoria"] == "Comida",
               "y los gastos de esos mismos sitios siguen donde estaban",
               str(df["categoria"].to_dict()))
 
@@ -812,14 +812,14 @@ def prueba_ingreso_sin_regla(e):
     # regresión del piloto: un cobro sin regla caía en «Otros», que es de
     # gasto, y dejaba el mes con gastos negativos
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("03/04/2026", "TRANSF DE ESTUDIO NORTE FACTURA 12", 1210.00),
-                      ("05/04/2026", "COMPRA MERCADONA MADRID", -60.00),
+                     [("03/04/2026", "TRANSF DE ESTUDIO EJEMPLO FACTURA 12", 1210.00),
+                      ("05/04/2026", "COMPRA MERCADONA CENTRO", -60.00),
                       ("07/04/2026", "TIENDA DESCONOCIDA SL", -40.00)])
     salida = e.ejecutar()
     f = e.resumen().iloc[0]
     df = e.historico().set_index("descripcion")
 
-    comprobar(df.at["TRANSF DE ESTUDIO NORTE FACTURA 12", "categoria"] == "Ingresos",
+    comprobar(df.at["TRANSF DE ESTUDIO EJEMPLO FACTURA 12", "categoria"] == "Ingresos",
               "el cobro sin regla es un ingreso", str(df["categoria"].to_dict()))
     comprobar(df.at["TIENDA DESCONOCIDA SL", "categoria"] == "Otros",
               "un gasto sin regla sigue yendo a Otros", str(df["categoria"].to_dict()))
@@ -835,9 +835,9 @@ def prueba_cuentas_declaradas_tarde(e):
     # regresión del piloto: las filas viejas se quedaban sin cuenta y las
     # mismas, releídas, entraban con cuenta: todo sumaba el doble
     fx.escribir_html(e.entrada / "negocio_2026.xls",
-                     [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+                     [("05/04/2026", "COMPRA MERCADONA CENTRO", -100.00)])
     fx.escribir_html(e.entrada / "personal_2026.xls",
-                     [("06/04/2026", "COMPRA MERCADONA MADRID", -30.00)])
+                     [("06/04/2026", "COMPRA MERCADONA CENTRO", -30.00)])
     e.ejecutar()
     antes = len(e.historico())
 
@@ -859,7 +859,7 @@ def prueba_cuentas_cura_duplicados(e):
     # el estado que dejaba la 2.12.0: cada fila dos veces, una sin cuenta y
     # otra con ella. Se fabrica a mano sobre el histórico.
     fx.escribir_html(e.entrada / "negocio_2026.xls",
-                     [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                     [("05/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
                       ("08/04/2026", "COMPRA LIDL", -20.00)])
     e.ejecutar()
     import pandas as pd
@@ -921,8 +921,8 @@ def prueba_importes_formato(e):
 def prueba_signo(e):
     # Comida: -100 de compra y +150 de devolución -> la categoría acaba a favor.
     # Debe salir como -50, NO como +50 (eso es lo que hacía ABS()).
-    datos = [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
-             ("09/04/2026", "DEVOLUCION MERCADONA MADRID", 150.00)]
+    datos = [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
+             ("09/04/2026", "DEVOLUCION MERCADONA CENTRO", 150.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.ejecutar()
     res = e.resumen()
@@ -934,7 +934,7 @@ def prueba_signo(e):
 @caso("dedup", "Dos descargas que se solapan no duplican movimientos")
 def prueba_dedup(e):
     abril = ABRIL[:5]
-    abril_y_mayo = ABRIL[:5] + [("03/05/2026", "COMPRA LIDL MADRID", -25.00)]
+    abril_y_mayo = ABRIL[:5] + [("03/05/2026", "COMPRA LIDL CENTRO", -25.00)]
 
     fx.escribir_html(e.entrada / "descarga_1.xls", abril)
     e.ejecutar()
@@ -953,8 +953,8 @@ def prueba_dedup(e):
 
 @caso("repetido", "Dos cargos idénticos el mismo día son dos gastos reales")
 def prueba_repetido(e):
-    datos = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00),
-             ("07/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    datos = [("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00),
+             ("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.ejecutar()
 
@@ -1079,9 +1079,9 @@ def prueba_informe_validacion(e):
 
 @caso("informe-relleno", "El relleno del banco y los números no se sugieren como clave")
 def prueba_informe_relleno(e):
-    datos = [("07/04/2026", "PAGO TARJ 000456 CLUB DEPORTIVO", -15.00),
-             ("08/04/2026", "PAGO TARJ 000456 CLUB DEPORTIVO", -15.00),
-             ("09/04/2026", "PAGO TARJ 000456 CLUB DEPORTIVO", -15.00)]
+    datos = [("07/04/2026", "PAGO TARJ 000456 ACADEMIA IDIOMAS", -15.00),
+             ("08/04/2026", "PAGO TARJ 000456 ACADEMIA IDIOMAS", -15.00),
+             ("09/04/2026", "PAGO TARJ 000456 ACADEMIA IDIOMAS", -15.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     salida = e.ejecutar()
 
@@ -1089,15 +1089,15 @@ def prueba_informe_relleno(e):
               and '"000456"' not in salida,
               "ni el relleno del banco ni el número de referencia se sugieren",
               salida)
-    comprobar('"deportivo": "PON_TU_CATEGORIA"' in salida
-              or '"club": "PON_TU_CATEGORIA"' in salida,
+    comprobar('"academia": "PON_TU_CATEGORIA"' in salida
+              or '"idiomas": "PON_TU_CATEGORIA"' in salida,
               "y sí una palabra de verdad del concepto", salida)
 
 
 @caso("informe-vacio", "Sin nada sin clasificar, el informe no se muestra")
 def prueba_informe_vacio(e):
-    datos = [("07/04/2026", "COMPRA MERCADONA MADRID", -10.00),
-             ("09/04/2026", "COMPRA CARREFOUR MADRID", -10.00)]
+    datos = [("07/04/2026", "COMPRA MERCADONA CENTRO", -10.00),
+             ("09/04/2026", "COMPRA CARREFOUR CENTRO", -10.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     salida = e.ejecutar()
 
@@ -1413,10 +1413,10 @@ def prueba_asistente_formato(e):
 # contaba como un ingreso. Datos inventados: dos meses de compras, cada uno
 # pagado a primeros del siguiente; el abono cae en el mes de compras
 # siguiente, que es justo lo que descuadraba la suma neta del mes.
-ESPEJO_TARJETA = [("10/04/2026", "COMPRA MERCADONA MADRID", -50.00),
-                  ("20/04/2026", "COMPRA MERCADONA MADRID", -30.25),   # abril -80,25
+ESPEJO_TARJETA = [("10/04/2026", "COMPRA MERCADONA CENTRO", -50.00),
+                  ("20/04/2026", "COMPRA MERCADONA CENTRO", -30.25),   # abril -80,25
                   ("05/05/2026", "PAGO RECIBO 4321", 80.25),
-                  ("12/05/2026", "COMPRA MERCADONA MADRID", -60.00),   # mayo  -60,00
+                  ("12/05/2026", "COMPRA MERCADONA CENTRO", -60.00),   # mayo  -60,00
                   ("05/06/2026", "PAGO RECIBO 4321", 60.00)]
 ESPEJO_CUENTA = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
                  ("05/05/2026", "TARJ.CRDTO 4321 ABRIL", -80.25),
@@ -1488,9 +1488,9 @@ def prueba_tarjeta_espejo_neutro(e):
 @caso("tarjeta-espejo-casualidad", "Una devolución que coincide con un cargo cualquiera no es el recibo")
 def prueba_tarjeta_espejo_casualidad(e):
     e.escribir_config("exclude_patterns.json", [])
-    tarjeta = [("05/04/2026", "COMPRA MERCADONA MADRID", -50.00),
+    tarjeta = [("05/04/2026", "COMPRA MERCADONA CENTRO", -50.00),
                ("10/04/2026", "DEVOLUCION LIBRERIA", 35.00),     # devolución de verdad
-               ("15/04/2026", "COMPRA MERCADONA MADRID", -30.25)]  # neto -45,25
+               ("15/04/2026", "COMPRA MERCADONA CENTRO", -30.25)]  # neto -45,25
     fx.escribir_xml_ss(e.entrada / "tarjeta.xls", tarjeta, tarjeta=True)
     cuenta = [("01/04/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
               ("12/04/2026", "RECIBO GIMNASIO PUEBLO", -35.00),   # mismo importe, por casualidad
@@ -1527,7 +1527,7 @@ def prueba_asistente_exclusion_dos_lados(e):
 
 @caso("iso", "Las fechas aaaa-mm-dd no se invierten")
 def prueba_iso(e):
-    datos = [("02/04/2026", "COMPRA MERCADONA MADRID", -10.00)]
+    datos = [("02/04/2026", "COMPRA MERCADONA CENTRO", -10.00)]
     fx.escribir_csv(e.entrada / "cuenta.xls", datos, fechas_iso=True)
     e.ejecutar()
 
@@ -1540,7 +1540,7 @@ def prueba_iso(e):
 @caso("mes", "El mes contable mueve las nóminas de los días 1-3")
 def prueba_mes(e):
     datos = [("01/05/2026", "NOMINA EMPRESA FICTICIA SL", 2000.00),
-             ("05/05/2026", "COMPRA MERCADONA MADRID", -10.00)]
+             ("05/05/2026", "COMPRA MERCADONA CENTRO", -10.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.ejecutar()
 
@@ -1577,7 +1577,7 @@ def prueba_manual(e):
         elif "MEDIA MARKT" in desc:
             fila[7].value = "(excluido)"            # sacar de los totales
             escritas += 1
-        elif "ABP" in desc:
+        elif "QBP" in desc:
             fila[7].value = "Categoria Inventada"   # errata
             escritas += 1
     wb.save(e.ruta_historico)
@@ -1601,9 +1601,9 @@ def prueba_manual(e):
     # Una categoría que no existe en categorias.json NO se aplica: si se
     # aplicara, el movimiento desaparecería de todas las columnas del resumen
     # sin restar de ningún total, y el Excel descuadraría en silencio.
-    comprobar(categoria_de(df, "ABP") == "Otros",
+    comprobar(categoria_de(df, "QBP") == "Otros",
               "una categoría mal escrita se ignora y mandan las reglas",
-              str(categoria_de(df, "ABP")))
+              str(categoria_de(df, "QBP")))
     comprobar("Categoria Inventada" in salida,
               "pero avisa por pantalla de la errata", salida)
 
@@ -1734,7 +1734,7 @@ def prueba_sync_notas_realineadas(e):
     wb = load_workbook(ruta)
     ws = wb["MOVIMIENTOS"]
     fila = next(r for r in range(2, ws.max_row + 1)
-                if ws.cell(r, 2).value == "COMPRA MERCADONA MADRID")
+                if ws.cell(r, 2).value == "COMPRA MERCADONA CENTRO")
     ws.cell(fila, 10).value = "la del cumple"
     wb.save(ruta)
     wb.close()
@@ -1747,7 +1747,7 @@ def prueba_sync_notas_realineadas(e):
     ws = wb["MOVIMIENTOS"]
     junto = {ws.cell(r, 2).value: ws.cell(r, 10).value for r in range(2, ws.max_row + 1)}
     wb.close()
-    comprobar(junto.get("COMPRA MERCADONA MADRID") == "la del cumple",
+    comprobar(junto.get("COMPRA MERCADONA CENTRO") == "la del cumple",
               "la nota sigue junto a su movimiento", str(junto))
     comprobar(sum(1 for v in junto.values() if v) == 1,
               "y no se ha quedado otra copia en su fila vieja", str(junto))
@@ -1782,12 +1782,12 @@ def prueba_cuentas_descarga_sin_patron(e):
     # «movimientos (1).xls» no casaba con ninguna cuenta, entraba como una
     # tercera «(sin identificar)» y todo lo suyo sumaba dos veces
     e.escribir_config("cuentas.json", {"negocio": "negocio", "personal": "personal"})
-    negocio = [("05/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+    negocio = [("05/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
                ("08/04/2026", "COMPRA LIDL", -20.00),
                ("12/04/2026", "RECIBO GIMNASIO", -30.00)]
     fx.escribir_html(e.entrada / "negocio_2026.xls", negocio)
     fx.escribir_html(e.entrada / "personal_2026.xls",
-                     [("06/04/2026", "COMPRA MERCADONA MADRID", -30.00)])
+                     [("06/04/2026", "COMPRA MERCADONA CENTRO", -30.00)])
     fx.escribir_html(e.entrada / "movimientos (1).xls", negocio)
     salida = e.ejecutar()
 
@@ -1870,14 +1870,14 @@ def prueba_cargo_abono(e):
     ws.append([])
     ws.append(["Fecha", "Concepto", "Cargo", "Abono", "Saldo"])
     ws.append(["01/04/2026", "NOMINA EMPRESA FICTICIA SL", None, "2.000,00", "7.000,00"])
-    ws.append(["07/04/2026", "COMPRA MERCADONA MADRID", "100,00", None, "6.900,00"])
+    ws.append(["07/04/2026", "COMPRA MERCADONA CENTRO", "100,00", None, "6.900,00"])
     ws.append(["08/04/2026", "COMPRA LIDL", "-20,00", None, "6.880,00"])
     wb.save(e.entrada / "extracto.xlsx")
     e.ejecutar()
     df = e.historico().set_index("descripcion")
     comprobar(len(df) == 3, "se leen los tres", str(len(df)))
     comprobar(df.at["NOMINA EMPRESA FICTICIA SL", "importe"] == 2000
-              and df.at["COMPRA MERCADONA MADRID", "importe"] == -100
+              and df.at["COMPRA MERCADONA CENTRO", "importe"] == -100
               and df.at["COMPRA LIDL", "importe"] == -20,
               "lo del Abono entra y lo del Cargo sale, venga con el signo que venga",
               str(df["importe"].to_dict()))
@@ -2045,7 +2045,7 @@ def prueba_hoja_cuentas(e):
                      [("05/04/2026", "NOMINA EMPRESA FICTICIA SL", 1000.00),
                       ("08/04/2026", "COMPRA LIDL", -20.00)])
     fx.escribir_html(e.entrada / "personal_2026.xls",
-                     [("06/04/2026", "COMPRA MERCADONA MADRID", -30.00)])
+                     [("06/04/2026", "COMPRA MERCADONA CENTRO", -30.00)])
     salida = e.ejecutar()
     import pandas as pd
     wb = e.libro_historico()
@@ -2089,7 +2089,7 @@ def _hoja_propia(ruta):
     ws.title = "Datos"
     ws.append(["Fecha", "Concepto", "Importe", "Categoría"])
     ws.append([dt.datetime(2026, 3, 2), "RECIBO A MANO", -10, "Piso"])
-    ws.append([dt.datetime(2026, 4, 7), "compra mercadona madrid", -100, "Comida"])
+    ws.append([dt.datetime(2026, 4, 7), "compra mercadona centro", -100, "Comida"])
     wb.save(ruta)
 
 
@@ -2107,7 +2107,7 @@ def prueba_sync_anadir(e):
     from openpyxl import load_workbook
     ws = load_workbook(e.dir / "contabilidad.xlsx")["Datos"]
     filas = list(ws.iter_rows(values_only=True))
-    comprobar(filas[1][1] == "RECIBO A MANO" and filas[2][1] == "compra mercadona madrid",
+    comprobar(filas[1][1] == "RECIBO A MANO" and filas[2][1] == "compra mercadona centro",
               "lo tecleado a mano sigue igual y en su sitio", str(filas[:3]))
     # de los tres de abril, el Mercadona ya estaba (escrito en minúsculas)
     comprobar(len(filas) == 5 and filas[3][1] == "NOMINA EMPRESA FICTICIA SL",
@@ -2218,6 +2218,25 @@ def prueba_equivalencias(e):
     comprobar("iberdrola" not in salida.lower().split("descartadas")[-1][:400]
               if "descartadas" in salida else True,
               "sin descartar sus reglas de la base", salida)
+
+
+@caso("categoria-renombrada", "Quien conserva «Perros» no pierde las reglas de «Mascotas»")
+def prueba_categoria_renombrada(e):
+    # La plantilla de antes traía «Perros»; la base ahora manda a «Mascotas».
+    # Sin la equivalencia implícita, veterinarios y tiendas de animales se
+    # descartarían y caerían en Otros sin que nada lo dijera.
+    cat = e.leer_config("categorias.json")
+    cat["gastos"] = ["Perros" if g == "Mascotas" else g for g in cat["gastos"]]
+    e.escribir_config("categorias.json", cat)
+    fx.escribir_html(e.entrada / "cuenta.xls", [
+        ("05/04/2026", "CLINICA VETERINARIA CENTRO", -45.00),
+        ("08/04/2026", "KIWOKO TIENDA", -20.00)])
+    salida = e.ejecutar()
+    df = e.historico()
+    comprobar(set(df["categoria"]) == {"Perros"}, "van a su «Perros» de siempre",
+              str(df["categoria"].tolist()))
+    comprobar("no cuadran" not in salida and "reglas de la base descartadas" not in salida,
+              "sin descartar reglas ni avisos de categorías", salida)
 
 
 @caso("historico-copias-sin-cambios", "Sin nada nuevo, no se gasta otra copia del histórico")
@@ -2401,7 +2420,7 @@ def prueba_sitios(e):
 
 @caso("capas", "Tus reglas mandan sobre la base")
 def prueba_capas(e):
-    datos = [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),   # solo en la base
+    datos = [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),   # solo en la base
              ("09/04/2026", "PEPE GARCIA ALQUILER", -700.00)]      # solo tuya
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.escribir_config("rules.json", {"pepe garcia": "Piso"})
@@ -2421,7 +2440,7 @@ def prueba_capas(e):
 @caso("capas-gana", "Repetir una clave de la base la cambia")
 def prueba_capas_gana(e):
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00)])
     e.escribir_config("rules.json", {"mercadona": "Otros"})
     e.ejecutar()
 
@@ -2458,7 +2477,7 @@ def prueba_base_orden(e):
         ("08/04/2026", "AMAZON PRIME VIDEO", -4.99),
         ("09/04/2026", "AMAZON EU MARKETPLACE", -30.00),
         ("10/04/2026", "SPAR EXPRESS", -15.00),
-        ("11/04/2026", "SPARKLE LAVANDERIA", -9.00),
+        ("11/04/2026", "SPARTEX LAVANDERIA", -9.00),
         ("12/04/2026", "IBERIAN JAMONES", -25.00),
         ("14/04/2026", "HOSTAL PENSION LA ESTRELLA", -40.00),
     ])
@@ -2470,12 +2489,12 @@ def prueba_base_orden(e):
         ("ALQUILER PISO", "Piso", "y el alquiler del piso sigue en Piso"),
         ("UBER EATS", "Ocio", "un pedido de comida no es un viaje"),
         ("UBER BV", "Transporte", "y un viaje sigue siendo Transporte"),
-        ("VETERINARIA", "Perros", "una clínica veterinaria no es la del médico"),
+        ("VETERINARIA", "Mascotas", "una clínica veterinaria no es la del médico"),
         ("CLINICA DENTAL", "Higiene", "y el dentista sigue en Higiene"),
         ("AMAZON PRIME", "Ocio", "la suscripción no es una compra de Amazon"),
         ("AMAZON EU", "Otros", "y la compra sigue en Otros"),
         ("SPAR EXPRESS", "Comida", "=spar pilla el supermercado"),
-        ("SPARKLE", "Otros", "pero no otra palabra que empiece igual"),
+        ("SPARTEX", "Otros", "pero no otra palabra que empiece igual"),
         ("IBERIAN", "Otros", "=iberia no pilla IBERIAN"),
         ("HOSTAL PENSION", "Otros", "pension solo es ingreso si es positiva"),
     ]:
@@ -2493,7 +2512,7 @@ def prueba_capas_categoria(e):
         "columna_mes": "mes_ajustado"})
     e.escribir_config("rules.json", {})
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
                       ("09/04/2026", "MOVISTAR FIBRA", -45.00)])
     salida = e.ejecutar()
 
@@ -2523,7 +2542,7 @@ def prueba_resumen_personalizado(e):
         "orden_resumen": ["Mes", "Comida", "Otros", "Balance", "Acumulado"]})
     e.escribir_config("rules.json", {"mercadona": "Comida", "nomina": "Ingresos"})
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
                       ("09/04/2026", "NOMINA EMPRESA SL", 2000.00)])
     e.ejecutar()
 
@@ -2546,7 +2565,7 @@ def prueba_resumen_orden_invalido(e):
         "orden_resumen": ["Mes", "Komida", "Balance"]})
     e.escribir_config("rules.json", {"mercadona": "Comida"})
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00)])
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00)])
     salida = e.ejecutar()
 
     comprobar("Komida" in salida and "orden_resumen" in salida,
@@ -2566,9 +2585,9 @@ CATEGORIAS_DOS_INGRESOS = {
     "ingresos": ["Nomina", "Ingresos"],
     "neutras": ["Transferencias internas"],
     "columna_mes": "mes_ajustado"}
-MOVIMIENTOS_DOS_INGRESOS = [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+MOVIMIENTOS_DOS_INGRESOS = [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
                             ("09/04/2026", "NOMINA EMPRESA SL", 2000.00),
-                            ("12/04/2026", "BIZUM DE MARTA ALQUILER", 350.00)]
+                            ("12/04/2026", "BIZUM DE AMIGA ALQUILER", 350.00)]
 REGLAS_DOS_INGRESOS = {"mercadona": "Comida", "nomina": "Nomina",
                        "bizum": {"+": "Ingresos", "-": "Otros"}}
 
@@ -2687,7 +2706,7 @@ def _xml_graficos(ruta):
 
 @caso("graficos", "Los gráficos de RESUMEN se ven también en OnlyOffice")
 def prueba_graficos(e):
-    datos = ABRIL + [("05/05/2026", "COMPRA MERCADONA MADRID", -80.00)]
+    datos = ABRIL + [("05/05/2026", "COMPRA MERCADONA CENTRO", -80.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.ejecutar()
     xmls = _xml_graficos(e.ruta_historico)
@@ -2721,7 +2740,7 @@ def prueba_graficos_orden_resumen(e):
         "orden_resumen": ["Mes", "Comida", "Otros", "Total Gastos", "Ingresos"]})
     e.escribir_config("rules.json", {"mercadona": "Comida", "nomina": "Ingresos"})
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+                     [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
                       ("09/04/2026", "NOMINA EMPRESA SL", 2000.00)])
     salida = e.ejecutar()
     xmls = _xml_graficos(e.ruta_historico)
@@ -2780,7 +2799,7 @@ def prueba_recurrentes_mensual(e):
     datos = (_meses(3, "NETFLIX.COM", [-12.99, -12.99, -12.99, -13.99, -13.99, -13.99])
              + [(f"{d}/{m:02d}/2026", f"RECIBO GIMNASIO REF {m}{m}731", -35.00)
                 for d, m in (("01", 2), ("02", 3), ("01", 4), ("01", 5), ("01", 6))]
-             + [("20/06/2026", "COMPRA MERCADONA MADRID", -60.00)])
+             + [("20/06/2026", "COMPRA MERCADONA CENTRO", -60.00)])
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     salida = e.ejecutar()
 
@@ -2801,7 +2820,7 @@ def prueba_recurrentes_mensual(e):
 def prueba_recurrentes_no(e):
     datos = (
         # la compra: muchas veces, fechas e importes irregulares
-        [(f"{d:02d}/{m:02d}/2026", "COMPRA MERCADONA MADRID", -(40 + d + m))
+        [(f"{d:02d}/{m:02d}/2026", "COMPRA MERCADONA CENTRO", -(40 + d + m))
          for m in range(1, 7) for d in (4, 11, 19, 26)]
         # solo dos cargos: todavía no es una serie
         + _meses(5, "SPOTIFY", [-10.99, -10.99], desde_mes=5)
@@ -2833,7 +2852,7 @@ def prueba_recurrentes_anual(e):
                                      "mercadona": "Comida"})
     datos = [("15/03/2025", "SEGURO HOGAR POLIZA 88123", -280.00),
              ("14/03/2026", "SEGURO HOGAR POLIZA 88124", -295.00),
-             ("20/06/2026", "COMPRA MERCADONA MADRID", -60.00)]
+             ("20/06/2026", "COMPRA MERCADONA CENTRO", -60.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     salida = e.ejecutar()
 
@@ -2843,18 +2862,18 @@ def prueba_recurrentes_anual(e):
 
 @caso("signo", "Un Bizum recibido no es lo mismo que uno enviado")
 def prueba_signo(e):
-    datos = [("07/04/2026", "BIZUM A MARTA CENA", -18.00),
-             ("09/04/2026", "BIZUM DE MARTA ALQUILER", 350.00)]
+    datos = [("07/04/2026", "BIZUM A AMIGA CENA", -18.00),
+             ("09/04/2026", "BIZUM DE AMIGA ALQUILER", 350.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.escribir_config("rules.json",
                       {"bizum": {"+": "Ingresos", "-": "Ocio"}})
     e.ejecutar()
 
     df = e.historico()
-    comprobar(categoria_de(df, "BIZUM A MARTA") == "Ocio",
-              "el enviado es gasto", str(categoria_de(df, "BIZUM A MARTA")))
-    comprobar(categoria_de(df, "BIZUM DE MARTA") == "Ingresos",
-              "el recibido es ingreso", str(categoria_de(df, "BIZUM DE MARTA")))
+    comprobar(categoria_de(df, "BIZUM A AMIGA") == "Ocio",
+              "el enviado es gasto", str(categoria_de(df, "BIZUM A AMIGA")))
+    comprobar(categoria_de(df, "BIZUM DE AMIGA") == "Ingresos",
+              "el recibido es ingreso", str(categoria_de(df, "BIZUM DE AMIGA")))
 
     res = e.resumen()
     # Las columnas de gasto se muestran en positivo (ver el caso gastos-signo).
@@ -2889,7 +2908,7 @@ def prueba_signo_devolucion(e):
     # Que un abono de Mercadona reste de Comida es lo correcto: es la
     # devolución del mismo gasto. El signo solo hace falta cuando el positivo
     # es un concepto distinto del negativo.
-    datos = [("07/04/2026", "COMPRA MERCADONA MADRID", -100.00),
+    datos = [("07/04/2026", "COMPRA MERCADONA CENTRO", -100.00),
              ("09/04/2026", "MERCADONA DEVOLUCION", 30.00)]
     fx.escribir_html(e.entrada / "cuenta.xls", datos)
     e.ejecutar()
@@ -2938,7 +2957,7 @@ def prueba_mes_heredado(e):
     # prestación del día 1 cambiaría de mes y el resumen bailaría solo.
     (e.ajustes / "mes_contable.json").unlink(missing_ok=True)
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("05/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+                     [("05/04/2026", "COMPRA MERCADONA CENTRO", -10.00)])
     e.ejecutar()                                   # crea el histórico
     (e.ajustes / "mes_contable.json").unlink(missing_ok=True)
 
@@ -2962,7 +2981,7 @@ def prueba_mes_nuevo(e):
     import shutil
     shutil.rmtree(e.ajustes)
     fx.escribir_html(e.entrada / "cuenta.xls",
-                     [("05/04/2026", "COMPRA MERCADONA MADRID", -10.00)])
+                     [("05/04/2026", "COMPRA MERCADONA CENTRO", -10.00)])
     salida = e.ejecutar()
 
     cfg = e.leer_config("mes_contable.json")
@@ -3206,7 +3225,7 @@ def prueba_exportar_funciona(e):
         (destino / "entrada").mkdir(exist_ok=True)
         fx.escribir_html(destino / "entrada" / "extracto.xls",
                          [("05/04/2026", "NOMINA EMPRESA FICTICIA SL", 1500.00),
-                          ("07/04/2026", "COMPRA CARREFOUR MADRID", -50.00)])
+                          ("07/04/2026", "COMPRA CARREFOUR CENTRO", -50.00)])
 
         proc = subprocess.run(
             [sys.executable, os.path.join(DIR_APP, "process.py")], cwd=destino,

@@ -87,7 +87,7 @@ piloto».
 - **Una hoja propia añadida a `historico.xlsx`** se pierde al volver a
   ejecutar, sin aviso (pareja). Es coherente con que el histórico se
   regenera, pero no se dice.
-- «Sin clasificar» propone el nombre de un cliente (`"antonio"`) en vez de un
+- «Sin clasificar» propone el nombre de un cliente (`"cliente"`) en vez de un
   patrón común (`"transf. de"`) (autónomo).
 
 ## Peticiones de producto (no fallos)

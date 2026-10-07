@@ -3,7 +3,7 @@
   "_plantilla": "Reglas de partida, solo con cadenas conocidas en toda Espana. Esta base se reemplaza entera con cada version: lo tuyo (tu casero, los comercios de tu barrio, tu gimnasio) va en ajustes/rules.json, que manda sobre esto. Para probar sin ejecutar el proceso entero: python app/reglas.py \"TEXTO DEL MOVIMIENTO\"",
   "_orden": "Las claves concretas van ANTES que las generales que las contienen: 'alquiler de vehiculos' antes que 'alquiler', 'uber eats' antes que 'uber', 'clinica veterinaria' antes que 'clinica', 'amazon prime' antes que 'amazon'. Si no, la general gana siempre y la concreta no se aplica nunca.",
 
-  "_ingresos": "Los ingresos van PRIMERO y solo para el lado positivo: una NOMINA COLEGIO SAN JOSE caia en 'colegio' (Hijos) y una NOMINA MERCADONA en Comida, porque cualquier regla de gasto anterior se la llevaba. Con {\"+\": ...}, un cargo negativo que los mencione sigue buscando mas abajo.",
+  "_ingresos": "Los ingresos van PRIMERO y solo para el lado positivo: una NOMINA COLEGIO EJEMPLO caia en 'colegio' (Hijos) y una NOMINA MERCADONA en Comida, porque cualquier regla de gasto anterior se la llevaba. Con {\"+\": ...}, un cargo negativo que los mencione sigue buscando mas abajo.",
 
   "nomina": {"+": "Ingresos"},
   "transferencia recibida": {"+": "Ingresos"},
@@ -149,7 +149,7 @@
   "cofidis": "Prestamos",
   "cetelem": "Prestamos",
 
-  "clinica veterinaria": "Perros",
+  "clinica veterinaria": "Mascotas",
   "farmacia": "Higiene",
   "parafarmacia": "Higiene",
   "clinica": "Higiene",
@@ -225,12 +225,12 @@
   "juguet": "Hijos",
   "imaginarium": "Hijos",
 
-  "veterin": "Perros",
-  "kiwoko": "Perros",
-  "tiendanimal": "Perros",
-  "zooplus": "Perros",
-  "miscota": "Perros",
-  "mascota": "Perros",
+  "veterin": "Mascotas",
+  "kiwoko": "Mascotas",
+  "tiendanimal": "Mascotas",
+  "zooplus": "Mascotas",
+  "miscota": "Mascotas",
+  "mascota": "Mascotas",
 
   "amazon": "Otros",
   "aliexpress": "Otros",

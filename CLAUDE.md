@@ -75,9 +75,10 @@ una categoría, ponle su cerrojo.**
 SpreadsheetML, CSV, xlsx real y BIFF). `detectar_formato()` mira los primeros
 bytes. No lo simplifiques a mirar la extensión.
 
-**Las reglas casan por límite de palabra**, no por subcadena: `dia` no pilla
-MEDIA MARKT, `vida` no pilla NAVIDAD, `bar` no pilla BARCELONA. Hay un caso de
-prueba por trampa.
+**Las reglas casan por inicio de palabra**, no por subcadena: `dia` no pilla
+MEDIA MARKT y `vida` no pilla NAVIDAD. Pero `bar` sí pilla BARCELONA (empieza
+así): por eso la base usa `=bar`, la palabra exacta. Hay un caso de prueba por
+trampa.
 
 **El resumen muestra los gastos en positivo** (es `-suma`). Una categoría que
 acabe a favor sale negativa. No lo "arregles": hubo un `ABS()` que disfrazaba

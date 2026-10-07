@@ -70,6 +70,8 @@ bastante de ti (el colegio, el veterinario, el casero, los dígitos de tu
 tarjeta). Usa  exportar.bat  (Mac: exportar.command; Linux: exportar.sh).
 Genera un ZIP con el programa, la guía y unas reglas de partida genéricas,
 y nada tuyo.
+Con el eledger.exe no hay exportar: pásale el ZIP que descargaste, o el
+enlace de la web.
 
 Qué versión tengo
 -----------------

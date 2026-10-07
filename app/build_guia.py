@@ -600,8 +600,8 @@ story += [Paragraph(
     "las demás reglas, como si la tuya no estuviera. "
     "Usa <font face='Mono' size='8.2'>=</font> siempre que la palabra sea corta "
     "(3-4 letras) o pueda aparecer dentro de otra. Sin ese marcador, "
-    "<font face='Mono' size='8.2'>bar</font> se comería BARCELONA y "
-    "<font face='Mono' size='8.2'>vida</font> se comería NAVIDAD.", S["pmini"])]
+    "<font face='Mono' size='8.2'>bar</font> se comería BARCELONA, que empieza "
+    "igual.", S["pmini"])]
 story += [EE]
 
 story += [h1("Probar una regla sin reprocesar todo"), E]
@@ -1134,7 +1134,9 @@ story += [p(
     "<font face='Mono' size='9'>exportar.sh</font>). Genera un ZIP con el "
     "programa, los lanzadores, esta guía y unas reglas de partida genéricas. Nada "
     "más: no funciona quitando cosas de la carpeta, sino al revés, copiando solo lo "
-    "que está autorizado, para que un fichero nuevo no se cuele por olvido.")]
+    "que está autorizado, para que un fichero nuevo no se cuele por olvido. "
+    "Con el <font face='Mono' size='9'>eledger.exe</font> no hay exportar: pásale el "
+    "ZIP que descargaste, o el enlace de la web.")]
 story += [Spacer(1, 4)]
 story += [Paragraph(
     "Quien lo reciba, al ejecutarlo por primera vez, se creará su propia "
